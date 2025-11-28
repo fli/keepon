@@ -17,8 +17,26 @@ public class AppDelegate: ExpoAppDelegate, EXDevLauncherControllerDelegate {
     print("[keepOn-native] didFinishLaunchingWithOptions")
     initialLaunchOptions = launchOptions
 
-    let window = self.window ?? UIWindow(frame: UIScreen.main.bounds)
-    self.window = window
+    // Ensure a key window exists before Expo subscribers (Dev Launcher) run.
+    if window == nil {
+      if #available(iOS 13.0, *) {
+        if let scene = UIApplication.shared.connectedScenes
+          .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+          let newWindow = UIWindow(windowScene: scene)
+          newWindow.frame = scene.coordinateSpace.bounds
+          window = newWindow
+        } else {
+          window = UIWindow(frame: UIScreen.main.bounds)
+        }
+      } else {
+        window = UIWindow(frame: UIScreen.main.bounds)
+      }
+    }
+
+    guard let window = window else {
+      fatalError("[keepOn-native] Failed to create UIWindow")
+    }
+
     if window.rootViewController == nil {
       let placeholder = UIViewController()
       placeholder.view.backgroundColor = .systemBackground
@@ -32,14 +50,19 @@ public class AppDelegate: ExpoAppDelegate, EXDevLauncherControllerDelegate {
     self.bindReactNativeFactory(factory)
     ReactHost.shared.configure(factory: factory, launchOptions: launchOptions)
 
-    _ = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+#if EXPO_CONFIGURATION_DEBUG
+    // Prepare Dev Launcher and register delegate before Expo subscribers run.
+    EXDevLauncherController.sharedInstance().autoSetupPrepare(self, launchOptions: launchOptions)
+#endif
+
+    let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
 #if !EXPO_CONFIGURATION_DEBUG
     NavigationCoordinator.shared.start(in: window, launchOptions: launchOptions)
     print("[keepOn-native] NavigationCoordinator.start called (release)")
 #endif
 
-    return true
+    return result
   }
 
   // MARK: - EXDevLauncherControllerDelegate
@@ -47,7 +70,16 @@ public class AppDelegate: ExpoAppDelegate, EXDevLauncherControllerDelegate {
     print("[keepOn-native] DevLauncher didStart success=\(success)")
     guard success else { return }
     DispatchQueue.main.async {
-      guard let window = self.window ?? UIApplication.shared.windows.first else { return }
+      let win = self.window
+        ?? UIApplication.shared.connectedScenes
+          .compactMap { $0 as? UIWindowScene }
+          .flatMap { $0.windows }
+          .first { $0.isKeyWindow }
+
+      guard let window = win else {
+        print("[keepOn-native] DevLauncher callback but no key window; cannot start NavigationCoordinator")
+        return
+      }
       NavigationCoordinator.shared.start(in: window, launchOptions: self.initialLaunchOptions)
       print("[keepOn-native] NavigationCoordinator.start re-attached from DevLauncher delegate")
     }
