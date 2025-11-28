@@ -1,7 +1,14 @@
-"use client"
+'use client'
 
 import { useMemo, useState, type ReactNode } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, Text, View, StyleSheet } from 'react-native'
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  StyleSheet,
+} from 'react-native'
 import { Card } from 'app/components/card'
 import { Button } from 'app/components/button'
 import { useAuth } from 'app/provider/auth'
@@ -42,12 +49,7 @@ export function DashboardScreen() {
   const styles = makeStyles(theme)
   const { token } = useAuth()
   const router = useRouter()
-  const {
-    data,
-    isPending,
-    error,
-    refetch,
-  } = useDashboardData()
+  const { data, isPending, error, refetch } = useDashboardData()
   const insets = useSafeArea()
 
   const now = useMemo(() => new Date(), [])
@@ -72,7 +74,10 @@ export function DashboardScreen() {
 
   const infoBoxes = useMemo(() => {
     const boxes: { id: string; label: string; tone: Tone }[] = []
-    if (data?.trainer.trialDaysRemaining && data.trainer.trialDaysRemaining > 0) {
+    if (
+      data?.trainer.trialDaysRemaining &&
+      data.trainer.trialDaysRemaining > 0
+    ) {
       boxes.push({
         id: 'trial',
         label: `${data.trainer.trialDaysRemaining} days left on trial`,
@@ -128,7 +133,10 @@ export function DashboardScreen() {
           },
           {
             title: 'Paid',
-            value: formatCurrency(data.payments.last7Days.paid, data.payments.currency),
+            value: formatCurrency(
+              data.payments.last7Days.paid,
+              data.payments.currency
+            ),
           },
         ],
       },
@@ -145,7 +153,10 @@ export function DashboardScreen() {
           },
           {
             title: 'Paid',
-            value: formatCurrency(data.payments.today.paid, data.payments.currency),
+            value: formatCurrency(
+              data.payments.today.paid,
+              data.payments.currency
+            ),
           },
         ],
       },
@@ -154,7 +165,7 @@ export function DashboardScreen() {
 
   const [paymentFilter, setPaymentFilter] = useState<string>('week')
   const activePaymentFilter =
-    paymentFilters.find(filter => filter.id === paymentFilter) ??
+    paymentFilters.find((filter) => filter.id === paymentFilter) ??
     paymentFilters[0]
 
   const bookingItems: BookingItem[] = useMemo(
@@ -208,18 +219,32 @@ export function DashboardScreen() {
             <View style={{ gap: theme.spacing.sm }}>
               <Text style={styles.cardTitle}>Unable to load data</Text>
               <Text style={styles.cardHint}>
-                {error instanceof Error ? error.message : 'Check your connection and try again.'}
+                {error instanceof Error
+                  ? error.message
+                  : 'Check your connection and try again.'}
               </Text>
-              <Button label="Retry" onPress={() => refetch()} />
+              <Button
+                label="Retry"
+                onPress={() => {
+                  void refetch()
+                }}
+              />
             </View>
           </Card>
         ) : null}
 
         {isPending && !data ? (
           <Card>
-            <View style={{ paddingVertical: theme.spacing.md, alignItems: 'center' }}>
+            <View
+              style={{
+                paddingVertical: theme.spacing.md,
+                alignItems: 'center',
+              }}
+            >
               <ActivityIndicator />
-              <Text style={[styles.cardHint, { marginTop: theme.spacing.sm }]}>Loading dashboard…</Text>
+              <Text style={[styles.cardHint, { marginTop: theme.spacing.sm }]}>
+                Loading dashboard…
+              </Text>
             </View>
           </Card>
         ) : null}
@@ -235,22 +260,26 @@ export function DashboardScreen() {
             <Card style={styles.missionCard}>
               <View style={styles.missionHeader}>
                 <Text style={styles.cardTitle}>Keepon missions</Text>
-                <Text style={styles.cardHint}>Complete these to finish setup.</Text>
+                <Text style={styles.cardHint}>
+                  Complete these to finish setup.
+                </Text>
               </View>
               <View style={styles.missionList}>
                 {data.missions.map((mission) => (
                   <View key={mission.id} style={styles.missionItem}>
                     <View style={styles.missionText}>
                       <Text style={styles.missionTitle}>{mission.title}</Text>
-                      <Text style={styles.missionDetail}>{mission.description}</Text>
+                      <Text style={styles.missionDetail}>
+                        {mission.description}
+                      </Text>
                     </View>
                     <Pressable style={styles.secondaryButton}>
                       <Text style={styles.secondaryButtonLabel}>
                         {mission.rewardClaimed
                           ? 'Reward claimed'
                           : mission.completed
-                            ? 'Claim reward'
-                            : 'View'}
+                          ? 'Claim reward'
+                          : 'View'}
                       </Text>
                     </Pressable>
                   </View>
@@ -294,7 +323,8 @@ export function DashboardScreen() {
                     <Text
                       style={[
                         styles.filterChipLabel,
-                        paymentFilter === filter.id && styles.filterChipLabelActive,
+                        paymentFilter === filter.id &&
+                          styles.filterChipLabelActive,
                       ]}
                     >
                       {filter.label}
@@ -324,7 +354,9 @@ export function DashboardScreen() {
                     )}`
                   : '—'}
               </Text>
-              <Text style={styles.statHint}>Send reminders and collect online.</Text>
+              <Text style={styles.statHint}>
+                Send reminders and collect online.
+              </Text>
             </Card>
             <Card style={styles.statCard}>
               <Text style={styles.statLabel}>Funds to transfer</Text>
@@ -372,7 +404,9 @@ export function DashboardScreen() {
               <Text style={styles.statValue}>
                 {data ? data.subscriptions.activePacks : '—'}
               </Text>
-              <Text style={styles.statHint}>Credit packs with sessions left.</Text>
+              <Text style={styles.statHint}>
+                Credit packs with sessions left.
+              </Text>
             </Card>
           </View>
         </Section>
@@ -398,12 +432,16 @@ export function DashboardScreen() {
               </>
             ) : (
               <>
-                <Text style={styles.appointmentTitle}>No appointments coming up</Text>
+                <Text style={styles.appointmentTitle}>
+                  No appointments coming up
+                </Text>
                 <Text style={styles.appointmentDetail}>
                   Keep your calendar full by adding sessions or availability.
                 </Text>
                 <Pressable style={styles.secondaryButton}>
-                  <Text style={styles.secondaryButtonLabel}>Add appointment</Text>
+                  <Text style={styles.secondaryButtonLabel}>
+                    Add appointment
+                  </Text>
                 </Pressable>
               </>
             )}
@@ -420,7 +458,9 @@ export function DashboardScreen() {
                     <Text style={styles.bookingDetail}>{item.detail}</Text>
                   </View>
                   <Pressable style={styles.secondaryButton}>
-                    <Text style={styles.secondaryButtonLabel}>{item.action}</Text>
+                    <Text style={styles.secondaryButtonLabel}>
+                      {item.action}
+                    </Text>
                   </Pressable>
                 </View>
               ))}
@@ -434,12 +474,12 @@ export function DashboardScreen() {
 
 function handleQuickAction(id: string, router: ReturnType<typeof useRouter>) {
   switch (id) {
-  case 'make-sale':
-    router.push('/sales/make')
-    break
-  default:
-    // Other quick actions will be wired next
-    break
+    case 'make-sale':
+      router.push('/sales/make')
+      break
+    default:
+      // Other quick actions will be wired next
+      break
   }
 }
 
@@ -461,13 +501,20 @@ const formatCurrency = (value: number, currency: string) =>
     maximumFractionDigits: 2,
   }).format(Number.isFinite(value) ? value : 0)
 
-const formatAppointmentTitle = (appointment: NonNullable<DashboardSummary['nextAppointment']>) => {
+const formatAppointmentTitle = (
+  appointment: NonNullable<DashboardSummary['nextAppointment']>
+) => {
   const start = new Date(appointment.startTime)
-  const time = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  const time = start.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
   return `${time} - ${appointment.title}`
 }
 
-const formatAppointmentDetail = (appointment: NonNullable<DashboardSummary['nextAppointment']>) => {
+const formatAppointmentDetail = (
+  appointment: NonNullable<DashboardSummary['nextAppointment']>
+) => {
   const parts = [
     `${appointment.durationMinutes} min`,
     appointment.location ?? appointment.address ?? 'Location TBD',
@@ -487,7 +534,9 @@ function InfoChip({ label, tone }: { label: string; tone: Tone }) {
         { backgroundColor: palette.bg, borderColor: palette.border },
       ]}
     >
-      <Text style={[styles.infoChipLabel, { color: palette.text }]}>{label}</Text>
+      <Text style={[styles.infoChipLabel, { color: palette.text }]}>
+        {label}
+      </Text>
     </View>
   )
 }

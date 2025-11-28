@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { statusOptions, normalizeStatus, statusColors } from 'app/features/clients/shared'
-import type { Client } from 'app/services/api'
 import { loadClientsServer, readSessionFromCookies } from './actions'
 
 export default async function ClientsPage() {

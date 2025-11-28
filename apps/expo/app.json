@@ -18,6 +18,9 @@
     "newArchEnabled": true,
     "experiments": {
       "reactCanary": true
-    }
+    },
+    "plugins": [
+      "./plugins/with-keep-appdelegate"
+    ]
   }
 }

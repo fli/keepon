@@ -1,20 +1,15 @@
 'use client'
 
-import { Provider } from 'app/provider'
+import type { ReactNode } from 'react'
 import type { KeeponSession } from '@keepon/api'
 
-export function AppProviders({
-  children,
-  initialSession = null,
-  enableQuery = true,
-}: {
-  children: React.ReactNode
+type Props = {
+  children: ReactNode
   initialSession?: KeeponSession | null
   enableQuery?: boolean
-}) {
-  return (
-    <Provider initialSession={initialSession} enableQuery={enableQuery}>
-      {children}
-    </Provider>
-  )
+}
+
+// Web app no longer depends on React Native Web providers; keep a lightweight wrapper for future hooks.
+export function AppProviders({ children }: Props) {
+  return <>{children}</>
 }

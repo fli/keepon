@@ -17,13 +17,9 @@ export function Provider({
     <KeyboardControllerProvider>
       <SafeArea>
         <AuthProvider initialSession={initialSession}>
-          {enableQuery ? (
-            <QueryProvider>
-              <NavigationProvider>{children}</NavigationProvider>
-            </QueryProvider>
-          ) : (
-            <NavigationProvider>{children}</NavigationProvider>
-          )}
+          <NavigationProvider>
+            {enableQuery ? <QueryProvider>{children}</QueryProvider> : children}
+          </NavigationProvider>
         </AuthProvider>
       </SafeArea>
     </KeyboardControllerProvider>

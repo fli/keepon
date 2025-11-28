@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { statusColors, normalizeStatus, optionalValue } from 'app/features/clients/shared'
@@ -18,7 +19,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
       <div className="page-shell flex flex-col gap-3">
         <p className="text-sm text-[var(--color-secondaryText)]">Clients</p>
         <h1 className="text-2xl font-semibold">Client not found</h1>
-        <a href="/clients" className="btn btn-secondary text-sm w-fit">Back to clients</a>
+        <Link href="/clients" className="btn btn-secondary text-sm w-fit">Back to clients</Link>
       </div>
     )
   }
@@ -33,7 +34,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
           <h1 className="text-3xl font-semibold leading-tight">{client.firstName} {client.lastName}</h1>
           <p className="text-sm text-[var(--color-secondaryText)]">{client.company || 'Independent client'}</p>
         </div>
-        <a href="/clients" className="btn btn-secondary text-sm">Back</a>
+        <Link href="/clients" className="btn btn-secondary text-sm">Back</Link>
       </div>
 
       <div className="card card-padded flex flex-col gap-4 max-w-3xl">

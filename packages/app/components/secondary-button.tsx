@@ -1,6 +1,6 @@
 'use client'
 
-import { Pressable, Text, StyleProp, StyleSheet } from 'react-native'
+import { Pressable, Text, StyleProp, StyleSheet, type ViewStyle } from 'react-native'
 import { useTheme } from 'app/theme'
 
 export function SecondaryButton({
@@ -19,9 +19,14 @@ export function SecondaryButton({
       accessibilityRole="button"
       onPress={onPress}
       disabled={disabled}
-      style={({ pressed }) =>
-        ([styles.secondaryButton, pressed && styles.itemPressed, disabled && styles.disabled] as StyleProp)
-      }
+      style={({ pressed }) => {
+        const stateStyles: StyleProp<ViewStyle> = [
+          styles.secondaryButton,
+          pressed ? styles.itemPressed : null,
+          disabled ? styles.disabled : null,
+        ]
+        return stateStyles
+      }}
     >
       <Text style={styles.secondaryLabel}>{label}</Text>
     </Pressable>

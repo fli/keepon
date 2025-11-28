@@ -8,8 +8,13 @@ import { createAccount, login, type KeeponSession } from 'app/services/api'
 const SESSION_COOKIE = 'kpSession'
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 28
 
-function persistSession(session: KeeponSession) {
-  const jar = cookies()
+const getFormString = (formData: FormData, key: string, fallback = '') => {
+  const value = formData.get(key)
+  return typeof value === 'string' ? value : fallback
+}
+
+async function persistSession(session: KeeponSession) {
+  const jar = await cookies()
   jar.set(SESSION_COOKIE, encodeURIComponent(JSON.stringify(session)), {
     httpOnly: true,
     sameSite: 'lax',
@@ -21,10 +26,10 @@ function persistSession(session: KeeponSession) {
 
 export async function loginAction(_prev: { error?: string | null }, formData: FormData) {
   try {
-    const email = (formData.get('email') || '').toString().trim()
-    const password = (formData.get('password') || '').toString()
+    const email = getFormString(formData, 'email').trim()
+    const password = getFormString(formData, 'password')
     const session = await login({ email, password })
-    persistSession(session)
+    await persistSession(session)
     redirect('/dashboard')
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unable to sign in'
@@ -34,11 +39,11 @@ export async function loginAction(_prev: { error?: string | null }, formData: Fo
 
 export async function createAccountAction(_prev: { error?: string | null }, formData: FormData) {
   try {
-    const firstName = (formData.get('firstName') || '').toString().trim()
-    const lastName = (formData.get('lastName') || '').toString().trim() || null
-    const email = (formData.get('email') || '').toString().trim()
-    const password = (formData.get('password') || '').toString()
-    const country = (formData.get('country') || 'US').toString().trim().slice(0, 2).toUpperCase()
+    const firstName = getFormString(formData, 'firstName').trim()
+    const lastName = getFormString(formData, 'lastName').trim() || null
+    const email = getFormString(formData, 'email').trim()
+    const password = getFormString(formData, 'password')
+    const country = getFormString(formData, 'country', 'US').trim().slice(0, 2).toUpperCase()
 
     const session = await createAccount({
       firstName,
@@ -52,7 +57,7 @@ export async function createAccountAction(_prev: { error?: string | null }, form
       locale: Intl.DateTimeFormat().resolvedOptions().locale ?? 'en-US',
     })
 
-    persistSession(session)
+    await persistSession(session)
     redirect('/dashboard')
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unable to create account'

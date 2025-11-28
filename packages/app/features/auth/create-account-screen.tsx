@@ -6,6 +6,7 @@ import { Button } from 'app/components/button'
 import { KeyboardAvoidingView } from 'app/components/keyboard-avoiding-view'
 import { TextField } from 'app/components/text-field'
 import { useAuth } from 'app/provider/auth'
+import { useRouter } from 'app/navigation'
 import { createAccount } from 'app/services/api'
 import { useTheme } from 'app/theme'
 
@@ -63,6 +64,7 @@ export function CreateAccountScreen({ onAlreadyHaveAccount }: Props) {
   const { theme } = useTheme()
   const styles = makeStyles(theme)
   const { setSession } = useAuth()
+  const router = useRouter()
 
   const defaultLocale = useMemo(() => safeLocale(), [])
   const defaultTimezone = useMemo(() => safeTimezone(), [])
@@ -165,10 +167,10 @@ export function CreateAccountScreen({ onAlreadyHaveAccount }: Props) {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Button label="Create account" onPress={submit} loading={loading} />
+          <Button label="Create account" onPress={() => void submit()} loading={loading} />
           <Button
             label="I already have an account"
-            onPress={onAlreadyHaveAccount}
+            onPress={onAlreadyHaveAccount ?? (() => router.replace('/auth'))}
             disabled={loading}
             style={styles.secondaryButton}
           />

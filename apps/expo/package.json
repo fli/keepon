@@ -1,9 +1,6 @@
 {
   "dependencies": {
     "@babel/runtime": "^7.28.4",
-    "@react-navigation/bottom-tabs": "^7.8.7",
-    "@react-navigation/native": "^7.1.22",
-    "@react-navigation/native-stack": "^7.8.1",
     "app": "*",
     "expo": "^54.0.16",
     "expo-dev-client": "^6.0.18",

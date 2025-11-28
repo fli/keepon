@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ActivityIndicator, Pressable, ScrollView, Switch, Text, View, StyleProp, StyleSheet } from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, Switch, Text, View, StyleProp, StyleSheet, type ViewStyle } from 'react-native'
 import { useRouter } from 'app/navigation'
 
 import { Button } from 'app/components/button'
@@ -508,13 +508,17 @@ export function MakeSaleScreen() {
           </Text>
         </View>
         <View style={styles.ctaRow}>
-          <Button label={submitLabel} onPress={handleSubmit} disabled={buttonDisabled} loading={submitting} />
+          <Button label={submitLabel} onPress={() => void handleSubmit()} disabled={buttonDisabled} loading={submitting} />
           <Pressable
             accessibilityRole="button"
             onPress={() => router.back()}
-            style={({ pressed }) =>
-              ([styles.outlineButton, pressed && styles.pillPressed] as StyleProp)
-            }
+            style={({ pressed }) => {
+              const stateStyles: StyleProp<ViewStyle> = [
+                styles.outlineButton,
+                pressed ? styles.pillPressed : null,
+              ]
+              return stateStyles
+            }}
           >
             <Text style={styles.outlineLabel}>Cancel</Text>
           </Pressable>
@@ -579,14 +583,15 @@ function ChoicePill({
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) =>
-        ([
+      style={({ pressed }) => {
+        const stateStyles: StyleProp<ViewStyle> = [
           styles.pill,
-          selected && styles.pillSelected,
-          compact && styles.pillCompact,
-          pressed && styles.pillPressed,
-        ] as StyleProp)
-      }
+          selected ? styles.pillSelected : null,
+          compact ? styles.pillCompact : null,
+          pressed ? styles.pillPressed : null,
+        ]
+        return stateStyles
+      }}
     >
       <Text style={[styles.pillLabel, selected ? styles.pillLabelSelected : null]}>{label}</Text>
       {caption ? (

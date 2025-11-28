@@ -6,6 +6,7 @@ import { Button } from 'app/components/button'
 import { KeyboardAvoidingView } from 'app/components/keyboard-avoiding-view'
 import { TextField } from 'app/components/text-field'
 import { useAuth } from 'app/provider/auth'
+import { useRouter } from 'app/navigation'
 import { login } from 'app/services/api'
 import { useTheme } from 'app/theme'
 
@@ -22,6 +23,7 @@ export function LoginScreen({ onCreateAccount }: Props) {
   const { theme } = useTheme()
   const styles = makeStyles(theme)
   const { setSession } = useAuth()
+  const router = useRouter()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -71,10 +73,10 @@ export function LoginScreen({ onCreateAccount }: Props) {
             onChangeText={setPassword}
           />
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Button label="Sign in" onPress={submit} loading={loading} />
+          <Button label="Sign in" onPress={() => void submit()} loading={loading} />
           <Button
             label="Create account"
-            onPress={onCreateAccount}
+            onPress={onCreateAccount ?? (() => router.push('/signup'))}
             disabled={loading}
             style={styles.secondaryButton}
           />

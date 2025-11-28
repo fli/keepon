@@ -100,24 +100,21 @@ export function LegendList<T>({
   const resolvedRenderScrollComponent =
     renderScrollComponent ?? (stickySectionHeadersEnabled ? (props => <Animated.ScrollView {...props} />) : undefined)
 
-  const LegendComponent = LegendListBase as unknown as React.ComponentType<
+  const LegendComponent = LegendListBase as React.ComponentType<
     LegendListProps<LegendListItem<T>>
   >
 
   return (
+    // @ts-expect-error LegendList generic constraints conflict with our flattened item type when using the web shim.
     <LegendComponent
       data={data}
       renderItem={renderLegendItem}
-      keyExtractor={item => item.key}
+      keyExtractor={(item: LegendListItem<T>) => item.key}
       getItemType={getItemType}
       stickyIndices={sticky}
-      estimatedItemSize={(estimatedItemSize ?? 96) as number}
-      ListHeaderComponent={
-        ListHeaderComponent as LegendListProps<LegendListItem<T>>['ListHeaderComponent']
-      }
-      renderScrollComponent={
-        resolvedRenderScrollComponent as LegendListProps<LegendListItem<T>>['renderScrollComponent']
-      }
+      estimatedItemSize={estimatedItemSize ?? 96}
+      ListHeaderComponent={ListHeaderComponent}
+      renderScrollComponent={resolvedRenderScrollComponent}
       {...rest}
     />
   )

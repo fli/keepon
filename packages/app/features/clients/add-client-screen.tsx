@@ -1,13 +1,9 @@
 'use client'
 
-import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
-import { Platform, Pressable, ScrollView, Text, View } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { useCallback, useMemo, useRef } from 'react'
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { StyleSheet } from 'react-native'
 import { useRouter, useSearchParams } from 'app/navigation'
-import type { RootStackParamList } from 'app/navigation/native'
 
 import { SecondaryButton } from 'app/components/secondary-button'
 import { KeyboardAvoidingView } from 'app/components/keyboard-avoiding-view'
@@ -26,7 +22,6 @@ export function AddClientScreen({ createClientAction }: Props) {
   const { theme } = useTheme()
   const styles = makeStyles(theme)
   const router = useRouter()
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'addClient'>>()
   const searchParams = useSearchParams()
   const isIos = Platform.OS === 'ios'
   const formRef = useRef<AddClientFormHandle>(null)
@@ -50,36 +45,6 @@ export function AddClientScreen({ createClientAction }: Props) {
     },
     [router]
   )
-
-  const triggerSave = useCallback(() => {
-    formRef.current?.submit()
-  }, [])
-
-  useLayoutEffect(() => {
-    if (Platform.OS !== 'ios') return
-
-    navigation.setOptions({
-      headerBackVisible: false,
-      unstable_headerLeftItems: ({ tintColor }) => [
-        {
-          type: 'button' as const,
-          label: 'Cancel',
-          accessibilityLabel: 'Cancel add client',
-          tintColor,
-          onPress: handleClose,
-        },
-      ],
-      unstable_headerRightItems: ({ tintColor }) => [
-        {
-          type: 'button' as const,
-          label: 'Save',
-          accessibilityLabel: 'Save client',
-          tintColor,
-          onPress: triggerSave,
-        },
-      ],
-    })
-  }, [handleClose, navigation, triggerSave])
 
   if (isIos) {
     return (

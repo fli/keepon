@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { Platform } from 'react-native'
+import { nativeNavigation } from 'app/navigation/native-module'
 import type { KeeponSession } from '@keepon/api'
 
 type AuthContextValue = {
@@ -146,16 +148,28 @@ export function AuthProvider({ children, initialSession = null }: Props) {
     setReady(true)
   }, [session, ready])
 
+  useEffect(() => {
+    if (Platform.OS === 'ios' && ready) {
+      nativeNavigation.setAuthenticated(Boolean(session))
+    }
+  }, [ready, session])
+
   const setSession = useCallback(async (next: KeeponSession) => {
     setSessionState(next)
     persistSessionStorage(next)
     persistSessionCookie(next)
+    if (Platform.OS === 'ios') {
+      nativeNavigation.setAuthenticated(true)
+    }
   }, [])
 
   const clearSession = useCallback(async () => {
     setSessionState(null)
     clearSessionStorage()
     clearSessionCookie()
+    if (Platform.OS === 'ios') {
+      nativeNavigation.setAuthenticated(false)
+    }
   }, [])
 
   const token = session?.token ?? null

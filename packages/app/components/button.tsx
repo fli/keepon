@@ -1,4 +1,4 @@
-import { Pressable, Text, ActivityIndicator, PressableProps, StyleProp, StyleSheet } from 'react-native'
+import { Pressable, Text, ActivityIndicator, PressableProps, StyleProp, StyleSheet, type ViewStyle } from 'react-native'
 import { useTheme } from 'app/theme'
 
 type Props = PressableProps & {
@@ -8,26 +8,28 @@ type Props = PressableProps & {
 
 export function Button({ label, loading, disabled, style, ...rest }: Props) {
   const { theme } = useTheme()
+  const themedStyles = styles(theme)
   const combinedDisabled = disabled || loading
 
   return (
     <Pressable
       accessibilityRole="button"
-      style={({ pressed }) =>
-        ([
-          styles(theme).base,
-          pressed && styles(theme).pressed,
-          combinedDisabled && styles(theme).disabled,
+      style={({ pressed }) => {
+        const stateStyles: StyleProp<ViewStyle> = [
+          themedStyles.base,
+          pressed ? themedStyles.pressed : null,
+          combinedDisabled ? themedStyles.disabled : null,
           style,
-        ] as StyleProp)
-      }
+        ]
+        return stateStyles
+      }}
       disabled={combinedDisabled}
       {...rest}
     >
       {loading ? (
         <ActivityIndicator color={theme.colors.text} />
       ) : (
-        <Text style={styles(theme).label}>{label}</Text>
+        <Text style={themedStyles.label}>{label}</Text>
       )}
     </Pressable>
   )

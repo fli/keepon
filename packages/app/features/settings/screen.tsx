@@ -35,7 +35,7 @@ export function SettingsScreen() {
       <Card>
         <Text style={styles.cardTitle}>Account</Text>
         <Text style={styles.cardBody}>Manage your Keepon session.</Text>
-        <Button label="Sign out" onPress={handleLogout} loading={loading} disabled={!token} />
+        <Button label="Sign out" onPress={() => void handleLogout()} loading={loading} disabled={!token} />
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </Card>
     </View>

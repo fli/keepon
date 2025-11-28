@@ -38,6 +38,10 @@ declare module 'react-native' {
   const ActivityIndicator: any
   const Animated: any
   const Button: any
+  const AppRegistry: any
+  const NativeModules: Record<string, any>
+  const StyleSheet: { create: <T extends Record<string, any>>(styles: T) => T }
+  function useColorScheme(): 'light' | 'dark' | null
   const Platform: {
     OS: string
     select: <T>(spec: {

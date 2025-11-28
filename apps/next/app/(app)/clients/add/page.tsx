@@ -1,8 +1,19 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 
 import { createClientAction, readSessionFromCookies } from '../actions'
-import { optionalValue, statusOptions, type StatusFilter } from 'app/features/clients/shared'
+import {
+  optionalValue,
+  statusOptions,
+  type StatusFilter,
+  isStatusFilter,
+} from 'app/features/clients/shared'
+
+const getFormString = (formData: FormData, key: string, fallback = '') => {
+  const value = formData.get(key)
+  return typeof value === 'string' ? value : fallback
+}
 
 async function addClient(formData: FormData) {
   'use server'
@@ -12,19 +23,21 @@ async function addClient(formData: FormData) {
     redirect('/auth')
   }
 
-  const firstName = (formData.get('firstName') || '').toString().trim()
+  const firstName = getFormString(formData, 'firstName').trim()
   if (!firstName) {
     throw new Error('First name is required')
   }
 
+  const statusValue = getFormString(formData, 'status')
+
   const payload = {
     firstName,
-    lastName: optionalValue((formData.get('lastName') || '').toString()),
-    email: optionalValue((formData.get('email') || '').toString()),
-    mobileNumber: optionalValue((formData.get('mobileNumber') || '').toString()),
-    otherNumber: optionalValue((formData.get('otherNumber') || '').toString()),
-    company: optionalValue((formData.get('company') || '').toString()),
-    status: (formData.get('status') as StatusFilter | null) ?? 'current',
+    lastName: optionalValue(getFormString(formData, 'lastName')),
+    email: optionalValue(getFormString(formData, 'email')),
+    mobileNumber: optionalValue(getFormString(formData, 'mobileNumber')),
+    otherNumber: optionalValue(getFormString(formData, 'otherNumber')),
+    company: optionalValue(getFormString(formData, 'company')),
+    status: isStatusFilter(statusValue) ? statusValue : ('current' as StatusFilter),
   }
 
   const client = await createClientAction(payload)
@@ -45,9 +58,9 @@ export default async function AddClientPage() {
           <p className="text-sm uppercase tracking-wide text-[var(--color-secondaryText)]">Clients</p>
           <h1 className="text-3xl font-semibold leading-tight">Add client</h1>
         </div>
-        <a className="btn btn-secondary text-sm" href="/clients">
+        <Link className="btn btn-secondary text-sm" href="/clients">
           Cancel
-        </a>
+        </Link>
       </div>
 
       <form action={addClient} className="card card-padded flex flex-col gap-4 max-w-2xl">
@@ -105,9 +118,9 @@ export default async function AddClientPage() {
           <button type="submit" className="btn btn-primary text-sm">
             Save client
           </button>
-          <a className="btn btn-secondary text-sm" href="/clients">
+          <Link className="btn btn-secondary text-sm" href="/clients">
             Cancel
-          </a>
+          </Link>
         </div>
       </form>
     </div>
