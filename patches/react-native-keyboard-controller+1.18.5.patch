@@ -1,0 +1,12 @@
+diff --git a/node_modules/react-native-keyboard-controller/ios/views/KeyboardExtenderContainerView.swift b/node_modules/react-native-keyboard-controller/ios/views/KeyboardExtenderContainerView.swift
+index a91bf30..dc1a310 100644
+--- a/node_modules/react-native-keyboard-controller/ios/views/KeyboardExtenderContainerView.swift
++++ b/node_modules/react-native-keyboard-controller/ios/views/KeyboardExtenderContainerView.swift
+@@ -98,7 +98,6 @@ private class ModernContainerView: BaseContainerView {
+ 
+       visualEffectView = UIVisualEffectView(effect: glassEffect)
+       visualEffectView?.overrideUserInterfaceStyle = isDark ? .dark : .light
+-      visualEffectView?.cornerConfiguration = .capsule()
+ 
+       if let visualEffectView = visualEffectView {
+         visualEffectView.contentView.addSubview(contentView)

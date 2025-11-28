@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "keepon-solito",
+    "slug": "keepon-solito",
+    "version": "1.0.0",
+    "scheme": "keepon-solito",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.keepon.solito"
+    },
+    "android": {
+      "softwareKeyboardLayoutMode": "pan",
+      "package": "com.keepon.solito"
+    },
+    "newArchEnabled": true,
+    "experiments": {
+      "reactCanary": true
+    }
+  }
+}

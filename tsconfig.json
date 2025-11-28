@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strictNullChecks": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "paths": {
+      "app/*": ["./packages/app/*"],
+      "@keepon/db": ["./packages/db/src"],
+      "@keepon/db/*": ["./packages/db/src/*"],
+      "next": ["./apps/next/node_modules/next"],
+      "next/*": ["./apps/next/node_modules/next/*"],
+      "zod": ["./apps/next/node_modules/zod"],
+      "zod/*": ["./apps/next/node_modules/zod/*"],
+      "bignumber.js": ["./apps/next/node_modules/bignumber.js"],
+      "bignumber.js/*": ["./apps/next/node_modules/bignumber.js/*"]
+    },
+    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "types": ["react"]
+  }
+}
