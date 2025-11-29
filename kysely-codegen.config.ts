@@ -3,8 +3,8 @@ import type { Config } from 'kysely-codegen'
 const config: Config = {
   // Load DATABASE_URL from the dedicated codegen environment file.
   envFile: '.env.codegen',
-  // Introspect our Postgres instance and emit tables into the shared DB package.
-  outFile: './packages/db/src/generated.ts',
+  // Introspect our Postgres instance and emit tables into the DB lib.
+  outFile: './src/lib/db/generated.ts',
   dialect: 'postgres',
   url: 'env(DATABASE_URL_CODEGEN)',
   // Keep shared/public schemas unprefixed while allowing non-default schemas like
