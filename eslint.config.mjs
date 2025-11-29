@@ -96,5 +96,6 @@ export default defineConfig([
     '**/dist/**',
     '**/build/**',
     '**/.output/**',
+    'src/lib/db/generated.ts',
   ]),
 ])

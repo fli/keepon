@@ -45,6 +45,8 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.d.ts",
+    "global.d.ts",
+    "kysely-codegen.config.ts",
     "next.config.js",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"

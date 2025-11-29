@@ -17,6 +17,9 @@ importers:
       '@orpc/server':
         specifier: 1.11.3
         version: 1.11.3(@opentelemetry/api@1.9.0)
+      '@orpc/tanstack-query':
+        specifier: 1.11.3
+        version: 1.11.3(@opentelemetry/api@1.9.0)(@orpc/client@1.11.3(@opentelemetry/api@1.9.0))(@tanstack/query-core@5.90.11)
       bignumber.js:
         specifier: ^9.2.1
         version: 9.3.1
@@ -563,6 +566,12 @@ packages:
   '@orpc/standard-server@1.11.3':
     resolution: {integrity: sha512-j61f0TqITURN+5zft3vDjuyHjwTkusx91KrTGxfZ3E6B/dP2SLtoPCvTF8aecozxb5KvyhvAvbuDQMPeyqXvDg==}
 
+  '@orpc/tanstack-query@1.11.3':
+    resolution: {integrity: sha512-oGCoNqQcVs/BH8pCjMQ2UPfuLvXtIkybMlVb3oG7/LKb7KnWPRUvadsCeKNOFGp+8zyrJkUJqkKV2DlHbihW5g==}
+    peerDependencies:
+      '@orpc/client': 1.11.3
+      '@tanstack/query-core': '>=5.80.2'
+
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
 
@@ -659,6 +668,9 @@ packages:
 
   '@tailwindcss/postcss@4.1.17':
     resolution: {integrity: sha512-+nKl9N9mN5uJ+M7dBOOCzINw94MPstNR/GtIhz1fpZysxL/4a+No64jCBD6CPN+bIHWFx3KWuu8XJRrj/572Dw==}
+
+  '@tanstack/query-core@5.90.11':
+    resolution: {integrity: sha512-f9z/nXhCgWDF4lHqgIE30jxLe4sYv15QodfdPDKYAk7nAEjNcndy4dHz3ezhdUaR23BpWa4I2EH4/DZ0//Uf8A==}
 
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
@@ -3082,6 +3094,14 @@ snapshots:
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
+  '@orpc/tanstack-query@1.11.3(@opentelemetry/api@1.9.0)(@orpc/client@1.11.3(@opentelemetry/api@1.9.0))(@tanstack/query-core@5.90.11)':
+    dependencies:
+      '@orpc/client': 1.11.3(@opentelemetry/api@1.9.0)
+      '@orpc/shared': 1.11.3(@opentelemetry/api@1.9.0)
+      '@tanstack/query-core': 5.90.11
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+
   '@rtsao/scc@1.1.0': {}
 
   '@standard-schema/spec@1.0.0': {}
@@ -3158,6 +3178,8 @@ snapshots:
       '@tailwindcss/oxide': 4.1.17
       postcss: 8.5.6
       tailwindcss: 4.1.17
+
+  '@tanstack/query-core@5.90.11': {}
 
   '@tybys/wasm-util@0.10.1':
     dependencies:
