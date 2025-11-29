@@ -1,6 +1,6 @@
-import { LegendList as LegendListBase, type LegendListProps } from '@legendapp/list'
+import { LegendList as LegendListBase, type LegendListProps, type LegendListRef } from '@legendapp/list'
 import { Animated, Text, View, StyleSheet } from 'react-native'
-import { type ReactElement, useCallback, useMemo } from 'react'
+import React, { type ReactElement, useCallback, useMemo } from 'react'
 import { useTheme } from 'app/theme'
 
 export type LegendSection<T> = { title: string; data: T[] }
@@ -29,6 +29,7 @@ type Props<T> = Omit<LegendListProps<LegendListItem<T>>, 'data' | 'renderItem' |
   renderItem: RenderItem<T>
   keyExtractor?: (item: T, index: number) => string
   stickySectionHeadersEnabled?: boolean
+  listRef?: React.Ref<LegendListRef>
 }
 
 export function LegendList<T>({
@@ -39,6 +40,7 @@ export function LegendList<T>({
   ListHeaderComponent,
   estimatedItemSize,
   renderScrollComponent,
+  listRef,
   ...rest
 }: Props<T>) {
   const { theme } = useTheme()
@@ -107,6 +109,7 @@ export function LegendList<T>({
   return (
     // @ts-expect-error LegendList generic constraints conflict with our flattened item type when using the web shim.
     <LegendComponent
+      ref={listRef as React.Ref<LegendListRef>}
       data={data}
       renderItem={renderLegendItem}
       keyExtractor={(item: LegendListItem<T>) => item.key}

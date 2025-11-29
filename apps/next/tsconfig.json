@@ -29,6 +29,10 @@
     ],
     "baseUrl": ".",
     "paths": {
+      "@/*": ["./*"],
+      "@/components/*": ["./components/*"],
+      "@/lib/*": ["./lib/*"],
+      "@/server/*": ["./server/*"],
       "app/*": [
         "../../packages/app/*"
       ]
@@ -40,9 +44,7 @@
     "**/*.ts",
     "**/*.tsx",
     "**/*.d.ts",
-    "next.config.js",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    "next.config.js"
   ],
   "exclude": [
     "node_modules"

@@ -1,7 +1,10 @@
-import { KeyboardAvoidingView as RNKeyboardAvoidingView } from 'react-native-keyboard-controller'
+import React from 'react'
 
-export type KeyboardAvoidingViewProps = React.ComponentProps<typeof RNKeyboardAvoidingView>
+type Props = {
+  children?: React.ReactNode
+  style?: unknown
+}
 
-export function KeyboardAvoidingView(props: KeyboardAvoidingViewProps) {
-  return <RNKeyboardAvoidingView {...props} />
+export function KeyboardAvoidingView({ children }: Props) {
+  return <>{children}</>
 }

@@ -17,4 +17,6 @@ export {
   type Client,
   createClient,
   type CreateClientPayload,
+  fetchServices,
+  type ServiceProduct,
 } from '@keepon/api'

@@ -137,6 +137,13 @@ export default defineConfig([
     },
   },
   ...scopedNext,
+  {
+    name: 'keepon-solito/next-app-router-rules',
+    files: ['apps/next/**/*.{js,jsx,ts,tsx,mjs,cts,mts}'],
+    rules: {
+      '@next/next/no-html-link-for-pages': 'off',
+    },
+  },
   ...scopedExpo,
   {
     name: 'keepon-solito/react-compiler',

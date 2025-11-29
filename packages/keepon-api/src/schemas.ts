@@ -50,6 +50,11 @@ export const productSchema = z.object({
   durationMinutes: z.number().int().nullable().optional(),
   totalCredits: z.number().int().nullable().optional(),
   description: z.string().nullable().optional(),
+  bookableOnline: z.boolean().optional(),
+})
+
+export const serviceProductSchema = productSchema.extend({
+  bookableOnline: z.boolean(),
 })
 
 export const saleSchema = z.object({
@@ -161,6 +166,7 @@ export type LoginResponse = z.infer<typeof loginResponseSchema>
 export type Trainer = z.infer<typeof trainerSchema>
 export type Client = z.infer<typeof clientSchema>
 export type Product = z.infer<typeof productSchema>
+export type ServiceProduct = z.infer<typeof serviceProductSchema>
 export type Sale = z.infer<typeof saleSchema>
 export type SaleProduct = z.infer<typeof saleProductSchema>
 export type SalePayment = z.infer<typeof salePaymentSchema>

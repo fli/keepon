@@ -9,8 +9,13 @@
     "moduleResolution": "bundler",
     "paths": {
       "app/*": ["./packages/app/*"],
+      "@/*": ["./apps/next/*"],
+      "@/app/*": ["./apps/next/app/*"],
+      "@/components/*": ["./apps/next/components/*"],
+      "@/lib/*": ["./apps/next/lib/*"],
       "@keepon/db": ["./packages/db/src"],
       "@keepon/db/*": ["./packages/db/src/*"],
+      "@/server/*": ["./apps/next/server/*"],
       "next": ["./apps/next/node_modules/next"],
       "next/*": ["./apps/next/node_modules/next/*"],
       "zod": ["./apps/next/node_modules/zod"],

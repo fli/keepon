@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { db } from '@keepon/db'
 import {
   authenticateTrainerOrClientRequest,
   buildErrorResponse,
 } from '../../_lib/accessToken'
+import { logout } from '@/server/auth'
 
 export const runtime = 'nodejs'
 
@@ -20,10 +20,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await db
-      .deleteFrom('access_token')
-      .where('id', '=', authorization.accessToken)
-      .execute()
+    await logout(authorization.accessToken)
 
     return new Response(null, { status: 204 })
   } catch (error) {

@@ -3,6 +3,15 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+import {
+  NavigationMenu,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+} from '@/components/ui/navigation-menu'
+import { PageContainer } from './page-container'
+import { KeeponLogo } from './keepon-logo'
+
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard' },
   { label: 'Calendar', href: '/calendar' },
@@ -22,46 +31,36 @@ export function WebTopNav() {
   const pathname = usePathname()
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-surface)]/95 backdrop-blur supports-[backdrop-filter]:backdrop-blur-lg">
-      <div className="page-shell flex items-center gap-6 py-3">
-        <div className="flex items-baseline gap-2 text-[var(--color-text)]">
-          <span className="text-lg font-semibold">Keepon</span>
-          <span className="text-sm text-[var(--color-secondaryText)]">
-            Coach tools
-          </span>
-        </div>
+    <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
+      <PageContainer className="flex items-center gap-6 py-3">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 text-foreground transition hover:opacity-90"
+        >
+          <KeeponLogo className="h-6 w-auto" aria-hidden />
+          <span className="sr-only">Keepon home</span>
+        </Link>
 
-        <nav className="flex flex-1 flex-wrap items-center gap-2 text-sm font-medium">
-          {NAV_ITEMS.map((item) => {
-            const active = isActive(pathname, item.href)
-            const classes = [
-              'rounded-full px-3 py-2 transition-colors',
-              active
-                ? 'bg-[var(--color-background)] text-[var(--color-text)] shadow-sm'
-                : 'text-[var(--color-secondaryText)] hover:text-[var(--color-text)]',
-            ]
-              .filter(Boolean)
-              .join(' ')
+        <NavigationMenu className="flex-1">
+          <NavigationMenuList className="flex-1">
+            {NAV_ITEMS.map((item) => {
+              const active = isActive(pathname, item.href)
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={classes}
-                aria-current={active ? 'page' : undefined}
-              >
-                {item.label}
-              </Link>
-            )
-          })}
-        </nav>
-
-        <div className="flex items-center gap-2">
-          <Link href="/sales/make" className="btn btn-primary text-sm">
-            Make sale
-          </Link>
-        </div>
-      </div>
+              return (
+                <NavigationMenuItem key={item.href}>
+                  <NavigationMenuLink
+                    active={active}
+                    aria-current={active ? 'page' : undefined}
+                    render={<Link href={item.href} />}
+                  >
+                    {item.label}
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              )
+            })}
+          </NavigationMenuList>
+        </NavigationMenu>
+      </PageContainer>
     </header>
   )
 }

@@ -240,6 +240,65 @@ export const authenticateTrainerRequest = async (
   }
 }
 
+export async function validateTrainerToken(
+  accessToken: string,
+  options: AuthenticateTrainerOptions = {}
+): Promise<{ trainerId: string; userId: string; accessToken: string }> {
+  const authRow = await db
+    .selectFrom('access_token')
+    .innerJoin(
+      'vw_legacy_trainer',
+      'vw_legacy_trainer.member_id',
+      'access_token.user_id'
+    )
+    .select(({ ref }) => [
+      ref('access_token.id').as('accessToken'),
+      ref('access_token.user_id').as('userId'),
+      ref('vw_legacy_trainer.id').as('trainerId'),
+      ref('access_token.expires_at').as('expiresAt'),
+    ])
+    .where('access_token.id', '=', accessToken)
+    .executeTakeFirst()
+
+  const parsed = authRow ? authRowSchema.safeParse(authRow) : null
+
+  if (!parsed?.success) {
+    throw new Error('invalid-access-token')
+  }
+
+  if (parsed.data.expiresAt.getTime() < Date.now()) {
+    throw new Error('expired-access-token')
+  }
+
+  if (!parsed.data.trainerId) {
+    throw new Error('invalid-access-token')
+  }
+
+  try {
+    await db
+      .updateTable('access_token')
+      .set({
+        expires_at: new Date(
+          Date.now() + TRAINER_ACCESS_TOKEN_EXTENSION_MS
+        ),
+      })
+      .where('id', '=', parsed.data.accessToken)
+      .execute()
+  } catch (error) {
+    console.error(
+      options.extensionFailureLogMessage ??
+        'Failed to extend trainer access token',
+      error
+    )
+  }
+
+  return {
+    trainerId: parsed.data.trainerId,
+    userId: parsed.data.userId,
+    accessToken: parsed.data.accessToken,
+  }
+}
+
 type AuthenticateClientOptions = {
   extensionFailureLogMessage?: string
 }

@@ -1,22 +1,17 @@
-"use client"
+'use client'
 
-import { useMemo } from 'react'
+import React from 'react'
 import { useQuery } from '@tanstack/react-query'
-
 import { useAuth } from 'app/provider/auth'
-import { fetchClients, type Client, type CreateClientPayload } from 'app/services/api'
-import { ClientsContent } from './content'
+import { fetchClients, type Client } from 'app/services/api'
+// Explicitly import the iOS-only implementation to avoid accidental resolution to shared/web variants.
+import { ClientsContent } from './content.ios'
 
-type Props = {
-  initialClients?: Client[] | null
-  createClientAction?: (payload: CreateClientPayload) => Promise<Client>
-}
-
-export function ClientsScreen(_props: Props) {
+export function ClientsScreen() {
   const auth = useAuth()
 
   const {
-    data,
+    data: clients = [],
     isPending,
     isFetching,
     error,
@@ -24,16 +19,17 @@ export function ClientsScreen(_props: Props) {
   } = useQuery<Client[], Error>({
     queryKey: ['clients', auth.session?.trainerId],
     enabled: auth.ready && Boolean(auth.session),
-    queryFn: () => (auth.session ? fetchClients(auth.session) : Promise.resolve([])),
-    staleTime: 30_000,
+    queryFn: async () => {
+      if (!auth.session) return []
+      return fetchClients(auth.session)
+    },
+    staleTime: 10_000,
   })
-
-  const clients = useMemo(() => data ?? [], [data])
 
   return (
     <ClientsContent
       clients={clients}
-      isPending={isPending && clients.length === 0}
+      isPending={isPending}
       isFetching={isFetching}
       error={error ?? null}
       onRetry={() => void refetch()}
@@ -41,5 +37,3 @@ export function ClientsScreen(_props: Props) {
     />
   )
 }
-
-export { ClientDetailCard } from './client-detail-card'

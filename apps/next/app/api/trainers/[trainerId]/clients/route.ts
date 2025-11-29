@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import { db, type Point, type Selectable, type VwLegacyClient } from '@keepon/db'
 import { z } from 'zod'
 import {
   authenticateTrainerRequest,
   buildErrorResponse,
 } from '../../../_lib/accessToken'
-import { adaptClientRow, clientListSchema } from '../../../clients/shared'
+import {
+  createClientForTrainer,
+  createClientSchema,
+  listClientsForTrainer,
+} from '@/server/clients'
+import { clientListSchema } from '../../../clients/shared'
 
 export const runtime = 'nodejs'
 
@@ -17,34 +21,6 @@ type TrainerRouteContext = { params?: Promise<{ trainerId?: string }> }
 
 const querySchema = z.object({
   sessionId: z.string().uuid().optional(),
-})
-
-const nullableTrimmedString = z
-  .string()
-  .trim()
-  .transform(value => (value.length === 0 ? null : value))
-  .optional()
-
-const createClientSchema = z.object({
-  firstName: z
-    .string()
-    .trim()
-    .min(1, 'First name is required'),
-  lastName: nullableTrimmedString,
-  email: nullableTrimmedString,
-  mobileNumber: nullableTrimmedString,
-  otherNumber: nullableTrimmedString,
-  status: z.enum(['current', 'lead', 'past']).default('current'),
-  company: nullableTrimmedString,
-  location: nullableTrimmedString,
-  address: nullableTrimmedString,
-  googlePlaceId: nullableTrimmedString,
-  geo: z
-    .object({
-      lat: z.number(),
-      lng: z.number(),
-    })
-    .optional(),
 })
 
 const createClientsSchema = z.union([createClientSchema, z.array(createClientSchema)])
@@ -129,28 +105,7 @@ export async function GET(request: Request, context: TrainerRouteContext) {
   const { sessionId } = queryResult.data
 
   try {
-    let clientQuery = db
-      .selectFrom('vw_legacy_client as client')
-      .selectAll('client')
-      .where('client.trainerId', '=', auth.trainerId)
-
-    if (sessionId) {
-      const sessionClients = db
-        .selectFrom('client_session')
-        .select('client_session.client_id')
-        .where('client_session.session_id', '=', sessionId)
-        .as('session_clients')
-
-      clientQuery = clientQuery.innerJoin(
-        sessionClients,
-        'session_clients.client_id',
-        'client.id'
-      )
-    }
-
-    const clientRows = await clientQuery.execute()
-    const clients = clientListSchema.parse(clientRows.map(adaptClientRow))
-
+    const clients = await listClientsForTrainer(auth.trainerId, sessionId)
     return NextResponse.json(clients)
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -231,62 +186,11 @@ export async function POST(request: Request, context: TrainerRouteContext) {
   const payloads = Array.isArray(parsedBody) ? parsedBody : [parsedBody]
 
   try {
-    const created: Selectable<VwLegacyClient>[] = await db.transaction().execute(async trx => {
-      const userRows = await trx
-        .insertInto('user_')
-        .values(payloads.map(() => ({ type: 'client' })))
-        .returning('id')
-        .execute()
+    const created = await Promise.all(
+      payloads.map(payload => createClientForTrainer(auth.trainerId, payload))
+    )
 
-      if (userRows.length !== payloads.length) {
-        throw new Error('Failed to create user records for clients')
-      }
-
-      const clientRows = await trx
-        .insertInto('client')
-        .values(
-          payloads.map((client, idx) => {
-            const geo: Point | null = client.geo
-              ? { x: client.geo.lat, y: client.geo.lng }
-              : null
-
-            return {
-              user_id: userRows[idx]?.id ?? '',
-              user_type: 'client',
-              trainer_id: auth.trainerId,
-              first_name: client.firstName,
-              last_name: client.lastName ?? null,
-              email: client.email ?? null,
-              mobile_number: client.mobileNumber ?? null,
-              other_number: client.otherNumber ?? null,
-              status: client.status,
-              company: client.company ?? null,
-              location: client.location ?? null,
-              address: client.address ?? null,
-              google_place_id: client.googlePlaceId ?? null,
-              geo,
-            }
-          })
-        )
-        .returning('id')
-        .execute()
-
-      if (clientRows.length !== payloads.length) {
-        throw new Error('Failed to create client records')
-      }
-
-      const ids = clientRows.map(row => row.id)
-
-      const newClients = await trx
-        .selectFrom('vw_legacy_client')
-        .selectAll()
-        .where('id', 'in', ids)
-        .execute()
-
-      return newClients
-    })
-
-    const parsed = clientListSchema.parse(created.map(adaptClientRow))
+    const parsed = clientListSchema.parse(created)
 
     return NextResponse.json(Array.isArray(parsedBody) ? parsed : parsed[0])
   } catch (error) {

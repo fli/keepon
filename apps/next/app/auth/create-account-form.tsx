@@ -3,6 +3,11 @@
 import { useActionState } from 'react'
 import Link from 'next/link'
 
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+
 import { createAccountAction } from './actions'
 
 const initialState = { error: null as string | null }
@@ -11,42 +16,55 @@ export function CreateAccountForm() {
   const [state, formAction, pending] = useActionState(createAccountAction, initialState)
 
   return (
-    <form action={formAction} className="card card-padded flex w-full max-w-xl flex-col gap-3">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm font-medium text-[var(--color-text)]">
-          First name
-          <input name="firstName" required className="input" autoComplete="given-name" />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium text-[var(--color-text)]">
-          Last name
-          <input name="lastName" className="input" autoComplete="family-name" />
-        </label>
-      </div>
+    <Card className="w-full max-w-xl">
+      <form action={formAction} className="space-y-4">
+        <CardHeader>
+          <CardTitle>Create account</CardTitle>
+          <CardDescription>We keep your session in a secure cookie after signup.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First name</Label>
+              <Input id="firstName" name="firstName" required autoComplete="given-name" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last name</Label>
+              <Input id="lastName" name="lastName" autoComplete="family-name" />
+            </div>
+          </div>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-[var(--color-text)]">
-        Email
-        <input name="email" type="email" required className="input" autoComplete="email" />
-      </label>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" name="email" type="email" required autoComplete="email" />
+          </div>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-[var(--color-text)]">
-        Password
-        <input name="password" type="password" required className="input" autoComplete="new-password" />
-      </label>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input id="password" name="password" type="password" required autoComplete="new-password" />
+          </div>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-[var(--color-text)]">
-        Country (2-letter)
-        <input name="country" defaultValue="US" className="input" autoComplete="country" maxLength={2} />
-      </label>
+          <div className="space-y-2">
+            <Label htmlFor="country">Country (2-letter)</Label>
+            <Input id="country" name="country" defaultValue="US" autoComplete="country" maxLength={2} />
+          </div>
 
-      {state.error ? <p className="text-sm text-[var(--color-danger)]">{state.error}</p> : null}
+          {state.error ? (
+            <p className="text-sm text-destructive">{state.error}</p>
+          ) : null}
 
-      <button type="submit" className="btn btn-primary" disabled={pending}>
-        {pending ? 'Creating…' : 'Create account'}
-      </button>
+          <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? 'Creating…' : 'Create account'}
+          </Button>
 
-      <p className="text-sm text-[var(--color-secondaryText)]">
-        Already have an account? <Link href="/auth" className="underline">Sign in</Link>
-      </p>
-    </form>
+          <p className="text-sm text-muted-foreground">
+            Already have an account?{' '}
+            <Link href="/auth" className="font-medium text-foreground underline underline-offset-4">
+              Sign in
+            </Link>
+          </p>
+        </CardContent>
+      </form>
+    </Card>
   )
 }

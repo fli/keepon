@@ -4,6 +4,10 @@ import { useActionState } from 'react'
 import Link from 'next/link'
 
 import { loginAction } from './actions'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 const initialState = { error: null as string | null }
 
@@ -11,26 +15,45 @@ export function LoginForm() {
   const [state, formAction, pending] = useActionState(loginAction, initialState)
 
   return (
-    <form action={formAction} className="card card-padded flex w-full max-w-md flex-col gap-3">
-      <label className="flex flex-col gap-1 text-sm font-medium text-[var(--color-text)]">
-        Email
-        <input name="email" type="email" required className="input" autoComplete="email" />
-      </label>
+    <Card className="w-full max-w-md">
+      <form action={formAction} className="space-y-4">
+        <CardHeader>
+          <CardTitle>Sign in</CardTitle>
+          <CardDescription>Access your coaching workspace from the web.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" name="email" type="email" required autoComplete="email" />
+          </div>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-[var(--color-text)]">
-        Password
-        <input name="password" type="password" required className="input" autoComplete="current-password" />
-      </label>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              required
+              autoComplete="current-password"
+            />
+          </div>
 
-      {state.error ? <p className="text-sm text-[var(--color-danger)]">{state.error}</p> : null}
+          {state.error ? (
+            <p className="text-sm text-destructive">{state.error}</p>
+          ) : null}
 
-      <button type="submit" className="btn btn-primary" disabled={pending}>
-        {pending ? 'Signing in…' : 'Sign in'}
-      </button>
+          <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? 'Signing in…' : 'Sign in'}
+          </Button>
 
-      <p className="text-sm text-[var(--color-secondaryText)]">
-        New to Keepon? <Link href="/auth/create" className="underline">Create an account</Link>
-      </p>
-    </form>
+          <p className="text-sm text-muted-foreground">
+            New to Keepon?{' '}
+            <Link href="/auth/create" className="font-medium text-foreground underline underline-offset-4">
+              Create an account
+            </Link>
+          </p>
+        </CardContent>
+      </form>
+    </Card>
   )
 }

@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 
+import { Card, CardContent } from '@/components/ui/card'
+import { PageContainer } from '@/components/page-container'
 import { readSessionFromCookies } from '../../../session.server'
 
 export default async function UserPage({ params }: { params: Promise<{ userId: string }> }) {
@@ -10,10 +12,14 @@ export default async function UserPage({ params }: { params: Promise<{ userId: s
   }
 
   return (
-    <div className="page-shell flex flex-col gap-3">
-      <p className="text-sm text-[var(--color-secondaryText)]">User</p>
+    <PageContainer className="flex flex-col gap-3 py-8">
+      <p className="text-sm uppercase tracking-wide text-muted-foreground">User</p>
       <h1 className="text-3xl font-semibold">User {userId}</h1>
-      <p className="text-sm text-[var(--color-secondaryText)]">This route now renders on the server.</p>
-    </div>
+      <Card>
+        <CardContent className="py-4 text-sm text-muted-foreground">
+          This route now renders on the server.
+        </CardContent>
+      </Card>
+    </PageContainer>
   )
 }

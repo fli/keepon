@@ -3,6 +3,7 @@ import { z } from 'zod'
 import {
   clientSchema,
   productSchema,
+  serviceProductSchema,
   salePaymentSchema,
   saleProductSchema,
   saleSchema,
@@ -13,8 +14,9 @@ import {
   type SessionSeries,
   type Client,
   type Product,
-  type SalePayment,
   type SaleProduct,
+  type SalePayment,
+  type ServiceProduct,
 } from './schemas'
 
 export type KeeponSession = {
@@ -173,7 +175,6 @@ export async function logout(session: KeeponSession): Promise<void> {
 export async function fetchClients(session: KeeponSession): Promise<Client[]> {
   const json = await orpcClient.clients.list({
     token: session.token,
-    trainerId: session.trainerId,
   })
   return z.array(clientSchema).parse(json ?? [])
 }
@@ -217,7 +218,6 @@ export async function createClient(payload: CreateClientPayload, session: Keepon
 
   const json = await orpcClient.clients.create({
     token: session.token,
-    trainerId: session.trainerId,
     ...body,
   })
 
@@ -229,10 +229,14 @@ export async function fetchProducts(session: KeeponSession): Promise<Product[]> 
   return z.array(productSchema).parse(json ?? [])
 }
 
+export async function fetchServices(session: KeeponSession): Promise<ServiceProduct[]> {
+  const json = await orpcClient.services.list({ token: session.token })
+  return z.array(serviceProductSchema).parse(json ?? [])
+}
+
 export async function createSale(payload: CreateSalePayload, session: KeeponSession): Promise<string> {
   const json = await orpcClient.sales.create({
     token: session.token,
-    trainerId: session.trainerId,
     ...payload,
   })
   const parsed = saleSchema.pick({ id: true }).parse(json)
@@ -316,7 +320,7 @@ export function formatPrice(value: number | string): string {
   return numeric.toFixed(2)
 }
 
-export type { Client, Product, SalePayment, SaleProduct }
+export type { Client, Product, ServiceProduct, SalePayment, SaleProduct }
 export type { SessionSeries, Session, ClientSession }
 
 const isReactNative = () =>

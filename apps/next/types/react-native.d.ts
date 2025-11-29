@@ -39,6 +39,8 @@ declare module 'react-native' {
     onChangeText?: (text: string) => void
     keyboardType?: string
     autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters'
+    autoCorrect?: any
+    returnKeyType?: string
     secureTextEntry?: boolean
     multiline?: boolean
     numberOfLines?: number
@@ -63,6 +65,15 @@ declare module 'react-native' {
   export const ScrollView: React.ComponentType<ScrollViewProps>
   export const Pressable: React.ComponentType<PressableProps>
   export const Switch: React.ComponentType<{ value?: boolean; onValueChange?: (value: boolean) => void; style?: StyleProp }>
+  export const RefreshControl: React.ComponentType<{
+    refreshing: boolean
+    onRefresh: () => void
+    tintColor?: string
+  }>
+  export type AlertHandler = (title: string, message?: string) => void
+  export const Alert: {
+    alert: AlertHandler
+  }
   export const Linking: { openURL: (url: string) => Promise<void> }
   export const KeyboardAvoidingView: React.ComponentType<ViewProps>
   export const ActivityIndicator: React.ComponentType<ViewProps>

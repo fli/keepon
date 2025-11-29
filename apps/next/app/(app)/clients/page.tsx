@@ -1,8 +1,13 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
-import { statusOptions, normalizeStatus, statusColors } from 'app/features/clients/shared'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { PageContainer } from '@/components/page-container'
 import { loadClientsServer, readSessionFromCookies } from './actions'
+import { ClientsGrid } from './clients-grid'
+import { ImportClientsButton } from './import-button'
 
 export default async function ClientsPage() {
   const session = await readSessionFromCookies()
@@ -11,66 +16,67 @@ export default async function ClientsPage() {
   }
 
   const clients = (await loadClientsServer()) ?? []
-  const counts = clients.reduce<Record<string, number>>((acc, client) => {
-    const key = normalizeStatus(client.status)
-    acc[key] = (acc[key] ?? 0) + 1
-    return acc
-  }, {})
 
   return (
-    <div className="page-shell flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <p className="text-sm uppercase tracking-wide text-[var(--color-secondaryText)]">Clients</p>
-        <h1 className="text-3xl font-semibold leading-tight">Your roster</h1>
-        <p className="text-sm text-[var(--color-secondaryText)]">
-          Segment by status and open details without leaving the web app.
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link href="/clients/add" className="btn btn-primary text-sm">
-            Add client
-          </Link>
-          <div className="flex flex-wrap gap-2 text-xs text-[var(--color-secondaryText)]">
-            {statusOptions.map(option => (
-              <span key={option.id} className="pill" style={{ color: statusColors[option.id] }}>
-                {option.label}: {counts[option.id] ?? 0}
-              </span>
-            ))}
+    <PageContainer className="flex flex-col gap-6 py-8">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-3xl font-semibold leading-tight">Clients</h1>
+          <div className="flex items-center gap-2">
+            <ImportClientsButton />
+            <Button size="sm" render={<Link href="/clients/add" />}>
+              Add client
+            </Button>
           </div>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {clients.length === 0 ? (
-          <div className="card card-padded sm:col-span-2 lg:col-span-3">
-            <p className="text-lg font-semibold">No clients yet</p>
-            <p className="text-sm text-[var(--color-secondaryText)] mt-2">
-              Add clients to start scheduling and billing.
-            </p>
-          </div>
-        ) : null}
+      <Suspense
+        fallback={
+          <ClientsGridSkeleton />
+        }
+      >
+        <ClientsGrid clients={clients} />
+      </Suspense>
+    </PageContainer>
+  )
+}
 
-        {clients.map(client => (
-          <Link key={client.id} href={`/clients/${client.id}`} className="card card-padded flex flex-col gap-2 hover:translate-y-[-2px] transition-transform">
-            <div className="flex items-center gap-3">
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold"
-                style={{ backgroundColor: statusColors[normalizeStatus(client.status)] || '#e5e7eb' }}
-              >
-                {(client.firstName || client.lastName || '?').charAt(0)}
+function ClientsGridSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Skeleton className="h-9 w-32" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 w-24" />
+          <Skeleton className="h-9 w-16" />
+          <Skeleton className="h-9 w-16" />
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-border shadow-sm">
+        <div className="grid grid-cols-5 gap-3 bg-muted/50 px-4 py-3">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <Skeleton key={`header-${index}`} className="h-4 w-20" />
+          ))}
+        </div>
+        <div className="divide-y divide-border bg-background">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={`row-${index}`} className="grid grid-cols-5 items-center gap-3 px-4 py-4">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-full" />
+                <div className="flex flex-col gap-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
               </div>
-              <div className="flex flex-col gap-1 min-w-0">
-                <p className="truncate font-semibold">{client.firstName} {client.lastName}</p>
-                <p className="text-sm text-[var(--color-secondaryText)] truncate">{client.email || 'No email'}</p>
-              </div>
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-20" />
             </div>
-            <div className="flex items-center gap-2 text-xs text-[var(--color-secondaryText)]">
-              <span className="pill" style={{ color: statusColors[normalizeStatus(client.status)] }}>
-                {statusOptions.find(o => o.id === normalizeStatus(client.status))?.label ?? 'Current'}
-              </span>
-              {client.company ? <span className="pill text-[var(--color-secondaryText)]">{client.company}</span> : null}
-            </div>
-          </Link>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   )

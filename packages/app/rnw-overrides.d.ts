@@ -38,6 +38,7 @@ declare module 'react-native' {
   const ActivityIndicator: any
   const Animated: any
   const Button: any
+  const RefreshControl: any
   const AppRegistry: any
   const NativeModules: Record<string, any>
   const StyleSheet: { create: <T extends Record<string, any>>(styles: T) => T }

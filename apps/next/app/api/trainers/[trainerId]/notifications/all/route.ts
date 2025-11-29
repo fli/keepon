@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { db } from '@keepon/db'
 import { ZodError } from 'zod'
 import {
   authenticateTrainerRequest,
   buildErrorResponse,
 } from '../../../../_lib/accessToken'
-import { parseNotificationRows, paramsSchema, RawNotificationRow } from '../_shared'
+import { paramsSchema } from '../_shared'
+import { listTrainerNotifications } from '@/server/notifications'
 
 export const runtime = 'nodejs'
 
@@ -55,31 +55,10 @@ export async function GET(request: Request, context: ParamsContext) {
   }
 
   try {
-    const rows = await db
-      .selectFrom('vw_legacy_app_notification')
-      .select(({ ref }) => [
-        ref('vw_legacy_app_notification.id').as('id'),
-        ref('vw_legacy_app_notification.user_id').as('userId'),
-        ref('vw_legacy_app_notification.alert').as('alert'),
-        ref('vw_legacy_app_notification.created').as('created'),
-        ref('vw_legacy_app_notification.viewed').as('viewed'),
-        ref('vw_legacy_app_notification.model_name').as('modelName'),
-        ref('vw_legacy_app_notification.model_id').as('modelId'),
-        ref('vw_legacy_app_notification.expiration_interval').as(
-          'expirationInterval'
-        ),
-        ref('vw_legacy_app_notification.notification_type').as(
-          'notificationType'
-        ),
-        ref('vw_legacy_app_notification.client_id').as('clientId'),
-        ref('vw_legacy_app_notification.message_type').as('messageType'),
-        ref('vw_legacy_app_notification.category').as('category'),
-      ])
-      .where('vw_legacy_app_notification.user_id', '=', authorization.userId)
-      .orderBy('vw_legacy_app_notification.created', 'desc')
-      .execute() as RawNotificationRow[]
-
-    const notifications = parseNotificationRows(rows)
+    const notifications = await listTrainerNotifications(
+      authorization.trainerId,
+      authorization.userId
+    )
 
     return NextResponse.json(notifications)
   } catch (error) {

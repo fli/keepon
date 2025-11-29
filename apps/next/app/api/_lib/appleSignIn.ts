@@ -78,10 +78,8 @@ const base64UrlToUint8Array = (value: string): Uint8Array<ArrayBuffer> => {
   const paddingNeeded = (4 - (normalized.length % 4)) % 4
   const padded = normalized + '='.repeat(paddingNeeded)
   const buffer = Buffer.from(padded, 'base64')
-  const slice = buffer.buffer.slice(
-    buffer.byteOffset,
-    buffer.byteOffset + buffer.byteLength
-  )
+  const backing = buffer.buffer as ArrayBuffer
+  const slice = backing.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
   return new Uint8Array(slice)
 }
 

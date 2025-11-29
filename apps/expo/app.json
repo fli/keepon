@@ -4,6 +4,7 @@
     "slug": "keepon-solito",
     "version": "1.0.0",
     "scheme": "keepon-solito",
+    "userInterfaceStyle": "automatic",
     "platforms": [
       "ios",
       "android"
@@ -19,8 +20,6 @@
     "experiments": {
       "reactCanary": true
     },
-    "plugins": [
-      "./plugins/with-keep-appdelegate"
-    ]
+    "plugins": []
   }
 }

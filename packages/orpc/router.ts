@@ -2,6 +2,21 @@ import { os } from '@orpc/server'
 import type { RouterClient } from '@orpc/server'
 import { z } from 'zod'
 
+import { login, logout } from '../../apps/next/server/auth'
+import { createTrainerAccount, trainerSignupSchema } from '../../apps/next/server/trainers'
+import { listProducts } from '../../apps/next/server/products'
+import {
+  listClientsForTrainer,
+  createClientForTrainer,
+} from '../../apps/next/server/clients'
+import {
+  createSaleForTrainer,
+  requestPaymentForSale,
+} from '../../apps/next/server/sales'
+import { createSaleProductForTrainer } from '../../apps/next/server/saleProducts'
+import { createManualSalePaymentForTrainer } from '../../apps/next/server/salePayments'
+import { validateTrainerToken } from '../../apps/next/app/api/_lib/accessToken'
+
 const greetingInputSchema = z
   .object({
     name: z
@@ -13,93 +28,13 @@ const greetingInputSchema = z
   })
   .optional()
 
-export const health = os.handler(async () => ({
-  status: 'ok' as const,
-  timestamp: new Date().toISOString(),
-}))
-
-export const greeting = os
-  .input(greetingInputSchema)
-  .handler(async ({ input }) => {
-    const name = input?.name?.trim()
-    const safeName = name && name.length > 0 ? name : 'friend'
-
-    return {
-      message: `Hello, ${safeName}!`,
-      timestamp: new Date().toISOString(),
-    }
-  })
-
-const getApiBase = (ctx?: { request?: Request }) => {
-  if (ctx?.request) {
-    const url = new URL(ctx.request.url)
-    return `${url.protocol}//${url.host}`
-  }
-
-  return process.env.ORPC_API_BASE_URL ?? 'http://localhost:3001'
-}
-
-const buildBasicAuth = (token: string) => {
-  if (typeof btoa === 'function') return `Basic ${btoa(token)}`
-  if (typeof Buffer !== 'undefined') {
-    return `Basic ${Buffer.from(token, 'utf8').toString('base64')}`
-  }
-  return `Basic ${token}`
-}
-
-async function apiFetch(path: string, init: RequestInit, ctx?: { request?: Request }) {
-  const base = getApiBase(ctx)
-  const res = await fetch(`${base}${path}`, init)
-  const text = await res.text()
-  let json: unknown = null
-  if (text.trim().length > 0) {
-    try {
-      json = JSON.parse(text)
-    } catch {
-      json = text
-    }
-  }
-
-  if (!res.ok) {
-    const message =
-      (json as { error?: { message?: string }; message?: string })?.error?.message ??
-      (json as { message?: string })?.message ??
-      res.statusText
-    throw new Error(message || 'Request failed')
-  }
-
-  return json
-}
-
 const loginResponseSchema = z.object({
   id: z.string(),
   userId: z.string(),
   trainerId: z.string(),
 })
 
-const signupBaseSchema = z.object({
-  firstName: z.string().trim().min(1),
-  lastName: z.string().trim().optional(),
-  country: z.string().trim().length(2),
-  timezone: z.string().trim().min(1),
-  locale: z.string().trim().min(1),
-  businessName: z.string().trim().optional(),
-  industry: z.string().trim().optional(),
-  phone: z.string().trim().optional(),
-  brandColor: z.string().trim().optional(),
-  partner: z.string().trim().optional(),
-})
-
-const signupInputSchema = z.union([
-  signupBaseSchema.extend({
-    email: z.string().email(),
-    password: z.string().min(5),
-  }),
-  signupBaseSchema.extend({
-    signInWithAppleIdentityToken: z.string().min(1),
-    signInWithAppleNonce: z.string().min(1).optional(),
-  }),
-])
+const signupInputSchema = trainerSignupSchema
 
 const numeric = z.union([z.string(), z.number()]).transform(value => {
   const parsed = typeof value === 'number' ? value : Number.parseFloat(value)
@@ -127,6 +62,7 @@ const productSchema = z.object({
   durationMinutes: z.number().int().nullable().optional(),
   totalCredits: z.number().int().nullable().optional(),
   description: z.string().nullable().optional(),
+  bookableOnline: z.boolean().optional(),
 })
 
 const saleSchema = z.object({
@@ -170,12 +106,30 @@ const salePaymentSchema = z.object({
   updatedAt: z.union([z.string(), z.date()]),
 })
 
+const serviceProductSchema = productSchema.extend({
+  bookableOnline: z.boolean(),
+  durationMinutes: z.number().int().nullable().optional(),
+})
+
 export const appRouter = os.router({
   health: {
-    ping: health,
+    ping: os.handler(async () => ({
+      status: 'ok' as const,
+      timestamp: new Date().toISOString(),
+    })),
   },
   greeting: {
-    welcome: greeting,
+    welcome: os
+      .input(greetingInputSchema)
+      .handler(async ({ input }) => {
+        const name = input?.name?.trim()
+        const safeName = name && name.length > 0 ? name : 'friend'
+
+        return {
+          message: `Hello, ${safeName}!`,
+          timestamp: new Date().toISOString(),
+        }
+      }),
   },
   auth: {
     login: os
@@ -190,58 +144,25 @@ export const appRouter = os.router({
           }),
         ])
       )
-      .handler(async ({ input, context }) => {
-        const apiCtx = context as { request?: Request }
-        const json = await apiFetch('/api/members/login', {
-          method: 'POST',
-          body: JSON.stringify(input),
-          headers: { 'content-type': 'application/json' },
-        }, apiCtx)
-
-        const parsed = loginResponseSchema.parse(json)
+      .handler(async ({ input }) => {
+        const parsed = loginResponseSchema.parse(await login(input))
         return { token: parsed.id, userId: parsed.userId, trainerId: parsed.trainerId }
       }),
     signup: os
       .input(signupInputSchema)
-      .handler(async ({ input, context }) => {
-        const apiCtx = context as { request?: Request }
+      .handler(async ({ input }) => {
         const payload =
           'country' in input
             ? { ...input, country: input.country.toUpperCase() }
             : input
 
-        // Debug: log signup payload shape to diagnose validation issues
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('ORPC signup input', payload)
-        }
-
-        const json = await apiFetch(
-          '/api/trainers',
-          {
-            method: 'POST',
-            body: JSON.stringify(payload),
-            headers: { 'content-type': 'application/json' },
-          },
-          apiCtx
-        )
-
-        const parsed = loginResponseSchema.parse(json)
+        const parsed = loginResponseSchema.parse(await createTrainerAccount(payload))
         return { token: parsed.id, userId: parsed.userId, trainerId: parsed.trainerId }
       }),
     logout: os
       .input(z.object({ token: z.string().min(1) }))
-      .handler(async ({ input, context }) => {
-        const apiCtx = context as { request?: Request }
-        await apiFetch(
-          '/api/members/logout',
-          {
-            method: 'POST',
-            headers: {
-              Authorization: buildBasicAuth(input.token),
-            },
-          },
-          apiCtx
-        )
+      .handler(async ({ input }) => {
+        await logout(input.token)
 
         return { ok: true as const }
       }),
@@ -251,30 +172,18 @@ export const appRouter = os.router({
       .input(
         z.object({
           token: z.string().min(1),
-          trainerId: z.string().min(1),
           sessionId: z.string().uuid().optional(),
         })
       )
-      .handler(async ({ input, context }) => {
-        const apiCtx = context as { request?: Request }
-        const search = input.sessionId ? `?sessionId=${encodeURIComponent(input.sessionId)}` : ''
-        const json = await apiFetch(
-          `/api/trainers/${input.trainerId}/clients${search}`,
-          {
-            headers: {
-              Authorization: buildBasicAuth(input.token),
-            },
-          },
-          apiCtx
-        )
-
-        return z.array(clientSchema).parse(json)
+      .handler(async ({ input }) => {
+        const { trainerId } = await validateTrainerToken(input.token)
+        const clients = await listClientsForTrainer(trainerId, input.sessionId)
+        return z.array(clientSchema).parse(clients)
       }),
     create: os
       .input(
         z.object({
           token: z.string().min(1),
-          trainerId: z.string().min(1),
           firstName: z.string().trim().min(1),
           lastName: z.string().trim().optional(),
           email: z.string().trim().email().optional(),
@@ -287,9 +196,9 @@ export const appRouter = os.router({
           googlePlaceId: z.string().trim().optional(),
         })
       )
-      .handler(async ({ input, context }) => {
-        const { token, trainerId, ...body } = input
-        const apiCtx = context as { request?: Request }
+      .handler(async ({ input }) => {
+        const { token, ...body } = input
+        const { trainerId } = await validateTrainerToken(token)
 
         const normalize = (value?: string) => {
           if (value === undefined) return undefined
@@ -311,38 +220,27 @@ export const appRouter = os.router({
           status: body.status ?? 'current',
         }
 
-        const json = await apiFetch(
-          `/api/trainers/${trainerId}/clients`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: buildBasicAuth(token),
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-          },
-          apiCtx
-        )
+        const client = await createClientForTrainer(trainerId, payload)
 
-        return clientSchema.parse(json)
+        return clientSchema.parse(client)
       }),
   },
   products: {
     list: os
       .input(z.object({ token: z.string().min(1) }))
-      .handler(async ({ input, context }) => {
-        const apiCtx = context as { request?: Request }
-        const json = await apiFetch(
-          '/api/products',
-          {
-            headers: {
-              Authorization: buildBasicAuth(input.token),
-            },
-          },
-          apiCtx
-        )
-
-        return z.array(productSchema).parse(json)
+      .handler(async ({ input }) => {
+        const { trainerId } = await validateTrainerToken(input.token)
+        const products = await listProducts(trainerId, {})
+        return z.array(productSchema).parse(products)
+      }),
+  },
+  services: {
+    list: os
+      .input(z.object({ token: z.string().min(1) }))
+      .handler(async ({ input }) => {
+        const { trainerId } = await validateTrainerToken(input.token)
+        const products = await listProducts(trainerId, { type: 'service' })
+        return z.array(serviceProductSchema).parse(products)
       }),
   },
   sales: {
@@ -350,7 +248,6 @@ export const appRouter = os.router({
       .input(
         z.object({
           token: z.string().min(1),
-          trainerId: z.string().min(1),
           clientId: z.string().min(1),
           clientSessionId: z.string().uuid().nullable().optional(),
           dueAfter: z.string().nullable().optional(),
@@ -358,37 +255,19 @@ export const appRouter = os.router({
           paymentRequestPassOnTransactionFee: z.boolean().optional(),
         })
       )
-      .handler(async ({ input, context }) => {
-        const { token, trainerId: _trainerId, ...payload } = input
-        const apiCtx = context as { request?: Request }
-        const json = await apiFetch(
-          '/api/sales',
-          {
-            method: 'POST',
-            headers: {
-              Authorization: buildBasicAuth(token),
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-          },
-          apiCtx
+      .handler(async ({ input }) => {
+        const { token, ...payload } = input
+        const { trainerId } = await validateTrainerToken(token)
+        const parsed = saleSchema.pick({ id: true }).parse(
+          await createSaleForTrainer(trainerId, payload)
         )
-
-        const parsed = saleSchema.pick({ id: true }).parse(json)
         return { id: parsed.id }
       }),
     requestPayment: os
       .input(z.object({ token: z.string().min(1), saleId: z.string().uuid() }))
-      .handler(async ({ input, context }) => {
-        const apiCtx = context as { request?: Request }
-        await apiFetch(
-          `/api/sales/${input.saleId}/paymentRequest`,
-          {
-            method: 'POST',
-            headers: { Authorization: buildBasicAuth(input.token) },
-          },
-          apiCtx
-        )
+      .handler(async ({ input }) => {
+        const { trainerId } = await validateTrainerToken(input.token)
+        await requestPaymentForSale(trainerId, input.saleId)
         return { status: 'requested' as const }
       }),
   },
@@ -411,23 +290,11 @@ export const appRouter = os.router({
           googlePlaceId: z.string().nullable().optional(),
         })
       )
-      .handler(async ({ input, context }) => {
+      .handler(async ({ input }) => {
         const { token, ...payload } = input
-        const apiCtx = context as { request?: Request }
-        const json = await apiFetch(
-          '/api/saleProducts',
-          {
-            method: 'POST',
-            headers: {
-              Authorization: buildBasicAuth(token),
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-          },
-          apiCtx
-        )
-
-        return saleProductSchema.parse(json)
+        const { trainerId } = await validateTrainerToken(token)
+        const product = await createSaleProductForTrainer(trainerId, payload)
+        return saleProductSchema.parse(product)
       }),
   },
   salePayments: {
@@ -442,23 +309,14 @@ export const appRouter = os.router({
           specificMethodName: z.string().nullable().optional(),
         })
       )
-      .handler(async ({ input, context }) => {
+      .handler(async ({ input }) => {
         const { token, ...payload } = input
-        const apiCtx = context as { request?: Request }
-        const json = await apiFetch(
-          '/api/salePayments',
-          {
-            method: 'POST',
-            headers: {
-              Authorization: buildBasicAuth(token),
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify({ ...payload, type: 'manual' }),
-          },
-          apiCtx
+        const { trainerId } = await validateTrainerToken(token)
+        const payment = await createManualSalePaymentForTrainer(
+          trainerId,
+          payload
         )
-
-        return salePaymentSchema.parse(json)
+        return salePaymentSchema.parse(payment)
       }),
   },
 })

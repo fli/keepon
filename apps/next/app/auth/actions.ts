@@ -3,7 +3,9 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import { createAccount, login, type KeeponSession } from 'app/services/api'
+import type { KeeponSession } from '@keepon/api'
+import { login } from '@/server/auth'
+import { createTrainerAccount } from '@/server/trainers'
 
 const SESSION_COOKIE = 'kpSession'
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 28
@@ -28,7 +30,13 @@ export async function loginAction(_prev: { error?: string | null }, formData: Fo
   try {
     const email = getFormString(formData, 'email').trim()
     const password = getFormString(formData, 'password')
-    const session = await login({ email, password })
+    const json = await login({ email, password })
+    const session: KeeponSession = {
+      token: json.id,
+      userId: json.userId,
+      trainerId: json.trainerId,
+    }
+
     await persistSession(session)
     redirect('/dashboard')
   } catch (err) {
@@ -45,7 +53,7 @@ export async function createAccountAction(_prev: { error?: string | null }, form
     const password = getFormString(formData, 'password')
     const country = getFormString(formData, 'country', 'US').trim().slice(0, 2).toUpperCase()
 
-    const session = await createAccount({
+    const json = await createTrainerAccount({
       firstName,
       lastName,
       email,
@@ -56,6 +64,11 @@ export async function createAccountAction(_prev: { error?: string | null }, form
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'Etc/UTC',
       locale: Intl.DateTimeFormat().resolvedOptions().locale ?? 'en-US',
     })
+    const session: KeeponSession = {
+      token: json.id,
+      userId: json.userId,
+      trainerId: json.trainerId,
+    }
 
     await persistSession(session)
     redirect('/dashboard')

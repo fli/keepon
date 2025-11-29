@@ -4,7 +4,8 @@ import { cache } from 'react'
 
 import { cookies } from 'next/headers'
 
-import { createClient, fetchClients, type Client, type CreateClientPayload, type KeeponSession } from 'app/services/api'
+import type { Client, CreateClientPayload, KeeponSession } from '@keepon/api'
+import { listClientsForTrainer, createClientForTrainer, type CreateClientInput } from '@/server/clients'
 
 const SESSION_COOKIE = 'kpSession'
 
@@ -38,7 +39,8 @@ export async function loadClientsServer(): Promise<Client[] | undefined> {
   if (!session) return undefined
 
   try {
-    return await fetchClients(session)
+    const clients = await listClientsForTrainer(session.trainerId, undefined)
+    return clients
   } catch (error) {
     console.error('Clients actions: server-side fetch failed', error)
     return undefined
@@ -51,5 +53,10 @@ export async function createClientAction(payload: CreateClientPayload): Promise<
     throw new Error('Sign in to add clients')
   }
 
-  return createClient(payload, session)
+  const normalizedPayload: CreateClientInput = {
+    ...payload,
+    status: payload.status ?? 'current',
+  }
+
+  return createClientForTrainer(session.trainerId, normalizedPayload)
 }

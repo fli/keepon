@@ -1,6 +1,10 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { PageContainer } from '@/components/page-container'
 
 import { createClientAction, readSessionFromCookies } from '../actions'
 import {
@@ -52,77 +56,78 @@ export default async function AddClientPage() {
   }
 
   return (
-    <div className="page-shell flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm uppercase tracking-wide text-[var(--color-secondaryText)]">Clients</p>
-          <h1 className="text-3xl font-semibold leading-tight">Add client</h1>
-        </div>
-        <Link className="btn btn-secondary text-sm" href="/clients">
-          Cancel
-        </Link>
+    <PageContainer className="flex flex-col items-center gap-6 py-8">
+      <div className="flex w-full max-w-xl flex-col gap-2">
+        <h1 className="text-3xl font-semibold leading-tight">Add client</h1>
+        <p className="text-sm text-muted-foreground">
+          Create a client record to track status and contact details.
+        </p>
       </div>
 
-      <form action={addClient} className="card card-padded flex flex-col gap-4 max-w-2xl">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm font-medium text-[var(--color-text)]">
-            First name
-            <input name="firstName" required className="input" autoComplete="given-name" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-[var(--color-text)]">
-            Last name
-            <input name="lastName" className="input" autoComplete="family-name" />
-          </label>
+      <form action={addClient} className="w-full max-w-xl space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="firstName">First name</Label>
+          <Input
+            id="firstName"
+            name="firstName"
+            required
+            autoFocus
+            autoComplete="given-name"
+          />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm font-medium text-[var(--color-text)]">
-            Email
-            <input name="email" type="email" className="input" autoComplete="email" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-[var(--color-text)]">
-            Mobile
-            <input name="mobileNumber" className="input" autoComplete="tel" />
-          </label>
+        <div className="space-y-2">
+          <Label htmlFor="lastName">Last name</Label>
+          <Input id="lastName" name="lastName" autoComplete="family-name" />
         </div>
 
-        <label className="flex flex-col gap-1 text-sm font-medium text-[var(--color-text)]">
-          Other number
-          <input name="otherNumber" className="input" />
-        </label>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" name="email" type="email" autoComplete="email" />
+        </div>
 
-        <label className="flex flex-col gap-1 text-sm font-medium text-[var(--color-text)]">
-          Company
-          <input name="company" className="input" />
-        </label>
+        <div className="space-y-2">
+          <Label htmlFor="mobileNumber">Mobile</Label>
+          <Input id="mobileNumber" name="mobileNumber" autoComplete="tel" />
+        </div>
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-[var(--color-text)]">
-          Status
+        <div className="space-y-2">
+          <Label htmlFor="otherNumber">Other number</Label>
+          <Input id="otherNumber" name="otherNumber" />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="company">Company</Label>
+          <Input id="company" name="company" />
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium leading-none">Status</p>
           <div className="flex flex-wrap gap-2">
-            {statusOptions.map(option => (
-              <label key={option.id} className="pill flex cursor-pointer items-center gap-2 text-sm">
+            {statusOptions.map((option) => (
+              <label
+                key={option.id}
+                className="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
                 <input
                   type="radio"
                   name="status"
                   value={option.id}
                   defaultChecked={option.id === 'current'}
-                  className="accent-[var(--color-accent)]"
+                  className="sr-only"
                 />
                 <span>{option.label}</span>
               </label>
             ))}
           </div>
-        </label>
+        </div>
 
-        <div className="flex items-center gap-3">
-          <button type="submit" className="btn btn-primary text-sm">
+        <div className="flex justify-end">
+          <Button type="submit" size="sm">
             Save client
-          </button>
-          <Link className="btn btn-secondary text-sm" href="/clients">
-            Cancel
-          </Link>
+          </Button>
         </div>
       </form>
-    </div>
+    </PageContainer>
   )
 }
