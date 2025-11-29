@@ -34,7 +34,6 @@ export function CreateAccountForm() {
             required
             autoComplete="given-name"
             defaultValue={state.defaultValues?.firstName}
-            className="bg-background"
             autoFocus
           />
         </div>
@@ -45,7 +44,6 @@ export function CreateAccountForm() {
             name="lastName"
             autoComplete="family-name"
             defaultValue={state.defaultValues?.lastName ?? ''}
-            className="bg-background"
           />
         </div>
 
@@ -58,7 +56,6 @@ export function CreateAccountForm() {
             required
             autoComplete="email"
             defaultValue={state.defaultValues?.email}
-            className="bg-background"
           />
         </div>
 
@@ -70,7 +67,6 @@ export function CreateAccountForm() {
             type="password" 
             required 
             autoComplete="new-password"
-            className="bg-background"
           />
         </div>
 
@@ -82,7 +78,6 @@ export function CreateAccountForm() {
             defaultValue={state.defaultValues?.country ?? 'US'}
             autoComplete="country"
             maxLength={2}
-            className="bg-background"
           />
         </div>
 
