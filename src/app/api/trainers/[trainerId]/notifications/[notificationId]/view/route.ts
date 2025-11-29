@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -13,12 +13,7 @@ const paramsSchema = z.object({
   notificationId: z.string().min(1, 'Notification id is required'),
 })
 
-type ParamsContext = {
-  params?: {
-    trainerId?: string
-    notificationId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/trainers/[trainerId]/notifications/[notificationId]/view'>
 
 const toNumber = (value: unknown) => {
   if (typeof value === 'number') {
@@ -34,8 +29,8 @@ const toNumber = (value: unknown) => {
   return 0
 }
 
-export async function PUT(request: Request, context: ParamsContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function PUT(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import BigNumber from 'bignumber.js'
 import { db, sql } from '@/lib/db'
@@ -34,11 +34,7 @@ const stripeDetailsSchema = z.object({
   amount: z.union([z.string(), z.number()]),
 })
 
-type RouteContext = {
-  params?: {
-    paymentId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/salePayments/[paymentId]/refund'>
 
 class SalePaymentNotFoundError extends Error {
   constructor() {
@@ -101,8 +97,8 @@ const sumStripeBalanceEntries = (
     new BigNumber(0)
   )
 
-export async function POST(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function POST(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues

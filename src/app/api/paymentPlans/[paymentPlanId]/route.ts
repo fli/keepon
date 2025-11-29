@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -22,14 +22,10 @@ const paramsSchema = z.object({
   paymentPlanId: z.string().min(1),
 })
 
-type RouteContext = {
-  params?: {
-    paymentPlanId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/paymentPlans/[paymentPlanId]'>
 
-export async function GET(request: Request, context: RouteContext) {
-  const parsedParams = paramsSchema.safeParse(context.params ?? {})
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const parsedParams = paramsSchema.safeParse(await context.params)
 
   if (!parsedParams.success) {
     const detail = parsedParams.error.issues

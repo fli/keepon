@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import {
   authenticateTrainerOrClientRequest,
@@ -21,14 +21,10 @@ const paramsSchema = z.object({
     .uuid({ message: 'Sale product id must be a valid UUID' }),
 })
 
-type RouteContext = {
-  params?: {
-    saleProductId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/saleProducts/[saleProductId]'>
 
-export async function GET(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues

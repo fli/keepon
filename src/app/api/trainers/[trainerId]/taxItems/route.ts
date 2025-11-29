@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import {
   authenticateTrainerRequest,
@@ -13,14 +13,10 @@ const paramsSchema = z.object({
 
 const responseSchema = z.array(z.unknown())
 
-type RouteContext = {
-  params?: {
-    trainerId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/trainers/[trainerId]/taxItems'>
 
-export async function GET(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')

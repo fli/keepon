@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
@@ -159,14 +159,10 @@ const normalizeDetailsCode = (code: string | null | undefined) => {
 const ensureArray = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : []
 
-type RouteContext = {
-  params?: {
-    trainerId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/trainers/[trainerId]/stripeAccount'>
 
-export async function GET(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues

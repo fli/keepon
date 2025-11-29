@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -22,14 +22,10 @@ const responseSchema = z.object({
   id: z.string().uuid(),
 })
 
-type RouteContext = {
-  params?: {
-    userId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/members/[userId]'>
 
-export async function GET(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues

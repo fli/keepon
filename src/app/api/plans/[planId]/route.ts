@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import {
@@ -16,20 +16,10 @@ const paramsSchema = z.object({
     .min(1, 'planId must not be empty'),
 })
 
-type RouteContext = {
-  params: {
-    planId?: string | string[]
-  }
-}
+type HandlerContext = RouteContext<'/api/plans/[planId]'>
 
-export async function GET(request: Request, context: RouteContext) {
-  const rawPlanId = Array.isArray(context.params?.planId)
-    ? context.params?.planId[0]
-    : context.params?.planId
-
-  const parsedParams = paramsSchema.safeParse({
-    planId: rawPlanId,
-  })
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const parsedParams = paramsSchema.safeParse(await context.params)
 
   if (!parsedParams.success) {
     const detail = parsedParams.error.issues

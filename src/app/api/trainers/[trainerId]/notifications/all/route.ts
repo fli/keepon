@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import {
   authenticateTrainerRequest,
@@ -9,14 +9,10 @@ import { listTrainerNotifications } from '@/server/notifications'
 
 export const runtime = 'nodejs'
 
-type ParamsContext = {
-  params?: {
-    trainerId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/trainers/[trainerId]/notifications/all'>
 
-export async function GET(request: Request, context: ParamsContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -16,11 +16,7 @@ const paramsSchema = z.object({
     .uuid({ message: 'Session invitation id must be a valid UUID' }),
 })
 
-type RouteContext = {
-  params?: {
-    invitationId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/sessionInvitations/[invitationId]'>
 
 const normalizeDeletedCount = (value: unknown) => {
   if (typeof value === 'number') {
@@ -39,8 +35,8 @@ const normalizeDeletedCount = (value: unknown) => {
   return 0
 }
 
-export async function DELETE(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function DELETE(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues

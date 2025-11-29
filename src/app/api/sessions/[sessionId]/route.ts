@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -16,14 +16,10 @@ const paramsSchema = z.object({
     .min(1, 'sessionId must not be empty'),
 })
 
-type ParamsContext = {
-  params?: {
-    sessionId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/sessions/[sessionId]'>
 
-export async function GET(request: Request, context: ParamsContext) {
-  const parsedParams = paramsSchema.safeParse(context?.params ?? {})
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const parsedParams = paramsSchema.safeParse(await context.params)
 
   if (!parsedParams.success) {
     const detail = parsedParams.error.issues

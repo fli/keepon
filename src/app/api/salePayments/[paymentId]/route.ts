@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -21,13 +21,9 @@ const paramsSchema = z.object({
     .uuid({ message: 'Payment id must be a valid UUID' }),
 })
 
-type RouteContext = {
-  params?: {
-    paymentId?: string
-  }
-}
-export async function GET(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+type HandlerContext = RouteContext<'/api/salePayments/[paymentId]'>
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues

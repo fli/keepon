@@ -1,7 +1,7 @@
 import Stripe from 'stripe'
 
 // Stripe v17 typings only accept the latest API version literal
-export const STRIPE_API_VERSION: Stripe.LatestApiVersion = '2025-01-27.acacia'
+export const STRIPE_API_VERSION: Stripe.LatestApiVersion = '2025-11-17.clover'
 
 let cachedStripeClient: Stripe | null | undefined
 

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { buildErrorResponse } from '../../_lib/accessToken'
@@ -43,14 +43,10 @@ const rawCheckoutDetailsSchema = z.object({
     ),
 })
 
-type RouteContext = {
-  params?: {
-    id?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/smsCreditCheckouts/[id]'>
 
-export async function GET(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues

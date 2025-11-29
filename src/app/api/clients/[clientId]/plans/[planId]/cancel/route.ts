@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import {
   db,
   sql,
@@ -31,12 +31,7 @@ const paramsSchema = z.object({
     .uuid({ message: 'Plan id must be a valid UUID.' }),
 })
 
-type RouteContext = {
-  params?: {
-    clientId?: string
-    planId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/clients/[clientId]/plans/[planId]/cancel'>
 
 class SubscriptionNotFoundError extends Error {
   constructor() {
@@ -144,8 +139,8 @@ const adaptPaymentRow = (row: RawPaymentRow) => {
   })
 }
 
-export async function POST(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function POST(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues

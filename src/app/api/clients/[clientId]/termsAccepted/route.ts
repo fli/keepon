@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -16,11 +16,7 @@ const paramsSchema = z.object({
     .uuid({ message: 'Client id must be a valid UUID' }),
 })
 
-type RouteContext = {
-  params?: {
-    clientId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/clients/[clientId]/termsAccepted'>
 
 const toNumber = (value: unknown) => {
   if (typeof value === 'number') {
@@ -36,8 +32,8 @@ const toNumber = (value: unknown) => {
   return 0
 }
 
-export async function PUT(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function PUT(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues

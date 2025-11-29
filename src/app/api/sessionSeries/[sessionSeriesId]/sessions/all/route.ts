@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -32,11 +32,7 @@ const deleteResponseSchema = z.object({
   deletedSessionSeries: z.array(z.string().uuid()),
 })
 
-type RouteContext = {
-  params?: {
-    sessionSeriesId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/sessionSeries/[sessionSeriesId]/sessions/all'>
 
 type RawDetailRow = {
   session_id: string
@@ -91,8 +87,8 @@ const normalizeDetails = (rows: RawDetailRow[]): NormalizedDetailRow[] =>
     deletableSaleId: row.deletable_sale_id,
   }))
 
-export async function DELETE(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function DELETE(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues

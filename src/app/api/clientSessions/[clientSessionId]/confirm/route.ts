@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z, ZodError } from 'zod'
 import {
@@ -20,11 +20,7 @@ const paramsSchema = z.object({
     .uuid({ message: 'Client session id must be a valid UUID.' }),
 })
 
-type RouteContext = {
-  params?: {
-    clientSessionId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/clientSessions/[clientSessionId]/confirm'>
 
 class ClientSessionNotFoundError extends Error {
   constructor() {
@@ -47,8 +43,8 @@ const normalizeUpdatedCount = (value: unknown) => {
   return 0
 }
 
-export async function POST(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function POST(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import {
   authenticateTrainerRequest,
@@ -17,7 +17,7 @@ const paramsSchema = z.object({
   trainerId: z.string().uuid({ message: 'trainerId must be a valid UUID' }),
 })
 
-type TrainerRouteContext = { params?: Promise<{ trainerId?: string }> }
+type TrainerRouteContext = RouteContext<'/api/trainers/[trainerId]/clients'>
 
 const querySchema = z.object({
   sessionId: z.string().uuid().optional(),
@@ -47,8 +47,8 @@ const invalidBodyResponse = (detail?: string) =>
     { status: 400 }
   )
 
-export async function GET(request: Request, context: TrainerRouteContext) {
-  const params = await context?.params
+export async function GET(request: NextRequest, context: TrainerRouteContext) {
+  const params = await context.params
   const paramsResult = paramsSchema.safeParse(params ?? {})
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')
@@ -132,8 +132,8 @@ export async function GET(request: Request, context: TrainerRouteContext) {
   }
 }
 
-export async function POST(request: Request, context: TrainerRouteContext) {
-  const params = await context?.params
+export async function POST(request: NextRequest, context: TrainerRouteContext) {
+  const params = await context.params
   const paramsResult = paramsSchema.safeParse(params ?? {})
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -20,14 +20,10 @@ const paramsSchema = z.object({
     .uuid({ message: 'Session series id must be a valid UUID' }),
 })
 
-type RouteContext = {
-  params?: {
-    sessionSeriesId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/sessionSeries/[sessionSeriesId]'>
 
-export async function GET(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues

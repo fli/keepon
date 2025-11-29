@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z, ZodError } from 'zod'
 import {
@@ -19,14 +19,10 @@ const paramsSchema = z.object({
     .min(1, 'Client session id is required'),
 })
 
-type RouteContext = {
-  params?: {
-    clientSessionId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/clientSessions/[clientSessionId]'>
 
-export async function GET(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')

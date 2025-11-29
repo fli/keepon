@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -79,11 +79,13 @@ const normalizeTaxRow = (
   }
 }
 
+type HandlerContext = RouteContext<'/api/trainers/[trainerId]/taxes'>
+
 export async function GET(
-  request: Request,
-  context: { params?: { trainerId?: string } }
+  request: NextRequest,
+  context: HandlerContext
 ) {
-  const paramsParse = paramsSchema.safeParse(context?.params ?? {})
+  const paramsParse = paramsSchema.safeParse(await context.params)
   if (!paramsParse.success) {
     const detail = paramsParse.error.issues.map(issue => issue.message).join('; ')
     return NextResponse.json(

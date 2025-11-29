@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -69,14 +69,10 @@ const createInternalErrorResponse = () =>
     { status: 500 }
   )
 
-type RouteContext = {
-  params?: {
-    userId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/members/[userId]/devices'>
 
-export async function POST(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function POST(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues
       .map(issue => issue.message)

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -21,11 +21,7 @@ const requestBodySchema = z.object({
   content: z.string({ message: 'content must be a string.' }),
 })
 
-type RouteContext = {
-  params?: {
-    financeItemId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/financeItems/[financeItemId]/notes'>
 
 class FinanceItemNotFoundError extends Error {
   constructor() {
@@ -34,8 +30,8 @@ class FinanceItemNotFoundError extends Error {
   }
 }
 
-export async function POST(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function POST(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues

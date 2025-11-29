@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import {
   authenticateTrainerRequest,
@@ -9,11 +9,13 @@ import { parseNotificationRows, paramsSchema, RawNotificationRow } from '../_sha
 
 export const runtime = 'nodejs'
 
+type HandlerContext = RouteContext<'/api/trainers/[trainerId]/notifications/new'>
+
 export async function GET(
-  request: Request,
-  context: { params?: { trainerId?: string } }
+  request: NextRequest,
+  context: HandlerContext
 ) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')

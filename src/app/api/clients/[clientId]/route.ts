@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -24,14 +24,10 @@ const deleteResponseSchema = z.object({
     .nonnegative(),
 })
 
-type RouteContext = {
-  params?: {
-    clientId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/clients/[clientId]'>
 
-export async function GET(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues
@@ -125,8 +121,8 @@ class ClientNotFoundError extends Error {
   }
 }
 
-export async function DELETE(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function DELETE(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues

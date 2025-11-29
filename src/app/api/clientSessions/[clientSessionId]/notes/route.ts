@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import {
@@ -37,11 +37,7 @@ const requestBodySchema = z.object({
     }),
 })
 
-type RouteContext = {
-  params?: {
-    clientSessionId?: string
-  }
-}
+type HandlerContext = RouteContext<'/api/clientSessions/[clientSessionId]/notes'>
 
 class ClientSessionNotFoundError extends Error {
   constructor() {
@@ -50,8 +46,8 @@ class ClientSessionNotFoundError extends Error {
   }
 }
 
-export async function POST(request: Request, context: RouteContext) {
-  const paramsResult = paramsSchema.safeParse(context?.params ?? {})
+export async function POST(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
     const detail = paramsResult.error.issues
