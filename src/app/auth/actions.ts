@@ -45,14 +45,33 @@ export async function loginAction(_prev: { error?: string | null }, formData: Fo
   }
 }
 
-export async function createAccountAction(_prev: { error?: string | null }, formData: FormData) {
-  try {
-    const firstName = getFormString(formData, 'firstName').trim()
-    const lastName = getFormString(formData, 'lastName').trim() || null
-    const email = getFormString(formData, 'email').trim()
-    const password = getFormString(formData, 'password')
-    const country = getFormString(formData, 'country', 'US').trim().slice(0, 2).toUpperCase()
+export async function createAccountAction(
+  _prev: {
+    error?: string | null
+    defaultValues?: {
+      firstName: string
+      lastName: string | null
+      email: string
+      country: string
+    }
+  },
+  formData: FormData
+): Promise<{
+  error: string | null
+  defaultValues?: {
+    firstName: string
+    lastName: string | null
+    email: string
+    country: string
+  }
+}> {
+  const firstName = getFormString(formData, 'firstName').trim()
+  const lastName = getFormString(formData, 'lastName').trim() || null
+  const email = getFormString(formData, 'email').trim()
+  const password = getFormString(formData, 'password')
+  const country = getFormString(formData, 'country', 'US').trim().slice(0, 2).toUpperCase()
 
+  try {
     const json = await createTrainerAccount({
       firstName,
       lastName,
@@ -71,9 +90,18 @@ export async function createAccountAction(_prev: { error?: string | null }, form
     }
 
     await persistSession(session)
-    redirect('/dashboard')
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unable to create account'
-    return { error: message }
+    return {
+      error: message,
+      defaultValues: {
+        firstName,
+        lastName,
+        email,
+        country,
+      },
+    }
   }
+
+  redirect('/dashboard')
 }

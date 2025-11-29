@@ -10,7 +10,15 @@ import { Label } from '@/components/ui/label'
 
 import { createAccountAction } from './actions'
 
-const initialState = { error: null as string | null }
+const initialState = {
+  error: null as string | null,
+  defaultValues: {
+    firstName: '',
+    lastName: '',
+    email: '',
+    country: 'US',
+  },
+}
 
 export function CreateAccountForm() {
   const [state, formAction, pending] = useActionState(createAccountAction, initialState)
@@ -26,17 +34,35 @@ export function CreateAccountForm() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="firstName">First name</Label>
-              <Input id="firstName" name="firstName" required autoComplete="given-name" />
+              <Input
+                id="firstName"
+                name="firstName"
+                required
+                autoComplete="given-name"
+                defaultValue={state.defaultValues?.firstName}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lastName">Last name</Label>
-              <Input id="lastName" name="lastName" autoComplete="family-name" />
+              <Input
+                id="lastName"
+                name="lastName"
+                autoComplete="family-name"
+                defaultValue={state.defaultValues?.lastName ?? ''}
+              />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" required autoComplete="email" />
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              defaultValue={state.defaultValues?.email}
+            />
           </div>
 
           <div className="space-y-2">
@@ -46,7 +72,13 @@ export function CreateAccountForm() {
 
           <div className="space-y-2">
             <Label htmlFor="country">Country (2-letter)</Label>
-            <Input id="country" name="country" defaultValue="US" autoComplete="country" maxLength={2} />
+            <Input
+              id="country"
+              name="country"
+              defaultValue={state.defaultValues?.country ?? 'US'}
+              autoComplete="country"
+              maxLength={2}
+            />
           </div>
 
           {state.error ? (
