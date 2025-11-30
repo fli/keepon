@@ -15,7 +15,7 @@ function NavigationMenu({
   return (
     <BaseNavigationMenu.Root
       data-slot="navigation-menu"
-      className={cn('min-w-max', className)}
+      className={cn('min-w-0 w-full sm:min-w-max', className)}
       {...props}
     >
       {children}
@@ -31,7 +31,10 @@ function NavigationMenuList({
   return (
     <BaseNavigationMenu.List
       data-slot="navigation-menu-list"
-      className={cn('relative flex items-center justify-center gap-1', className)}
+      className={cn(
+        'relative flex w-full flex-wrap items-center justify-between gap-1 sm:justify-center sm:gap-2',
+        className
+      )}
       {...props}
     />
   )
@@ -93,7 +96,7 @@ function NavigationMenuLink({
     <BaseNavigationMenu.Link
       data-slot="navigation-menu-link"
       className={cn(
-        "border border-transparent data-[active]:border-border data-[active]:bg-accent/40 data-[active]:text-foreground hover:bg-accent/60 hover:text-accent-foreground focus:bg-accent/60 focus:text-accent-foreground focus-visible:ring-ring/50 [&_svg:not([class*='text-'])]:text-muted-foreground flex flex-col gap-1 rounded-sm p-2 text-sm font-medium transition-all outline-none focus-visible:ring-3 focus-visible:outline-1 [&_svg:not([class*='size-'])]:size-4",
+        "border border-transparent data-[active]:border-border data-[active]:bg-accent/40 data-[active]:text-foreground hover:bg-accent/60 hover:text-accent-foreground focus:bg-accent/60 focus:text-accent-foreground focus-visible:ring-ring/50 [&_svg:not([class*='text-'])]:text-muted-foreground flex h-9 min-w-[64px] flex-row items-center justify-center gap-1 rounded-md px-2.5 py-1.5 text-[13px] font-medium leading-tight transition-all whitespace-nowrap outline-none focus-visible:ring-3 focus-visible:outline-1 sm:h-9 sm:px-3 sm:text-sm [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
