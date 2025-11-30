@@ -1,5 +1,6 @@
 import { orpcClient, getOrpcEndpoint } from '@/lib/orpc'
 import { z } from 'zod'
+import { brandColors } from '@/config/referenceData'
 import {
   clientSchema,
   productSchema,
@@ -28,6 +29,8 @@ export type LoginWithPassword = { email: string; password: string }
 export type LoginWithApple = { signInWithAppleIdentityToken: string }
 export type LoginArgs = LoginWithPassword | LoginWithApple
 
+type BrandColorName = (typeof brandColors)[number]
+
 export type CreateAccountBase = {
   firstName: string
   lastName?: string | null
@@ -37,7 +40,7 @@ export type CreateAccountBase = {
   businessName?: string | null
   industry?: string | null
   phone?: string | null
-  brandColor?: string | null
+  brandColor?: BrandColorName | null
   partner?: string | null
 }
 

@@ -79,7 +79,7 @@ export async function createAccountAction(
       password,
       country,
       businessName: null,
-      brandColor: '#3b82f6',
+      brandColor: 'blue',
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'Etc/UTC',
       locale: Intl.DateTimeFormat().resolvedOptions().locale ?? 'en-US',
     })

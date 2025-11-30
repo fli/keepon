@@ -5,8 +5,11 @@ import {
   AppleSignInError,
   verifyAppleIdentityToken,
 } from '../app/api/_lib/appleSignIn'
+import { brandColors } from '@/config/referenceData'
 
-const DEFAULT_BRAND_COLOR = '#3b82f6'
+type BrandColorName = (typeof brandColors)[number]
+
+const DEFAULT_BRAND_COLOR: BrandColorName = 'blue'
 const BANNED_COUNTRIES = new Set(['NG', 'CN', 'IN'])
 const FALLBACK_TRIAL_DURATION = 14 * 24 * 60 * 60 * 1000
 
@@ -65,11 +68,7 @@ const nullableTrimmedString = z
   .nullable()
   .optional()
 
-const brandColorSchema = z
-  .string()
-  .trim()
-  .regex(/^#?[0-9a-fA-F]{6}$/)
-  .optional()
+const brandColorSchema = z.enum(brandColors as unknown as [BrandColorName, ...BrandColorName[]]).optional()
 
 const baseSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required'),
@@ -147,11 +146,7 @@ export async function createTrainerAccount(input: TrainerSignupInput) {
     throw new Error('emailInvalid')
   }
 
-  const brandColor = parsed.brandColor
-    ? parsed.brandColor.startsWith('#')
-      ? parsed.brandColor.toLowerCase()
-      : `#${parsed.brandColor.toLowerCase()}`
-    : DEFAULT_BRAND_COLOR
+  const brandColor: BrandColorName = parsed.brandColor ?? DEFAULT_BRAND_COLOR
 
   const result = await db.transaction().execute(async trx => {
     const countryRow = await trx

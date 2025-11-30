@@ -78,7 +78,7 @@ const base64UrlToUint8Array = (value: string): Uint8Array<ArrayBuffer> => {
   const paddingNeeded = (4 - (normalized.length % 4)) % 4
   const padded = normalized + '='.repeat(paddingNeeded)
   const buffer = Buffer.from(padded, 'base64')
-  const backing = buffer.buffer as ArrayBuffer
+  const backing = buffer.buffer
   const slice = backing.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
   return new Uint8Array(slice)
 }
@@ -92,7 +92,7 @@ const decodeSegmentToJson = <T>(segment: string): T => {
 const importAppleKey = async (jwk: AppleJwk): Promise<CryptoKey> =>
   getSubtleCrypto().importKey(
     'jwk',
-    { ...jwk, ext: true } as JsonWebKey,
+    { ...jwk, ext: true },
     { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
     false,
     ['verify']
