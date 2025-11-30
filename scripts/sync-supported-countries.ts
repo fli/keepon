@@ -4,6 +4,7 @@
  */
 import { createDb } from '../src/lib/db'
 import type { DB } from '../src/lib/db'
+import type { Insertable } from 'kysely'
 import { countries } from '../src/config/countries'
 import { currencies } from '../src/config/currencies'
 import { supportedCountryCurrency } from '../src/config/supportedCountryCurrency'
@@ -73,15 +74,18 @@ async function sync() {
           .execute()
       }
 
-      const upsertSimple = async (
-        table: keyof DB,
-        column: string,
-        values: readonly string[]
+      const upsertSimple = async <
+        TTable extends keyof DB,
+        TColumn extends keyof DB[TTable] & string
+      >(
+        table: TTable,
+        column: TColumn,
+        values: ReadonlyArray<DB[TTable][TColumn]>
       ) => {
         for (const value of values) {
           await trx
             .insertInto(table)
-            .values({ [column]: value } as Record<string, unknown>)
+            .values({ [column]: value } as Insertable<DB[TTable]>)
             .onConflict(oc => oc.column(column).doNothing())
             .execute()
         }

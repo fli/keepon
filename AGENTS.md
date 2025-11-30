@@ -1,3 +1,2 @@
-- Next.js v16
 - React v19.2
 - On every Codex startup, first call `mcp__next-devtools__init` (Next.js DevTools MCP init) before any other actions; once it returns, immediately continue with the triggering user request in the same turn (don't stop after “Initialization complete.”).
