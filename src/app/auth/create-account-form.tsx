@@ -4,24 +4,38 @@ import { useActionState } from 'react'
 import Link from 'next/link'
 
 import { Button } from '@/components/ui/button'
+import { NativeSelect } from '@/components/ui/native-select'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { supportedCountries, supportedCountryCodes } from '@/lib/supportedCountries'
 
 import { createAccountAction } from './actions'
 
-const initialState = {
-  error: null as string | null,
-  defaultValues: {
-    firstName: '',
-    lastName: '',
-    email: '',
-    country: 'US',
-  },
+type CreateAccountFormProps = {
+  defaultCountry?: string | null
 }
 
-export function CreateAccountForm() {
-  const [state, formAction, pending] = useActionState(createAccountAction, initialState)
+export function CreateAccountForm({ defaultCountry }: CreateAccountFormProps) {
+  const initialCountry =
+    defaultCountry && supportedCountryCodes.has(defaultCountry)
+      ? defaultCountry
+      : supportedCountries[0]?.code ?? 'US'
+
+  const [state, formAction, pending] = useActionState(createAccountAction, {
+    error: null as string | null,
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      country: initialCountry,
+    },
+  })
+
+  const selectedCountry =
+    state.defaultValues?.country && supportedCountryCodes.has(state.defaultValues.country)
+      ? state.defaultValues.country
+      : initialCountry
 
   return (
     <div className="w-full max-w-sm">
@@ -61,24 +75,30 @@ export function CreateAccountForm() {
 
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <Input 
-            id="password" 
-            name="password" 
-            type="password" 
-            required 
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            required
             autoComplete="new-password"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="country">Country (2-letter)</Label>
-          <Input
+          <Label htmlFor="country">Country</Label>
+          <NativeSelect
             id="country"
             name="country"
-            defaultValue={state.defaultValues?.country ?? 'US'}
+            defaultValue={selectedCountry}
             autoComplete="country"
-            maxLength={2}
-          />
+            required
+          >
+            {supportedCountries.map(country => (
+              <option key={country.code} value={country.code}>
+                {country.flag} {country.name}
+              </option>
+            ))}
+          </NativeSelect>
         </div>
 
         {state.error ? (

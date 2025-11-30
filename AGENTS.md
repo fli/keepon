@@ -1,3 +1,4 @@
 - Next.js v16
 - React v19.2
 - Rule: Before engineering a solution, pause to research existing patterns, tooling, or prior art and only build when none fit.
+- Always initiate Next.js MCP
