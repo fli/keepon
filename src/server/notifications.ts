@@ -8,6 +8,23 @@ import {
 
 export type NotificationList = z.infer<typeof notificationListSchema>
 
+const toNumber = (value: unknown) => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0
+  }
+
+  if (typeof value === 'bigint') {
+    return Number(value)
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+
+  return 0
+}
+
 export async function listTrainerNotifications(
   trainerId: string,
   userId: string,
@@ -45,4 +62,38 @@ export async function listTrainerNotifications(
   const rows = (await query.execute()) as RawNotificationRow[]
 
   return parseNotificationRows(rows)
+}
+
+export async function markNotificationAsViewed(
+  trainerId: string,
+  userId: string,
+  notificationId: string
+): Promise<void> {
+  const result = await db
+    .updateTable('app_notification')
+    .set({ viewed: true })
+    .where('id', '=', notificationId)
+    .where('user_id', '=', userId)
+    .where('trainer_id', '=', trainerId)
+    .executeTakeFirst()
+
+  const updatedCount = toNumber(result?.numUpdatedRows ?? 0)
+
+  if (updatedCount === 0) {
+    throw new Error('Notification not found for this trainer')
+  }
+}
+
+export async function markAllNotificationsAsViewed(
+  trainerId: string,
+  userId: string
+): Promise<number> {
+  const result = await db
+    .updateTable('app_notification')
+    .set({ viewed: true })
+    .where('user_id', '=', userId)
+    .where('trainer_id', '=', trainerId)
+    .executeTakeFirst()
+
+  return toNumber(result?.numUpdatedRows ?? 0)
 }

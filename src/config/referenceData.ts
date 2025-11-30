@@ -4,6 +4,13 @@ export const bookingPaymentTypes = ['fullPrepayment', 'hidePrice', 'noPrepayment
 
 export const bookingQuestionStates = ['optional', 'required'] as const
 
+export const clientAppointmentReminderTypes = ['email', 'emailAndSms', 'sms'] as const
+export const serviceProviderAppointmentReminderTypes = [
+  'email',
+  'emailAndNotification',
+  'notification',
+] as const
+
 export const brandColors = [
   'amber',
   'blue',

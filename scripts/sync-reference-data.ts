@@ -1,9 +1,9 @@
-/* Idempotent sync of country/currency reference data and supported country mappings.
+/* Idempotent sync of reference data (countries, currencies, enums).
  * Source data lives in ./src/config.
- * Run with: pnpm sync:supported-countries
+ * Run with: pnpm sync:reference-data
  */
-import { createDb } from '../src/lib/db'
-import type { DB } from '../src/lib/db'
+import { createDb } from '../src/lib/db/index'
+import type { DB } from '../src/lib/db/index'
 import type { Insertable } from 'kysely'
 import { countries } from '../src/config/countries'
 import { currencies } from '../src/config/currencies'
@@ -12,6 +12,8 @@ import {
   accessTokenTypes,
   bookingPaymentTypes,
   bookingQuestionStates,
+  clientAppointmentReminderTypes,
+  serviceProviderAppointmentReminderTypes,
   brandColors,
   clientSessionStates,
   clientStatuses,
@@ -94,6 +96,16 @@ async function sync() {
       await upsertSimple('access_token_type', 'type', accessTokenTypes)
       await upsertSimple('booking_payment_type', 'type', bookingPaymentTypes)
       await upsertSimple('booking_question_state', 'state', bookingQuestionStates)
+      await upsertSimple(
+        'client_appointment_reminder_type',
+        'type',
+        clientAppointmentReminderTypes
+      )
+      await upsertSimple(
+        'service_provider_appointment_reminder_type',
+        'type',
+        serviceProviderAppointmentReminderTypes
+      )
       await upsertSimple('brand_color', 'id', brandColors)
       await upsertSimple('client_session_state', 'state', clientSessionStates)
       await upsertSimple('client_status', 'status', clientStatuses)

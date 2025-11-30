@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getDashboardSummary, type DashboardSummary } from '@/server/dashboard'
-import { listTrainerNotifications, type NotificationList } from '@/server/notifications'
 
 import { Badge } from '@/components/ui/badge'
 import {
@@ -12,31 +11,20 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { ChevronDown } from 'lucide-react'
-import { NotificationsCard } from '@/components/notifications-card'
+  AlertCircle,
+  Bell,
+  Calendar,
+  ChevronRight,
+  Clock,
+  PenSquare,
+} from 'lucide-react'
 import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
 import { readSessionFromCookies } from '../../session.server'
+import { ProjectedPaidCard } from './projected-paid-card'
 
 async function loadDashboard(trainerId: string): Promise<DashboardSummary> {
   return getDashboardSummary(trainerId)
-}
-
-const DASHBOARD_NOTIFICATION_LIMIT = 5
-
-type Notification = NotificationList[number]
-
-async function loadNotifications(session: { trainerId: string; userId: string }): Promise<Notification[]> {
-  return listTrainerNotifications(session.trainerId, session.userId, {
-    limit: DASHBOARD_NOTIFICATION_LIMIT,
-  })
 }
 
 function formatCurrency(amount: number, currency: string) {
@@ -58,30 +46,12 @@ export default async function DashboardPage() {
 
   let data: DashboardSummary | null = null
   let dashboardError: string | null = null
-  let notifications: Notification[] = []
-  let notificationsError: string | null = null
 
-  const [dashboardResult, notificationsResult] = await Promise.allSettled([
-    loadDashboard(session.trainerId),
-    loadNotifications(session),
-  ])
-
-  if (dashboardResult.status === 'fulfilled') {
-    data = dashboardResult.value
-  } else {
+  try {
+    data = await loadDashboard(session.trainerId)
+  } catch (err) {
     dashboardError =
-      dashboardResult.reason instanceof Error
-        ? dashboardResult.reason.message
-        : 'Unable to load dashboard'
-  }
-
-  if (notificationsResult.status === 'fulfilled') {
-    notifications = notificationsResult.value
-  } else {
-    notificationsError =
-      notificationsResult.reason instanceof Error
-        ? notificationsResult.reason.message
-        : 'Unable to load notifications'
+      err instanceof Error ? err.message : 'Unable to load dashboard'
   }
 
   const greeting = (() => {
@@ -93,172 +63,251 @@ export default async function DashboardPage() {
   })()
 
   return (
-    <PageContainer className="flex flex-col gap-6 py-8">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-col gap-2">
+    <PageContainer className="flex flex-col gap-8 py-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-3">
           <h1 className="text-3xl font-semibold leading-tight">{greeting}</h1>
+          {typeof data?.trainer.smsCredits === 'number' ? (
+            <Badge variant="secondary" className="w-fit">
+              {data.trainer.smsCredits.toLocaleString()} text credits
+            </Badge>
+          ) : null}
           {dashboardError ? (
             <p className="text-sm text-destructive">{dashboardError}</p>
           ) : null}
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" type="button" render={<Link href="/dashboard/sell/credit-pack" />}>
+                Sell credit pack
+              </Button>
+              <Button variant="secondary" type="button">
+                Sell service
+              </Button>
+              <Button variant="secondary" type="button">
+                Sell item
+              </Button>
+              <Button variant="secondary" type="button">
+                Sell subscription
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" type="button">
+                Charge custom amount
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" type="button">
+                Add expense
+              </Button>
+            </div>
+          </div>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 bg-primary text-primary-foreground hover:bg-primary/80 shadow-xs h-9 px-4"
-          >
-            Actions
-            <ChevronDown className="size-4" aria-hidden />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" sideOffset={12}>
-            <DropdownMenuGroup>
-              <DropdownMenuItem>Sell credit pack</DropdownMenuItem>
-              <DropdownMenuItem>Sell service</DropdownMenuItem>
-              <DropdownMenuItem>Sell item</DropdownMenuItem>
-              <DropdownMenuItem>Sell subscription</DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>Charge custom amount</DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>Add expense</DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button
+          variant="outline"
+          size="icon-lg"
+          aria-label="Notifications"
+          render={<Link href="/dashboard/notifications" />}
+        >
+          <Bell className="size-5" aria-hidden />
+        </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Projected (7d)</CardDescription>
-            <CardTitle className="text-2xl">
-              {data
-                ? formatCurrency(
-                    data.payments.last7Days.projected,
-                    data.payments.currency
-                  )
-                : '—'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 text-sm text-muted-foreground">
-            Paid:{' '}
-            {data
-              ? formatCurrency(
-                  data.payments.last7Days.paid,
-                  data.payments.currency
-                )
-              : '—'}
-          </CardContent>
-        </Card>
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">Payments</h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <ProjectedPaidCard payments={data?.payments ?? null} />
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Available funds</CardDescription>
-            <CardTitle className="text-2xl">
-              {data
-                ? formatCurrency(data.funds.available, data.funds.currency)
-                : '—'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 text-sm text-muted-foreground">
-            Pending:{' '}
-            {data
-              ? formatCurrency(data.funds.pending, data.funds.currency)
-              : '—'}
-          </CardContent>
-        </Card>
+          <Card className="flex flex-col gap-3">
+            <CardHeader className="pb-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="danger" className="rounded-full p-2">
+                    <AlertCircle className="size-4" aria-hidden />
+                  </Badge>
+                  <CardDescription className="text-sm font-semibold text-foreground">
+                    {data?.payments.overdue.count ?? 0} overdue payments
+                  </CardDescription>
+                </div>
+                <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0 mt-auto">
+              <CardTitle className="text-3xl text-foreground">
+                {data
+                  ? formatCurrency(
+                      data.payments.overdue.total,
+                      data.payments.currency
+                    )
+                  : '—'}
+              </CardTitle>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Next appointment</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {data?.nextAppointment ? (
-              <>
-                <p className="text-lg font-semibold leading-tight">
-                  {data.nextAppointment.title}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {new Date(data.nextAppointment.startTime).toLocaleString(
-                    undefined,
-                    {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    }
-                  )}
-                </p>
-                {data.nextAppointment.location ? (
-                  <p className="text-sm text-muted-foreground">
-                    {data.nextAppointment.location}
+          <Card className="flex flex-col gap-3">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-sm font-semibold text-foreground">
+                Funds to transfer to your account
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0 text-sm text-muted-foreground mt-auto">
+              <div className="flex items-center gap-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Pending
                   </p>
-                ) : null}
-              </>
-            ) : (
+                  <p className="text-2xl font-semibold text-foreground">
+                    {data
+                      ? formatCurrency(data.funds.pending, data.funds.currency)
+                      : '—'}
+                  </p>
+                </div>
+                <div className="h-10 w-px bg-border mx-3" aria-hidden />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Available
+                  </p>
+                  <p className="text-2xl font-semibold text-foreground">
+                    {data
+                      ? formatCurrency(data.funds.available, data.funds.currency)
+                      : '—'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">Subscriptions & Packs</h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card className="flex flex-col">
+            <CardHeader className="pb-1 flex items-center justify-between">
+              <div>
+                <CardDescription className="text-sm font-semibold text-foreground">
+                  Active subscriptions
+                </CardDescription>
+                <CardTitle className="text-3xl text-foreground">
+                  {data?.subscriptions.activePlans ?? 0}
+                </CardTitle>
+              </div>
+              <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
+            </CardHeader>
+          </Card>
+
+          <Card className="flex flex-col">
+            <CardHeader className="pb-1 flex items-center justify-between">
+              <div>
+                <CardDescription className="text-sm font-semibold text-foreground">
+                  Active packs
+                </CardDescription>
+                <CardTitle className="text-3xl text-foreground">
+                  {data?.subscriptions.activePacks ?? 0}
+                </CardTitle>
+              </div>
+              <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
+            </CardHeader>
+          </Card>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">Next Appointment</h2>
+        <div className="grid">
+          <Card className="flex flex-col">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-sm font-semibold text-foreground">
+                Next appointment
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 mt-auto">
+              {data?.nextAppointment ? (
+                <>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="size-4" aria-hidden />
+                    <span>
+                      {new Date(data.nextAppointment.startTime).toLocaleString(
+                        undefined,
+                        {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        }
+                      )}
+                    </span>
+                  </div>
+                  <p className="text-lg font-semibold leading-tight">
+                    {data.nextAppointment.title}
+                  </p>
+                  {data.nextAppointment.location ? (
+                    <p className="text-sm text-muted-foreground">
+                      {data.nextAppointment.location}
+                    </p>
+                  ) : null}
+                  <Button size="sm" variant="secondary" className="mt-1 w-fit">
+                    View appointment
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-lg font-semibold leading-tight">
+                    Your day&apos;s completely free
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Book some appointments or take some time to yourself,
+                    whatever it is make sure you enjoy it.
+                  </p>
+                  <Button size="sm" className="w-fit">
+                    Add an appointment or event
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">Online Bookings</h2>
+        <div className="grid">
+          <Card className="flex flex-col">
+            <CardHeader className="pb-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardDescription className="text-sm font-semibold text-foreground">
+                    Today&apos;s online booking availability
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Edit online booking availability"
+                >
+                  <PenSquare className="size-4" aria-hidden />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-3 space-y-2 mt-auto">
+              <div className="inline-flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm font-medium text-foreground">
+                <Clock className="size-4" aria-hidden />
+                <span>
+                  {data?.onlineBookings.bookableCount
+                    ? '9:00 am - 9:00 pm'
+                    : 'Set availability'}
+                </span>
+              </div>
               <p className="text-sm text-muted-foreground">
-                No upcoming sessions scheduled.
+                {data?.onlineBookings.bookableCount
+                  ? `${data.onlineBookings.bookableCount.toLocaleString()} services available for online booking today.`
+                  : 'Publish bookable sessions and share your link with clients.'}
               </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-0">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardDescription>Subscriptions</CardDescription>
-                <CardTitle className="text-2xl">
-                  {data?.subscriptions.activePacks ?? 0} packs
-                </CardTitle>
-              </div>
-              <Badge variant="outline">
-                {data?.subscriptions.activePlans ?? 0} plans
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-3 text-sm text-muted-foreground">
-            Active subscriptions keep your cash flow predictable.
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-0">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardDescription>Online bookings</CardDescription>
-                <CardTitle className="text-2xl">
-                  {data?.onlineBookings.bookableCount ?? 0} services
-                </CardTitle>
-              </div>
-              <Badge variant="outline">Live</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-3 text-sm text-muted-foreground">
-            Publish bookable sessions and share your link with clients.
-          </CardContent>
-        </Card>
-      </div>
-
-      <NotificationsCard
-        notifications={notifications}
-        error={notificationsError}
-        title="Notifications"
-        description={
-          notifications.length
-            ? 'Recent updates for your business'
-            : 'Stay on top of client activity.'
-        }
-        headerAction={
-          <Button variant="ghost" size="sm" render={<Link href="/notifications" />}>
-            View all
-          </Button>
-        }
-      />
+            </CardContent>
+          </Card>
+        </div>
+      </section>
     </PageContainer>
   )
 }

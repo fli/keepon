@@ -9,7 +9,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "codegen": "kysely-codegen",
-    "sync:supported-countries": "tsx scripts/sync-supported-countries.ts"
+    "sync:reference-data": "tsx scripts/sync-reference-data.ts"
   },
   "dependencies": {
     "@base-ui-components/react": "^1.0.0-beta.7",

@@ -19,6 +19,7 @@ type NotificationsCardProps = {
   description?: string
   emptyMessage?: string
   headerAction?: ReactNode
+  onNotificationSelect?: (notification: Notification) => void
 }
 
 function formatNotificationDate(value?: string) {
@@ -40,6 +41,7 @@ export function NotificationsCard({
   description,
   emptyMessage = "You're all caught up.",
   headerAction,
+  onNotificationSelect,
 }: NotificationsCardProps) {
   if (error) {
     return (
@@ -79,7 +81,21 @@ export function NotificationsCard({
             {notifications.map(notification => (
               <li
                 key={notification.id}
-                className="flex items-start justify-between gap-3 px-6 py-4"
+                className={`flex items-start justify-between gap-3 px-6 py-4 ${
+                  onNotificationSelect ? 'cursor-pointer hover:bg-muted/40' : ''
+                }`}
+                onClick={() => onNotificationSelect?.(notification)}
+                onKeyDown={event => {
+                  if (
+                    onNotificationSelect &&
+                    (event.key === 'Enter' || event.key === ' ')
+                  ) {
+                    event.preventDefault()
+                    onNotificationSelect(notification)
+                  }
+                }}
+                role={onNotificationSelect ? 'button' : undefined}
+                tabIndex={onNotificationSelect ? 0 : undefined}
               >
                 <div className="space-y-1">
                   <p className="text-sm text-foreground">{notification.alert}</p>

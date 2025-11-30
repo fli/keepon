@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/breadcrumbs'
 
 import { loadClientsServer } from '../../clients/actions'
+import { loadCreditPacks } from '../../dashboard/sell/credit-pack/actions'
 
 type Crumb = {
   href: string
@@ -24,6 +25,8 @@ const TITLE_MAP: Record<string, string> = {
   clients: 'Clients',
   finance: 'Finance',
   sales: 'Sales',
+  sell: 'Sell',
+  'credit-pack': 'Credit pack',
   settings: 'Settings',
   users: 'Users',
   add: 'Add',
@@ -33,6 +36,9 @@ const TITLE_MAP: Record<string, string> = {
 function formatSegment(segment: string, parent?: string): string {
   if (segment === 'add' && parent === 'clients') return 'Add client'
   if (segment === 'make' && parent === 'sales') return 'Collect payment'
+  if (segment === 'sell' && parent === 'dashboard') return 'Sell'
+  if (segment === 'credit-pack' && parent === 'sell') return 'Credit pack'
+  if (segment === 'pack' && parent === 'credit-pack') return 'Credit pack'
 
   const mapped = TITLE_MAP[segment]
   if (mapped) return mapped
@@ -62,6 +68,28 @@ async function buildCrumbs(segments: string[]): Promise<Crumb[]> {
           .filter(Boolean)
           .join(' ')
           .trim() || 'Client'
+    }
+  }
+
+  if (normalized[0] === 'dashboard' && normalized[1] === 'sell' && normalized[2] === 'credit-pack') {
+    if (normalized[3]) {
+      const clients = (await loadClientsServer()) ?? []
+      const match = clients.find((client) => client.id === normalized[3])
+      if (match) {
+        dynamicLabels[3] =
+          [match.firstName, match.lastName]
+            .filter(Boolean)
+            .join(' ')
+            .trim() || 'Client'
+      }
+    }
+
+    if (normalized[4] === 'pack' && normalized[5]) {
+      const packs = await loadCreditPacks()
+      const match = packs.find((pack) => pack.id === normalized[5])
+      if (match) {
+        dynamicLabels[5] = match.name || 'Credit pack'
+      }
     }
   }
 
