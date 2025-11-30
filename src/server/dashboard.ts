@@ -1,9 +1,7 @@
 import { db, sql } from '@/lib/db'
+import { jsonArrayFrom, jsonObjectFrom } from 'kysely/helpers/postgres'
 import { z } from 'zod'
-import {
-  adaptSaleProductRow,
-  fetchSaleProducts,
-} from '../app/api/saleProducts/shared'
+// Single-query dashboard fetch using Kysely + json helpers to keep everything in one round trip
 
 const missionSchema = z.object({
   id: z.string(),
@@ -28,48 +26,37 @@ const stripeBalanceSchema = z.object({
   pending: z.array(balanceEntrySchema),
 })
 
-const trainerRowSchema = z.object({
-  firstName: z.string().nullable(),
-  createdAt: z.date().nullable(),
-  smsCredits: z.union([z.number(), z.string(), z.null()]),
-  defaultCurrency: z.string().nullable(),
-  timezone: z.string().nullable(),
-  stripeAccountId: z.string().nullable(),
-})
-
-const trialRowSchema = z.object({
-  startTime: z.date(),
-  endTime: z.date(),
-})
-
-const paymentsAggSchema = z.object({
-  paid7: z.union([z.number(), z.string(), z.null()]),
-  paidToday: z.union([z.number(), z.string(), z.null()]),
-})
-
-const pendingAggSchema = z.object({
-  overdueCount: z.union([z.number(), z.string(), z.null()]),
-  overdueTotal: z.union([z.number(), z.string(), z.null()]),
+const dashboardRowSchema = z.object({
+  trainerFirstName: z.string().nullable(),
+  trainerSmsCredits: z.union([z.number(), z.string(), z.null()]),
+  trainerDefaultCurrency: z.string().nullable(),
+  trainerTimezone: z.string().nullable(),
+  trainerCreatedAt: z.union([z.date(), z.string(), z.null()]),
+  trialStartTime: z.union([z.date(), z.string(), z.null()]),
+  trialEndTime: z.union([z.date(), z.string(), z.null()]),
+  missions: missionListSchema.nullable(),
+  paymentsPaid7: z.union([z.number(), z.string(), z.null()]),
+  paymentsPaidToday: z.union([z.number(), z.string(), z.null()]),
+  pendingOverdueCount: z.union([z.number(), z.string(), z.null()]),
+  pendingOverdueTotal: z.union([z.number(), z.string(), z.null()]),
   pending7Total: z.union([z.number(), z.string(), z.null()]),
   pendingTodayTotal: z.union([z.number(), z.string(), z.null()]),
-})
-
-const activeCountSchema = z.object({
-  count: z.union([z.number(), z.string(), z.null()]),
-})
-
-const nextSessionSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  startTime: z.date(),
-  durationMinutes: z.number(),
-  location: z.string().nullable(),
-  address: z.string().nullable(),
-  timezone: z.string().nullable(),
-})
-
-const onlineBookableCountSchema = z.object({
-  count: z.union([z.number(), z.string(), z.null()]),
+  activePlans: z.union([z.number(), z.string(), z.null()]),
+  activePacks: z.union([z.number(), z.string(), z.null()]),
+  balanceObject: stripeBalanceSchema.nullable(),
+  unreadNotifications: z.union([z.number(), z.string(), z.null()]),
+  nextSession: z
+    .object({
+      id: z.string(),
+      title: z.string().nullable(),
+      startTime: z.union([z.date(), z.string()]),
+      durationMinutes: z.union([z.number(), z.null()]),
+      location: z.string().nullable(),
+      address: z.string().nullable(),
+      timezone: z.string().nullable(),
+    })
+    .nullable(),
+  onlineBookableCount: z.union([z.number(), z.string(), z.null()]),
 })
 
 const money = (value: unknown) => {
@@ -120,53 +107,224 @@ export type DashboardSummary = {
   onlineBookings: {
     bookableCount: number
   }
+  notifications: {
+    hasUnread: boolean
+  }
 }
 
-export async function getDashboardSummary(trainerId: string): Promise<DashboardSummary> {
-  // Trainer basics
-  const trainerRow = await db
+export async function getDashboardSummary(
+  trainerId: string,
+  userId: string
+): Promise<DashboardSummary> {
+  const revenueCte = db
+    .selectFrom('payment as p')
+    .select([
+      sql`p.amount::numeric`.as('amount'),
+      sql`p.created_at`.as('ts'),
+    ])
+    .where('p.trainer_id', '=', trainerId)
+    .where('p.refunded_time', 'is', null)
+    .where(({ eb, ref }) =>
+      eb
+        .or([
+          eb(ref('p.is_manual'), '=', true),
+          eb(ref('p.is_stripe'), '=', true),
+          eb(ref('p.is_credit_pack'), '=', true),
+          eb(ref('p.is_subscription'), '=', true),
+        ])
+    )
+    .unionAll(
+      db
+        .selectFrom('payment_plan_payment as ppp')
+        .innerJoin('payment_plan as pp', 'pp.id', 'ppp.payment_plan_id')
+        .select([
+          sql`ppp.amount::numeric`.as('amount'),
+          sql`ppp.date`.as('ts'),
+        ])
+        .where('pp.trainer_id', '=', trainerId)
+        .where('ppp.status', '=', 'paid')
+    )
+    .unionAll(
+      db
+        .selectFrom('finance_item as fi')
+        .select([
+          sql`fi.amount::numeric`.as('amount'),
+          sql`fi.start_date`.as('ts'),
+        ])
+        .where('fi.trainer_id', '=', trainerId)
+        .where('fi.amount', '>', '0')
+    )
+
+  const pendingCte = db
+    .selectFrom('payment_plan_payment as ppp')
+    .innerJoin('payment_plan as pp', 'pp.id', 'ppp.payment_plan_id')
+    .where('pp.trainer_id', '=', trainerId)
+    .where('ppp.status', 'not in', [
+      'paid',
+      'cancelled',
+      'refunded',
+      'paused',
+    ])
+    .select(() => [
+      sql`COALESCE(SUM(CASE WHEN ppp.date < NOW() THEN 1 ELSE 0 END), 0)::numeric`.as(
+        'overdueCount'
+      ),
+      sql`COALESCE(SUM(CASE WHEN ppp.date < NOW() THEN ppp.amount_outstanding ELSE 0 END), 0)::numeric`.as(
+        'overdueTotal'
+      ),
+      sql`COALESCE(SUM(CASE WHEN ppp.date >= NOW() AND ppp.date < NOW() + INTERVAL '7 days' THEN ppp.amount_outstanding ELSE 0 END), 0)::numeric`.as(
+        'pending7Total'
+      ),
+      sql`COALESCE(SUM(CASE WHEN ppp.date >= date_trunc('day', NOW()) AND ppp.date < date_trunc('day', NOW()) + INTERVAL '1 day' THEN ppp.amount_outstanding ELSE 0 END), 0)::numeric`.as(
+        'pendingTodayTotal'
+      ),
+    ])
+
+  const creditUsageCte = db
+    .selectFrom('payment_credit_pack as pcp')
+    .select([
+      'pcp.sale_credit_pack_id',
+      sql`COALESCE(SUM(pcp.credits_used), 0)::int`.as('credits_used'),
+    ])
+    .groupBy('pcp.sale_credit_pack_id')
+
+  const row = await db
+    .with('revenue', () => revenueCte)
+    .with('pending', () => pendingCte)
+    .with('credit_usage', () => creditUsageCte)
     .selectFrom('vw_legacy_trainer as t')
-    .innerJoin('trainer', 'trainer.id', 't.id')
-    .select(({ ref }) => [
-      ref('t.first_name').as('firstName'),
-      ref('t.created_at').as('createdAt'),
-      ref('t.sms_credit_balance').as('smsCredits'),
-      ref('t.default_currency').as('defaultCurrency'),
-      ref('t.timezone').as('timezone'),
-      ref('trainer.stripe_account_id').as('stripeAccountId'),
+    .innerJoin('trainer as tr', 'tr.id', 't.id')
+    .select([
+      't.first_name as trainerFirstName',
+      't.sms_credit_balance as trainerSmsCredits',
+      't.default_currency as trainerDefaultCurrency',
+      't.timezone as trainerTimezone',
+      't.created_at as trainerCreatedAt',
+    ])
+    .select((eb) => [
+      eb
+        .selectFrom('trial')
+        .select('start_time')
+        .where('trainer_id', '=', trainerId)
+        .orderBy('end_time', 'desc')
+        .limit(1)
+        .as('trialStartTime'),
+      eb
+        .selectFrom('trial')
+        .select('end_time')
+        .where('trainer_id', '=', trainerId)
+        .orderBy('end_time', 'desc')
+        .limit(1)
+        .as('trialEndTime'),
+      jsonArrayFrom(
+        eb
+          .selectFrom('mission')
+          .innerJoin('mission_type', 'mission_type.id', 'mission.id')
+          .leftJoin('reward', 'reward.id', 'mission.reward_id')
+          .where('mission.trainer_id', '=', trainerId)
+          .select(sub => [
+            sql`mission.id::text`.as('id'),
+            sql`mission.display_order`.as('displayOrder'),
+            sql`mission.reward_id::text`.as('rewardId'),
+            sql`reward.claimed_at IS NOT NULL`.as('rewardClaimed'),
+            sql`mission.completed_at IS NOT NULL`.as('completed'),
+            sub.ref('mission_type.title').as('title'),
+            sub.ref('mission_type.description').as('description'),
+            sub.ref('mission_type.action_url').as('actionUrl'),
+          ])
+          .orderBy('mission.display_order')
+      ).as('missions'),
+      eb
+        .selectFrom('revenue as r')
+        .select(() =>
+          sql`COALESCE(SUM(CASE WHEN r.ts >= NOW() - INTERVAL '7 days' THEN r.amount ELSE 0 END), 0)::numeric`.as(
+            'paymentsPaid7'
+          )
+        )
+        .as('paymentsPaid7'),
+      eb
+        .selectFrom('revenue as r')
+        .select(() =>
+          sql`COALESCE(SUM(CASE WHEN r.ts >= date_trunc('day', NOW()) THEN r.amount ELSE 0 END), 0)::numeric`.as(
+            'paymentsPaidToday'
+          )
+        )
+        .as('paymentsPaidToday'),
+      eb
+        .selectFrom('pending')
+        .select('overdueCount')
+        .as('pendingOverdueCount'),
+      eb.selectFrom('pending').select('overdueTotal').as('pendingOverdueTotal'),
+      eb.selectFrom('pending').select('pending7Total').as('pending7Total'),
+      eb.selectFrom('pending').select('pendingTodayTotal').as('pendingTodayTotal'),
+      eb
+        .selectFrom('vw_legacy_plan')
+        .select(({ fn }) => fn.countAll().as('count'))
+        .where('trainerId', '=', trainerId)
+        .where(({ eb, ref }) => eb(ref('status'), 'not in', ['cancelled', 'ended']))
+        .as('activePlans'),
+      eb
+        .selectFrom('sale_product as sp')
+        .innerJoin('sale_credit_pack as scp', 'scp.id', 'sp.id')
+        .leftJoin('credit_usage as cu', 'cu.sale_credit_pack_id', 'scp.id')
+        .where('sp.trainer_id', '=', trainerId)
+        .where('sp.is_credit_pack', '=', true)
+        .where(sql<boolean>`scp.total_credits > COALESCE(cu.credits_used, 0)`)
+        .select(({ fn }) => fn.countAll().as('count'))
+        .as('activePacks'),
+      eb
+        .selectFrom('stripe_balance as sb')
+        .select('sb.object')
+        .whereRef('sb.account_id', '=', 'tr.stripe_account_id')
+        .orderBy('sb.updated_at', 'desc')
+        .limit(1)
+        .as('balanceObject'),
+      eb
+        .selectFrom('vw_legacy_app_notification')
+        .select(({ fn }) => fn.countAll().as('count'))
+        .where('user_id', '=', userId)
+        .where('viewed', '=', false)
+        .as('unreadNotifications'),
+      jsonObjectFrom(
+        eb
+          .selectFrom('session as s')
+          .leftJoin('session_series as series', 'series.id', 's.session_series_id')
+          .select([
+            's.id',
+            sql`COALESCE(series.name, s.location, 'Appointment')`.as('title'),
+            sql`(EXTRACT(EPOCH FROM s.duration) / 60)::int`.as('durationMinutes'),
+            's.start as startTime',
+            's.location',
+            's.address',
+            's.timezone',
+          ])
+          .where('s.trainer_id', '=', trainerId)
+          .where('s.start', '>', sql<Date>`NOW()`)
+          .orderBy('s.start', 'asc')
+          .limit(1)
+      ).as('nextSession'),
+      eb
+        .selectFrom('session')
+          .select(({ fn }) => fn.countAll().as('count'))
+          .where('trainer_id', '=', trainerId)
+          .where('bookable_online', '=', true)
+          .where('start', '>', sql<Date>`NOW()`)
+          .as('onlineBookableCount'),
     ])
     .where('t.id', '=', trainerId)
     .executeTakeFirst()
 
-  if (!trainerRow) {
+  if (!row) {
     throw new Error('Trainer not found')
   }
 
-  const parsedTrainer = trainerRowSchema.parse({
-    firstName: trainerRow.firstName,
-    createdAt: trainerRow.createdAt,
-    smsCredits: trainerRow.smsCredits,
-    defaultCurrency: trainerRow.defaultCurrency,
-    timezone: trainerRow.timezone,
-    stripeAccountId: trainerRow.stripeAccountId,
-  })
+  const parsed = dashboardRowSchema.parse(row)
 
-  // Trial info (latest)
-  const trialRow = await db
-    .selectFrom('trial')
-    .select(({ ref }) => [
-      ref('start_time').as('startTime'),
-      ref('end_time').as('endTime'),
-    ])
-    .where('trainer_id', '=', trainerId)
-    .orderBy('end_time', 'desc')
-    .limit(1)
-    .executeTakeFirst()
+  const toDate = (value: string | number | Date | null | undefined) =>
+    value instanceof Date ? value : value ? new Date(value) : null
 
-  const parsedTrial = trialRow ? trialRowSchema.safeParse(trialRow) : null
+  const trialEndsAt = toDate(parsed.trialEndTime)
   const now = new Date()
-  const trialEndsAt =
-    parsedTrial && parsedTrial.success ? parsedTrial.data.endTime : null
   const trialDaysRemaining =
     trialEndsAt && trialEndsAt > now
       ? Math.max(
@@ -177,214 +335,51 @@ export async function getDashboardSummary(trainerId: string): Promise<DashboardS
         )
       : 0
 
-  // Missions
-  const missionRows = await db
-    .selectFrom('mission')
-    .innerJoin('mission_type', 'mission_type.id', 'mission.id')
-    .leftJoin('reward', 'reward.id', 'mission.reward_id')
-    .select(({ ref }) => [
-      ref('mission.id').as('id'),
-      ref('mission.display_order').as('displayOrder'),
-      ref('mission.reward_id').as('rewardId'),
-      ref('mission.completed_at').as('completedAt'),
-      ref('mission_type.title').as('title'),
-      ref('mission_type.description').as('description'),
-      ref('mission_type.action_url').as('actionUrl'),
-      ref('reward.claimed_at').as('rewardClaimedAt'),
-    ])
-    .where('mission.trainer_id', '=', trainerId)
-    .orderBy('mission.display_order')
-    .execute()
+  const currency = parsed.trainerDefaultCurrency ?? 'USD'
 
-  const missions = missionListSchema.parse(
-    missionRows.map(row => ({
-      id: String(row.id),
-      displayOrder: Number(row.displayOrder),
-      rewardId: row.rewardId ?? null,
-      rewardClaimed: row.rewardClaimedAt !== null,
-      completed: row.completedAt !== null,
-      title: row.title ?? '',
-      description: row.description ?? '',
-      actionUrl: row.actionUrl ?? null,
-    }))
-  )
+  const missions = missionListSchema.parse(parsed.missions ?? [])
 
-  // Revenue (paid)
-  const paymentsAggResult = await sql<{
-    paid7: number | string | null
-    paidToday: number | string | null
-  }>`
-      WITH revenue AS (
-        SELECT payment.amount::numeric AS amount, payment.created_at AS ts
-          FROM payment
-         WHERE payment.trainer_id = ${trainerId}
-           AND payment.refunded_time IS NULL
-           AND (payment.is_manual OR payment.is_stripe OR payment.is_credit_pack OR payment.is_subscription)
-        UNION ALL
-        SELECT ppp.amount::numeric AS amount, ppp.date AS ts
-          FROM payment_plan_payment ppp
-          JOIN payment_plan pp ON pp.id = ppp.payment_plan_id
-         WHERE pp.trainer_id = ${trainerId}
-           AND ppp.status = 'paid'
-        UNION ALL
-        SELECT fi.amount::numeric AS amount, fi.start_date AS ts
-          FROM finance_item fi
-         WHERE fi.trainer_id = ${trainerId}
-           AND fi.amount > 0
-      )
-      SELECT
-        COALESCE(SUM(CASE WHEN ts >= NOW() - INTERVAL '7 days' THEN amount ELSE 0 END), 0)::numeric AS "paid7",
-        COALESCE(SUM(CASE WHEN ts >= date_trunc('day', NOW()) THEN amount ELSE 0 END), 0)::numeric AS "paidToday"
-      FROM revenue
-    `.execute(db)
-
-  const paymentsAgg = paymentsAggSchema.parse(paymentsAggResult.rows[0])
-
-  // Pending / overdue plan payments
-  const pendingAggResult = await sql<{
-    overdueCount: number | string | null
-    overdueTotal: number | string | null
-    pending7Total: number | string | null
-    pendingTodayTotal: number | string | null
-  }>`
-      SELECT
-        COALESCE(SUM(CASE WHEN ppp.date < NOW() THEN 1 ELSE 0 END), 0)::numeric AS "overdueCount",
-        COALESCE(SUM(CASE WHEN ppp.date < NOW() THEN ppp.amount_outstanding ELSE 0 END), 0)::numeric AS "overdueTotal",
-        COALESCE(SUM(CASE WHEN ppp.date >= NOW() AND ppp.date < NOW() + INTERVAL '7 days' THEN ppp.amount_outstanding ELSE 0 END), 0)::numeric AS "pending7Total",
-        COALESCE(SUM(CASE WHEN ppp.date >= date_trunc('day', NOW()) AND ppp.date < date_trunc('day', NOW()) + INTERVAL '1 day' THEN ppp.amount_outstanding ELSE 0 END), 0)::numeric AS "pendingTodayTotal"
-      FROM payment_plan_payment ppp
-      JOIN payment_plan pp ON pp.id = ppp.payment_plan_id
-     WHERE pp.trainer_id = ${trainerId}
-       AND ppp.status NOT IN ('paid','cancelled','refunded','paused')
-    `.execute(db)
-
-  const pendingAgg = pendingAggSchema.parse(pendingAggResult.rows[0])
-
-  // Active subscriptions
-  const activePlansRow = await db
-    .selectFrom('vw_legacy_plan')
-    .select(({ fn }) => fn.countAll().as('count'))
-    .where('trainerId', '=', trainerId)
-    .where(({ eb, ref }) =>
-      eb(ref('status'), 'not in', ['cancelled', 'ended'])
-    )
-    .executeTakeFirst()
-
-  const activePlans = activeCountSchema.parse({
-    count: activePlansRow?.count ?? 0,
-  }).count
-
-  // Active packs (credit packs with remaining credits)
-  const creditPackRows = await fetchSaleProducts(trainerId, {
-    type: 'creditPack',
-  })
-
-  const activePacks = creditPackRows
-    .map(adaptSaleProductRow)
-    .filter(
-      row =>
-        row.type === 'creditPack' &&
-        row.totalCredits > (row.creditsUsed ?? 0)
-    ).length
-
-  // Stripe balance (available + pending)
   let balanceAvailable = 0
   let balancePending = 0
 
-  if (parsedTrainer.stripeAccountId) {
-    const balanceRow = await db
-      .selectFrom('stripe_balance')
-      .select('object')
-      .where('account_id', '=', parsedTrainer.stripeAccountId)
-      .orderBy('updated_at', 'desc')
-      .limit(1)
-      .executeTakeFirst()
+  if (parsed.balanceObject) {
+    balanceAvailable = parsed.balanceObject.available
+      .filter(entry => (currency ? entry.currency === currency : true))
+      .reduce((total, entry) => total + centsToMajorUnits(entry.amount), 0)
 
-    if (balanceRow?.object) {
-      const parsedBalance = stripeBalanceSchema.safeParse(balanceRow.object)
-      if (parsedBalance.success) {
-        const currency = parsedTrainer.defaultCurrency ?? ''
-        balanceAvailable = parsedBalance.data.available
-          .filter(entry =>
-            currency ? entry.currency === currency : true
-          )
-          .reduce(
-            (total, entry) => total + centsToMajorUnits(entry.amount),
-            0
-          )
-        balancePending = parsedBalance.data.pending
-          .filter(entry =>
-            currency ? entry.currency === currency : true
-          )
-          .reduce(
-            (total, entry) => total + centsToMajorUnits(entry.amount),
-            0
-          )
-      }
-    }
+    balancePending = parsed.balanceObject.pending
+      .filter(entry => (currency ? entry.currency === currency : true))
+      .reduce((total, entry) => total + centsToMajorUnits(entry.amount), 0)
   }
 
-  // Next appointment (soonest future session)
-  const nextSessionResult = await sql<{
-    id: string
-    title: string | null
-    startTime: Date
-    durationMinutes: number | null
-    location: string | null
-    address: string | null
-    timezone: string | null
-  }>`
-      SELECT
-        s.id,
-        COALESCE(series.name, s.location, 'Appointment') AS "title",
-        s.start AS "startTime",
-        (EXTRACT(EPOCH FROM s.duration) / 60)::int AS "durationMinutes",
-        s.location AS "location",
-        s.address AS "address",
-        s.timezone AS "timezone"
-      FROM session s
-      LEFT JOIN session_series series ON series.id = s.session_series_id
-     WHERE s.trainer_id = ${trainerId}
-       AND s.start > NOW()
-     ORDER BY s.start ASC
-     LIMIT 1
-    `.execute(db)
-
-  const nextSessionRow = nextSessionResult.rows[0]
-  const nextSession = nextSessionRow
-    ? nextSessionSchema.parse({
-        id: nextSessionRow.id,
-        title: nextSessionRow.title ?? 'Appointment',
-        startTime: nextSessionRow.startTime,
-        durationMinutes: nextSessionRow.durationMinutes ?? 0,
-        location: nextSessionRow.location ?? null,
-        address: nextSessionRow.address ?? null,
-        timezone: nextSessionRow.timezone ?? null,
-      })
+  const nextSession = parsed.nextSession && parsed.nextSession.id
+    ? {
+        id: parsed.nextSession.id,
+        title: parsed.nextSession.title ?? 'Appointment',
+        startTime: (toDate(parsed.nextSession.startTime) ?? new Date()).toISOString(),
+        durationMinutes: parsed.nextSession.durationMinutes ?? 0,
+        location: parsed.nextSession.location,
+        address: parsed.nextSession.address,
+        timezone: parsed.nextSession.timezone,
+      }
     : null
 
-  // Online bookable sessions count
-  const onlineBookableRow = await db
-    .selectFrom('session')
-    .select(({ fn }) => fn.countAll().as('count'))
-    .where('trainer_id', '=', trainerId)
-    .where('bookable_online', '=', true)
-    .where('start', '>', sql<Date>`NOW()`)
-    .executeTakeFirst()
-
-  const onlineBookableCount = onlineBookableCountSchema.parse({
-    count: onlineBookableRow?.count ?? 0,
-  }).count
-
-  const currency = parsedTrainer.defaultCurrency ?? 'USD'
+  const paid7 = money(parsed.paymentsPaid7)
+  const paidToday = money(parsed.paymentsPaidToday)
+  const pending7Total = money(parsed.pending7Total)
+  const pendingTodayTotal = money(parsed.pendingTodayTotal)
+  const overdueCount = Number(parsed.pendingOverdueCount ?? 0)
+  const overdueTotal = money(parsed.pendingOverdueTotal)
+  const hasUnreadNotifications =
+    Number(parsed.unreadNotifications ?? 0) > 0
 
   return {
     trainer: {
-      firstName: parsedTrainer.firstName ?? null,
+      firstName: parsed.trainerFirstName ?? null,
       smsCredits:
-        parsedTrainer.smsCredits === null
+        parsed.trainerSmsCredits === null
           ? null
-          : money(parsedTrainer.smsCredits),
+          : money(parsed.trainerSmsCredits),
       trialEndsAt: trialEndsAt ? trialEndsAt.toISOString() : null,
       trialDaysRemaining: trialDaysRemaining || null,
       defaultCurrency: currency,
@@ -393,17 +388,16 @@ export async function getDashboardSummary(trainerId: string): Promise<DashboardS
     payments: {
       currency,
       last7Days: {
-        paid: money(paymentsAgg.paid7),
-        projected: money(paymentsAgg.paid7) + money(pendingAgg.pending7Total),
+        paid: paid7,
+        projected: paid7 + pending7Total,
       },
       today: {
-        paid: money(paymentsAgg.paidToday),
-        projected:
-          money(paymentsAgg.paidToday) + money(pendingAgg.pendingTodayTotal),
+        paid: paidToday,
+        projected: paidToday + pendingTodayTotal,
       },
       overdue: {
-        count: Number(pendingAgg.overdueCount ?? 0),
-        total: money(pendingAgg.overdueTotal),
+        count: overdueCount,
+        total: overdueTotal,
       },
     },
     funds: {
@@ -412,22 +406,15 @@ export async function getDashboardSummary(trainerId: string): Promise<DashboardS
       available: balanceAvailable,
     },
     subscriptions: {
-      activePlans: Number(activePlans ?? 0),
-      activePacks: Number(activePacks ?? 0),
+      activePlans: Number(parsed.activePlans ?? 0),
+      activePacks: Number(parsed.activePacks ?? 0),
     },
-    nextAppointment: nextSession
-      ? {
-        id: nextSession.id,
-        title: nextSession.title,
-        startTime: nextSession.startTime.toISOString(),
-        durationMinutes: nextSession.durationMinutes,
-        location: nextSession.location,
-        address: nextSession.address,
-        timezone: nextSession.timezone,
-      }
-      : null,
+    nextAppointment: nextSession,
     onlineBookings: {
-      bookableCount: Number(onlineBookableCount ?? 0),
+      bookableCount: Number(parsed.onlineBookableCount ?? 0),
+    },
+    notifications: {
+      hasUnread: hasUnreadNotifications,
     },
   }
 }

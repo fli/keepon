@@ -23,8 +23,11 @@ import { Button } from '@/components/ui/button'
 import { readSessionFromCookies } from '../../session.server'
 import { ProjectedPaidCard } from './projected-paid-card'
 
-async function loadDashboard(trainerId: string): Promise<DashboardSummary> {
-  return getDashboardSummary(trainerId)
+async function loadDashboard(
+  trainerId: string,
+  userId: string
+): Promise<DashboardSummary> {
+  return getDashboardSummary(trainerId, userId)
 }
 
 function formatCurrency(amount: number, currency: string) {
@@ -48,7 +51,7 @@ export default async function DashboardPage() {
   let dashboardError: string | null = null
 
   try {
-    data = await loadDashboard(session.trainerId)
+    data = await loadDashboard(session.trainerId, session.userId)
   } catch (err) {
     dashboardError =
       err instanceof Error ? err.message : 'Unable to load dashboard'
@@ -103,14 +106,22 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <Button
-          variant="outline"
-          size="icon-lg"
-          aria-label="Notifications"
-          render={<Link href="/dashboard/notifications" />}
-        >
-          <Bell className="size-5" aria-hidden />
-        </Button>
+        <div className="relative">
+          <Button
+            variant="outline"
+            size="icon-lg"
+            aria-label="Notifications"
+            render={<Link href="/dashboard/notifications" />}
+          >
+            <Bell className="size-5" aria-hidden />
+          </Button>
+          {data?.notifications.hasUnread ? (
+            <>
+              <span className="absolute right-2 top-2 inline-block h-2 w-2 rounded-full bg-destructive" aria-hidden />
+              <span className="sr-only">You have unread notifications</span>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <section className="space-y-3">

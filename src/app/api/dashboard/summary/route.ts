@@ -19,10 +19,13 @@ export async function GET(request: Request) {
     return authorization.response
   }
 
-  const { trainerId } = authorization
+  const { trainerId, userId } = authorization
 
   try {
-    const responseBody: DashboardSummary = await getDashboardSummary(trainerId)
+    const responseBody: DashboardSummary = await getDashboardSummary(
+      trainerId,
+      userId
+    )
     return NextResponse.json(responseBody)
   } catch (error) {
     if (error instanceof z.ZodError) {
