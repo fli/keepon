@@ -3,8 +3,6 @@ import { db } from '@/lib/db'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const isoDateTimeString = z
   .string()
   .trim()

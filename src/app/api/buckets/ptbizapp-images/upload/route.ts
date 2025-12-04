@@ -10,8 +10,6 @@ import {
   uploadToPublicBucket,
 } from '../../../_lib/storage'
 
-export const runtime = 'nodejs'
-
 const createInvalidBodyResponse = (detail?: string) =>
   NextResponse.json(
     buildErrorResponse({

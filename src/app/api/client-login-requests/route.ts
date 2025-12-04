@@ -9,8 +9,6 @@ import {
   KEEPON_LOGO_COLOR_URL,
 } from '../_lib/constants'
 
-export const runtime = 'nodejs'
-
 const requestSchema = z.object({
   email: z
     .string()
@@ -178,4 +176,3 @@ export async function POST(request: Request) {
 
   return new Response(null, { status: 204 })
 }
-

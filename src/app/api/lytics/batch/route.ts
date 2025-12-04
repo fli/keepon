@@ -5,8 +5,6 @@ import type { AnalyticsData } from '@/lib/db'
 import type { Insertable } from 'kysely'
 import { buildErrorResponse } from '../../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const dateLikeSchema = z.union([z.string(), z.number(), z.date()])
 const looseRecord = z.record(z.string(), z.unknown())
 

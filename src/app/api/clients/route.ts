@@ -7,8 +7,6 @@ import {
 } from '../_lib/accessToken'
 import { adaptClientRow, clientListSchema } from './shared'
 
-export const runtime = 'nodejs'
-
 const querySchema = z.object({
   sessionId: z.string().min(1).optional(),
 })

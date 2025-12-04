@@ -5,8 +5,6 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 type TimeZoneInfoMap = Record<string, string>
 
 let cachedTimeZoneInfo: TimeZoneInfoMap | null = null

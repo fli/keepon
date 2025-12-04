@@ -11,8 +11,6 @@ import {
 } from '@/server/clients'
 import { clientListSchema } from '../../../clients/shared'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   trainerId: z.string().uuid({ message: 'trainerId must be a valid UUID' }),
 })

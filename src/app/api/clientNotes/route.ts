@@ -12,8 +12,6 @@ import {
   type ClientNoteRow,
 } from './shared'
 
-export const runtime = 'nodejs'
-
 const requestBodySchema = z
   .object({
     clientId: z

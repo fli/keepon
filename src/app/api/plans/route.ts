@@ -7,8 +7,6 @@ import {
 } from '../_lib/accessToken'
 import { normalizePlanRow, type RawPlanRow } from './shared'
 
-export const runtime = 'nodejs'
-
 const querySchema = z.object({
   clientId: z
     .string()

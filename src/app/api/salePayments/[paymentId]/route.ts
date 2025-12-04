@@ -11,8 +11,6 @@ import {
   type SalePaymentRow,
 } from '../../_lib/salePayments'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   paymentId: z
     .string()

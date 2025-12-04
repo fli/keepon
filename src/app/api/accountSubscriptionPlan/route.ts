@@ -7,8 +7,6 @@ import {
 } from '../_lib/accessToken'
 import { getAccountSubscriptionPricingForCountry } from '../_lib/accountSubscriptionPricing'
 
-export const runtime = 'nodejs'
-
 const trainerPricingRowSchema = z.object({
   country: z
     .string()

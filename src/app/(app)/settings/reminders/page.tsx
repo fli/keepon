@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 
 import Link from 'next/link'
@@ -9,7 +10,22 @@ import { Button } from '@/components/ui/button'
 
 import { readSessionFromCookies } from '../../../session.server'
 
-export default async function RemindersSettingsPage() {
+export default function RemindersSettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer className="flex flex-col gap-6 py-8">
+          <h1 className="text-3xl font-semibold leading-tight">Reminders</h1>
+          <p className="text-sm text-muted-foreground">Loading your reminder settings…</p>
+        </PageContainer>
+      }
+    >
+      <RemindersSettingsContent />
+    </Suspense>
+  )
+}
+
+async function RemindersSettingsContent() {
   const session = await readSessionFromCookies()
   if (!session) {
     redirect('/auth')

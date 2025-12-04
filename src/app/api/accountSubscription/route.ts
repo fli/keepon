@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import BigNumber from 'bignumber.js'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
@@ -10,8 +11,6 @@ import {
 import { getAccountSubscriptionPricingForCountry } from '../_lib/accountSubscriptionPricing'
 import { currencyChargeLimits } from '../_lib/transactionFees'
 import { getStripeClient, STRIPE_API_VERSION } from '../_lib/stripeClient'
-
-export const runtime = 'nodejs'
 
 const patchRequestBodySchema = z.object({
   cancelAtPeriodEnd: z.boolean(),
@@ -77,8 +76,9 @@ const alreadySubscribedStripeStatuses = new Set([
   'trialing',
 ])
 
-const extractClientIp = (request: Request) => {
-  const forwardedFor = request.headers.get('x-forwarded-for')
+const extractClientIp = async () => {
+  const headerStore = await headers()
+  const forwardedFor = headerStore.get('x-forwarded-for')
   if (forwardedFor) {
     const [first] = forwardedFor.split(',')
     const ip = first?.trim()
@@ -87,7 +87,7 @@ const extractClientIp = (request: Request) => {
     }
   }
 
-  const realIp = request.headers.get('x-real-ip')
+  const realIp = headerStore.get('x-real-ip')
   return realIp?.trim() || undefined
 }
 
@@ -597,7 +597,7 @@ export async function PUT(request: Request) {
     }
   }
 
-  const ipAddress = extractClientIp(request)
+  const ipAddress = await extractClientIp()
   const stripeAddress: Stripe.AddressParam = {
     line1: parsedBody.address.line1,
     line2: parsedBody.address.line2 ?? undefined,

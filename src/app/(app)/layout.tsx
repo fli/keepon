@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Suspense } from 'react'
 
 import { WebTopNav } from '../../components/web-top-nav'
 
@@ -11,9 +12,11 @@ export default function AppShellLayout({
 }) {
   return (
     <>
-      <WebTopNav />
-      {breadcrumbs}
-      {children}
+      <Suspense fallback={null}>
+        <WebTopNav />
+      </Suspense>
+      <Suspense fallback={null}>{breadcrumbs}</Suspense>
+      <Suspense fallback={null}>{children}</Suspense>
     </>
   )
 }

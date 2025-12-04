@@ -14,8 +14,6 @@ import {
   type TransactionFeeType,
 } from '../_lib/transactionFees'
 
-export const runtime = 'nodejs'
-
 const amountSchema = z
   .string()
   .trim()

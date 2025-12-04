@@ -7,8 +7,6 @@ import {
 import { ZodError } from 'zod'
 import { parseNotificationRows, paramsSchema, RawNotificationRow } from '../_shared'
 
-export const runtime = 'nodejs'
-
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/notifications/new'>
 
 export async function GET(

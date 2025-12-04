@@ -9,8 +9,6 @@ import {
   buildErrorResponse,
 } from '../../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const weekdays = [
   'monday',
   'tuesday',

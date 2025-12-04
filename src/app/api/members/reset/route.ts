@@ -8,8 +8,6 @@ import {
   KEEPON_LOGO_COLOR_URL,
 } from '../../_lib/constants'
 
-export const runtime = 'nodejs'
-
 const PASSWORD_RESET_TTL_MINUTES = 15
 
 const requestSchema = z.object({

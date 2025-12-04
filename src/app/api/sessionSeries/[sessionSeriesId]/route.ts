@@ -10,8 +10,6 @@ import {
   type RawSessionSeriesRow,
 } from '../shared'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   sessionSeriesId: z
     .string()

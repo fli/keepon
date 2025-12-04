@@ -9,8 +9,6 @@ import {
 import { getStripeClient } from '../../_lib/stripeClient'
 import { adaptClientRow, clientSchema } from '../shared'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   clientId: z
     .string()

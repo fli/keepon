@@ -7,8 +7,6 @@ import {
 } from '../../_lib/accessToken'
 import { adaptSessionRow, RawSessionRow } from '../shared'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   sessionId: z
     .string()

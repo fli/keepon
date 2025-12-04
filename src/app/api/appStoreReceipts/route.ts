@@ -6,8 +6,6 @@ import {
   buildErrorResponse,
 } from '../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const APP_STORE_PROD_URL = 'https://buy.itunes.apple.com/verifyReceipt'
 const APP_STORE_SANDBOX_URL = 'https://sandbox.itunes.apple.com/verifyReceipt'
 

@@ -11,8 +11,6 @@ import {
   type ClientNoteRow,
 } from '../shared'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   clientNoteId: z
     .string()

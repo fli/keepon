@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const configSchema = z.object({
   stripePublishableKey: z.string().trim().min(1, 'STRIPE_PUBLISHABLE_KEY must not be empty.'),
   googlePublishableKey: z.string().trim().min(1, 'GOOGLE_PUBLISHABLE_KEY must not be empty.'),

@@ -3,8 +3,6 @@ import { z } from 'zod'
 import { buildErrorResponse } from '../../_lib/accessToken'
 import { login, loginRequestSchema } from '@/server/auth'
 
-export const runtime = 'nodejs'
-
 const responseSchema = z.object({
   id: z.string(),
   userId: z.string(),

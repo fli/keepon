@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
+import { headers as nextHeaders } from 'next/headers'
 import { z } from 'zod'
 import {
   authenticateTrainerRequest,
   buildErrorResponse,
 } from '../../../_lib/accessToken'
-
-export const runtime = 'nodejs'
 
 const baseUrl =
   'https://maps.googleapis.com/maps/api/place/autocomplete/json'
@@ -109,7 +108,7 @@ export async function GET(request: Request) {
 
     const headers = new Headers()
     const acceptLanguage = sanitizeHeaderValue(
-      request.headers.get('accept-language')
+      (await nextHeaders()).get('accept-language')
     )
     if (acceptLanguage) {
       headers.set('Accept-Language', acceptLanguage)

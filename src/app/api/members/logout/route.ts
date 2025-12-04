@@ -5,8 +5,6 @@ import {
 } from '../../_lib/accessToken'
 import { logout } from '@/server/auth'
 
-export const runtime = 'nodejs'
-
 export async function POST(request: Request) {
   const authorization = await authenticateTrainerOrClientRequest(request, {
     trainerExtensionFailureLogMessage:

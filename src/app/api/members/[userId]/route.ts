@@ -6,8 +6,6 @@ import {
   extractAccessToken,
 } from '../../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const FIFTEEN_MINUTES_IN_MS = 15 * 60 * 1000
 
 const paramsSchema = z.object({
@@ -47,7 +45,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
 
   const { userId } = paramsResult.data
 
-  const accessToken = extractAccessToken(request)
+  const accessToken = await extractAccessToken(request)
 
   if (!accessToken) {
     return NextResponse.json(

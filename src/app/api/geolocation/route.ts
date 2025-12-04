@@ -1,8 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, connection } from 'next/server'
+import { headers } from 'next/headers'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
-
-export const runtime = 'nodejs'
 
 const positionSchema = z
   .object({
@@ -47,15 +46,27 @@ const parsePositionHeader = (rawValue: string | null) => {
   return { lat, lng }
 }
 
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
   try {
-    const headers = request.headers
+    try {
+      await connection()
+    } catch {
+      // Ignore connection rejection during prerender.
+    }
+    let headersList: Headers | null = null
+    try {
+      headersList = await headers()
+    } catch {
+      // If prerendered, fall back to the request headers.
+    }
+
+    const headerSource = headersList ?? new Headers()
 
     const responseBody = geolocationSchema.parse({
-      country: sanitizeHeaderValue(headers.get('Geo-Country')),
-      subdivision: sanitizeHeaderValue(headers.get('Geo-Subdivision')),
-      city: sanitizeHeaderValue(headers.get('Geo-City')),
-      position: parsePositionHeader(headers.get('Geo-Position')),
+      country: sanitizeHeaderValue(headerSource.get('Geo-Country')),
+      subdivision: sanitizeHeaderValue(headerSource.get('Geo-Subdivision')),
+      city: sanitizeHeaderValue(headerSource.get('Geo-City')),
+      position: parsePositionHeader(headerSource.get('Geo-Position')),
     })
 
     return NextResponse.json(responseBody)

@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
-import { NextResponse } from 'next/server'
+import { NextResponse, connection } from 'next/server'
+import { headers } from 'next/headers'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 
@@ -66,8 +67,23 @@ export const buildErrorResponse = ({
 
 export type ErrorResponseBody = ReturnType<typeof buildErrorResponse>
 
-export const extractAccessToken = (request: Request) => {
-  const headerValue = request.headers.get('authorization')
+const ensureRuntimeContext = async () => {
+  try {
+    await connection()
+  } catch {
+    // During prerender connection() rejects once the prerender aborts; ignore to allow fallback.
+  }
+}
+
+export const extractAccessToken = async (request: Request) => {
+  await ensureRuntimeContext()
+  let headerValue: string | null = null
+  try {
+    headerValue = (await headers()).get('authorization')
+  } catch {
+    // Ignore header store errors during prerender.
+  }
+
   if (headerValue) {
     const [authType, value] = headerValue.split(/\s+/)
     if (authType === 'Basic' && value) {
@@ -85,6 +101,10 @@ export const extractAccessToken = (request: Request) => {
     } else if (headerValue.trim().length > 0) {
       return headerValue.trim()
     }
+  }
+
+  if (process.env.NEXT_PHASE === 'phase-production-build') {
+    return undefined
   }
 
   const url = new URL(request.url)
@@ -176,7 +196,7 @@ export const authenticateTrainerRequest = async (
   request: Request,
   options: AuthenticateTrainerOptions = {}
 ): Promise<AuthenticateTrainerSuccess | AuthenticateTrainerFailure> => {
-  const accessToken = extractAccessToken(request)
+  const accessToken = await extractAccessToken(request)
   if (!accessToken) {
     return {
       ok: false,
@@ -307,7 +327,7 @@ export const authenticateClientRequest = async (
   request: Request,
   options: AuthenticateClientOptions = {}
 ): Promise<AuthenticateClientSuccess | AuthenticateClientFailure> => {
-  const accessToken = extractAccessToken(request)
+  const accessToken = await extractAccessToken(request)
   if (!accessToken) {
     return {
       ok: false,
@@ -375,7 +395,7 @@ export const authenticateTrainerOrClientRequest = async (
 ): Promise<
   AuthenticateTrainerOrClientSuccess | AuthenticateTrainerOrClientFailure
 > => {
-  const accessToken = extractAccessToken(request)
+  const accessToken = await extractAccessToken(request)
   if (!accessToken) {
     return {
       ok: false,

@@ -1,10 +1,9 @@
 import { Buffer } from 'node:buffer'
 import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
-
-export const runtime = 'nodejs'
 
 const authorizationSchema = z.object({
   email: z
@@ -88,9 +87,9 @@ const parseBasicAuthorization = (
   return { ok: true, ...parsed.data }
 }
 
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
   const authorization = parseBasicAuthorization(
-    request.headers.get('authorization')
+    (await headers()).get('authorization')
   )
 
   if (!authorization.ok) {

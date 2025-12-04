@@ -12,8 +12,6 @@ import {
   rewardTypeSchema,
 } from '../shared'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   rewardId: z
     .string()

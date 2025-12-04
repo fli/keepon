@@ -13,8 +13,6 @@ import {
   type RawPlanRow,
 } from '../../../../plans/shared'
 
-export const runtime = 'nodejs'
-
 const MAX_TIME = new Date(8640000000000000)
 
 const paramsSchema = z.object({

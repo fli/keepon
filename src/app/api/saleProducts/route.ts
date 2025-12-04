@@ -13,8 +13,6 @@ import {
   saleProductTypeSchema,
 } from './shared'
 
-export const runtime = 'nodejs'
-
 const querySchema = z.object({
   type: saleProductTypeSchema.optional(),
   saleId: z.string().min(1).optional(),

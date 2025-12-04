@@ -9,8 +9,6 @@ import {
 } from '../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../_lib/constants'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   clientSessionId: z
     .string()

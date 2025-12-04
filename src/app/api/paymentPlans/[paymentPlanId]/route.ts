@@ -16,8 +16,6 @@ import {
   type PaymentPlanRow,
 } from '../shared'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   paymentPlanId: z.string().min(1),
 })

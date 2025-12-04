@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
@@ -123,7 +124,22 @@ async function createService(formData: FormData) {
   redirect('/settings/services')
 }
 
-export default async function AddServicePage() {
+export default function AddServicePage() {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer className="flex flex-col items-center gap-6 py-8">
+          <h1 className="text-3xl font-semibold leading-tight">Add service</h1>
+          <p className="text-sm text-muted-foreground">Loading form…</p>
+        </PageContainer>
+      }
+    >
+      <AddServiceContent />
+    </Suspense>
+  )
+}
+
+async function AddServiceContent() {
   const session = await readSessionFromCookies()
   if (!session) {
     redirect('/auth')
@@ -145,14 +161,14 @@ export default async function AddServicePage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="price">Price</Label>
-          <Input id="price" name="price" inputMode="decimal" placeholder="75.00" required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="durationMinutes">Duration (minutes)</Label>
-          <Input
-            id="durationMinutes"
+          <div className="space-y-2">
+            <Label htmlFor="price">Price</Label>
+            <Input id="price" name="price" inputMode="decimal" placeholder="75.00" required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="durationMinutes">Duration (minutes)</Label>
+            <Input
+              id="durationMinutes"
               name="durationMinutes"
               inputMode="numeric"
               placeholder="60"
@@ -162,14 +178,14 @@ export default async function AddServicePage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="location">Location (optional)</Label>
-          <Input id="location" name="location" placeholder="Studio, Online, etc." />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="address">Address (optional)</Label>
-          <Input id="address" name="address" placeholder="123 Main St" />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="location">Location (optional)</Label>
+            <Input id="location" name="location" placeholder="Studio, Online, etc." />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="address">Address (optional)</Label>
+            <Input id="address" name="address" placeholder="123 Main St" />
+          </div>
         </div>
 
         <div className="space-y-2">

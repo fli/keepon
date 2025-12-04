@@ -7,8 +7,6 @@ import type { IPostgresInterval } from 'postgres-interval'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 /**
  * Shared schemas
  */

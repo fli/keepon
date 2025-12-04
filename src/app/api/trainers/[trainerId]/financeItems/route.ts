@@ -11,8 +11,6 @@ import {
   type FinanceItemRow,
 } from '../../../financeItems/shared'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   trainerId: z.string().min(1, 'Trainer id is required'),
 })

@@ -7,8 +7,6 @@ import {
 import { getDashboardSummary } from '@/server/dashboard'
 import type { DashboardSummary } from '@/server/dashboard'
 
-export const runtime = 'nodejs'
-
 export async function GET(request: Request) {
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage:

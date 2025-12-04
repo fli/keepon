@@ -6,8 +6,6 @@ import {
   extractAccessToken,
 } from '../../../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   userId: z
     .string()
@@ -99,7 +97,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     )
   }
 
-  const accessToken = extractAccessToken(request)
+  const accessToken = await extractAccessToken(request)
   if (!accessToken) {
     return createMissingTokenResponse()
   }

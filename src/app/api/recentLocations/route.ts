@@ -6,8 +6,6 @@ import {
   buildErrorResponse,
 } from '../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const geoSchema = z
   .object({
     lat: z.number(),

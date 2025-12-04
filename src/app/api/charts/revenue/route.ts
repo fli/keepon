@@ -6,8 +6,6 @@ import {
   buildErrorResponse,
 } from '../../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const isValidTimeZone = (value: string) => {
   try {
     // Throws if the time zone identifier is invalid.

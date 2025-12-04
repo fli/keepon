@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import { z } from 'zod'
 import { db, sql } from '@/lib/db'
 import {
@@ -6,8 +7,6 @@ import {
   buildErrorResponse,
 } from '../../../_lib/accessToken'
 import { normalizePlanRow, type RawPlanRow } from '../../shared'
-
-export const runtime = 'nodejs'
 
 const paramsSchema = z.object({
   planId: z
@@ -52,8 +51,9 @@ type PlanDetails = {
   clientLastName: string | null
 }
 
-const extractClientIp = (request: Request) => {
-  const forwardedFor = request.headers.get('x-forwarded-for')
+const extractClientIp = async () => {
+  const headerStore = await headers()
+  const forwardedFor = headerStore.get('x-forwarded-for')
   if (forwardedFor) {
     const [first] = forwardedFor.split(',')
     const ip = first?.trim()
@@ -62,7 +62,7 @@ const extractClientIp = (request: Request) => {
     }
   }
 
-  const realIp = request.headers.get('x-real-ip')
+  const realIp = headerStore.get('x-real-ip')
   return realIp?.trim() || undefined
 }
 
@@ -141,7 +141,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         throw new NoPaymentMethodOnFileError()
       }
 
-      const ipAddress = extractClientIp(request)
+      const ipAddress = await extractClientIp()
       const clientName = joinName(details.clientFirstName, details.clientLastName)
       const planName = details.name ?? 'Subscription'
 

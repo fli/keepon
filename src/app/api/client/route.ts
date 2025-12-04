@@ -6,8 +6,6 @@ import {
   buildErrorResponse,
 } from '../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const clientRowSchema = z.object({
   email: z.string(),
   stripeCustomerId: z.string().nullable(),

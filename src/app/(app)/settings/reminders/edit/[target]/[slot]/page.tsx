@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 
 import { PageContainer } from '@/components/page-container'
@@ -15,7 +16,27 @@ const targetParamToKey = (param: TargetParam) =>
 const slotParamToNumber = (param: string): 1 | 2 | null =>
   param === '1' ? 1 : param === '2' ? 2 : null
 
-export default async function EditReminderPage({
+export default function EditReminderPage({
+  params,
+}: {
+  params: Promise<{ target: TargetParam; slot: string }>
+}) {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer className="flex flex-col gap-6 py-8">
+          <p className="text-sm uppercase tracking-wide text-muted-foreground">Settings</p>
+          <h1 className="text-3xl font-semibold leading-tight">Edit reminder</h1>
+          <p className="text-sm text-muted-foreground">Loading reminder…</p>
+        </PageContainer>
+      }
+    >
+      <EditReminderContent params={params} />
+    </Suspense>
+  )
+}
+
+async function EditReminderContent({
   params,
 }: {
   params: Promise<{ target: TargetParam; slot: string }>

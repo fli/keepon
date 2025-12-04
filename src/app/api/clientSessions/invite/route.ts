@@ -12,8 +12,6 @@ import {
   RawClientSessionRow,
 } from '../../_lib/clientSessionsSchema'
 
-export const runtime = 'nodejs'
-
 const requestSchema = z.object({
   clientId: z
     .string({ message: 'clientId is required' })

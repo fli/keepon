@@ -16,8 +16,6 @@ import {
 } from '../../../../../plans/shared'
 import { paymentSchema } from '../../../../../_lib/clientSessionsSchema'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   clientId: z
     .string()

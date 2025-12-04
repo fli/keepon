@@ -7,8 +7,6 @@ import {
 } from '../../../_lib/accessToken'
 import { noteSchema } from '../../../_lib/clientSessionsSchema'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   sessionId: z
     .string({ message: 'Session id is required.' })

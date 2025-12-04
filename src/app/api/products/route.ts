@@ -13,8 +13,6 @@ import {
 import type { Insertable } from 'kysely'
 import type { Service } from '@/lib/db/generated'
 
-export const runtime = 'nodejs'
-
 const nonNegativeMoneyString = moneyString.refine(
   value => Number.parseFloat(value) >= 0,
   'Price must be non-negative'

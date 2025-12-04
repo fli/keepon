@@ -7,8 +7,6 @@ import {
 import { paramsSchema } from '../_shared'
 import { listTrainerNotifications } from '@/server/notifications'
 
-export const runtime = 'nodejs'
-
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/notifications/all'>
 
 export async function GET(request: NextRequest, context: HandlerContext) {

@@ -11,8 +11,6 @@ import {
   type FetchSaleProductFilters,
 } from '../shared'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   saleProductId: z
     .string()

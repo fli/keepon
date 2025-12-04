@@ -4,8 +4,6 @@ import { z } from 'zod'
 import { buildErrorResponse } from '../../_lib/accessToken'
 import { getSmsCreditPricingForCountry } from '../../_lib/smsCreditPricing'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   id: z
     .string()

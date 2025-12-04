@@ -6,8 +6,6 @@ import {
   buildErrorResponse,
 } from '../../../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   clientId: z
     .string()

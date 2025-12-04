@@ -13,8 +13,6 @@ import {
   uploadBufferToPublicBucket,
 } from '../../../_lib/storage'
 
-export const runtime = 'nodejs'
-
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 const allowedExtensions = new Set(['jpg', 'jpeg', 'png', 'gif'])
 

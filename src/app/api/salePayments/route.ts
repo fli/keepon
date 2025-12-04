@@ -12,8 +12,6 @@ import {
   type SalePaymentRow,
 } from '../_lib/salePayments'
 
-export const runtime = 'nodejs'
-
 const querySchema = z.object({
   saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }).optional(),
   updatedAfter: z

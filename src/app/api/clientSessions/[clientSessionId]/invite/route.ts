@@ -12,8 +12,6 @@ import {
   RawClientSessionRow,
 } from '../../../_lib/clientSessionsSchema'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   clientSessionId: z
     .string()

@@ -7,8 +7,6 @@ import {
 } from '../../../../_lib/accessToken'
 import { financeItemNoteSchema } from '../../../shared'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   financeItemId: z
     .string({ message: 'Finance item id is required.' })

@@ -14,8 +14,6 @@ import {
   type RawPlanRow,
 } from '../../../plans/shared'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   clientId: z
     .string()

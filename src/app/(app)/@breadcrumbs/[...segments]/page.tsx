@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, Suspense } from 'react'
 import Link from 'next/link'
 import type { Route } from 'next'
 
@@ -105,6 +105,18 @@ async function buildCrumbs(segments: string[]): Promise<Crumb[]> {
 }
 
 export default async function BreadcrumbsSlot({
+  params,
+}: {
+  params: Promise<{ segments?: string[] }>
+}) {
+  return (
+    <Suspense fallback={null}>
+      <BreadcrumbsContent params={params} />
+    </Suspense>
+  )
+}
+
+async function BreadcrumbsContent({
   params,
 }: {
   params: Promise<{ segments?: string[] }>

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import './globals.css'
 import { cn } from '@/lib/utils'
 
@@ -27,7 +28,9 @@ export default async function RootLayout({
           'root min-h-screen bg-background text-foreground font-sans antialiased'
         )}
       >
-        <div className="min-h-screen flex flex-col">{children}</div>
+        <div className="min-h-screen flex flex-col">
+          <Suspense fallback={null}>{children}</Suspense>
+        </div>
       </body>
     </html>
   )

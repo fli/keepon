@@ -6,8 +6,6 @@ import {
   buildErrorResponse,
 } from '../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const FALLBACK_TRIAL_DURATION = '14 days'
 
 const intervalLiteralSchema = z

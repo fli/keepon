@@ -6,8 +6,6 @@ import {
   buildErrorResponse,
 } from '../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const isoDateTimeString = z
   .union([z.string(), z.date()])
   .transform(value => {

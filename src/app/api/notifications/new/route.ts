@@ -10,8 +10,6 @@ import {
   RawNotificationRow,
 } from '../../trainers/[trainerId]/notifications/_shared'
 
-export const runtime = 'nodejs'
-
 export async function GET(request: Request) {
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage:

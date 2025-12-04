@@ -18,8 +18,6 @@ import {
   type PaymentPlanStatus,
 } from './shared'
 
-export const runtime = 'nodejs'
-
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const rawStatus = url.searchParams.get('status')

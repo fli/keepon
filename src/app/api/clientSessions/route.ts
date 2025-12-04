@@ -11,8 +11,6 @@ import {
   RawClientSessionRow,
 } from '../_lib/clientSessionsSchema'
 
-export const runtime = 'nodejs'
-
 const querySchema = z.object({
   sessionId: z.string().min(1).optional(),
   clientId: z.string().min(1).optional(),

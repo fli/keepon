@@ -14,8 +14,6 @@ import {
 } from '../../../_lib/salePayments'
 import { getStripeClient, STRIPE_API_VERSION } from '../../../_lib/stripeClient'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   paymentId: z
     .string()

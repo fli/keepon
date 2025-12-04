@@ -7,8 +7,6 @@ import {
 } from '../../_lib/accessToken'
 import { getProductById, moneyString } from '@/server/products'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   productId: z
     .string()

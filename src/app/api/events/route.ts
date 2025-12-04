@@ -4,8 +4,6 @@ import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
 import { parseAmount } from '../paymentPlans/shared'
 
-export const runtime = 'nodejs'
-
 const querySchema = z.object({
   providerUrlSlug: z.string().trim().min(1, 'providerUrlSlug must not be empty'),
 })

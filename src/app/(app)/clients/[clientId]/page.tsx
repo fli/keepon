@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +12,22 @@ import { PageContainer } from '@/components/page-container'
 import { statusColors, normalizeStatus, optionalValue } from '@/lib/app/features/clients/shared'
 import { loadClientsServer, readSessionFromCookies } from '../actions'
 
-export default async function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
+export default function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer className="flex flex-col gap-6 py-8">
+          <h1 className="text-3xl font-semibold leading-tight">Client</h1>
+          <p className="text-sm text-muted-foreground">Loading client details…</p>
+        </PageContainer>
+      }
+    >
+      <ClientDetailContent params={params} />
+    </Suspense>
+  )
+}
+
+async function ClientDetailContent({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params
   const session = await readSessionFromCookies()
   if (!session) {

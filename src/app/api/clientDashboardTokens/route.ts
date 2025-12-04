@@ -3,8 +3,6 @@ import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const requestSchema = z.object({
   email: z
     .string()

@@ -13,8 +13,6 @@ import {
 } from './shared'
 import { db } from '@/lib/db'
 
-export const runtime = 'nodejs'
-
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const normalize = (value: string | null) =>

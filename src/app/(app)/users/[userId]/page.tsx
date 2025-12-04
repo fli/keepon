@@ -1,10 +1,26 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { PageContainer } from '@/components/page-container'
 import { readSessionFromCookies } from '../../../session.server'
 
-export default async function UserPage({ params }: { params: Promise<{ userId: string }> }) {
+export default function UserPage({ params }: { params: Promise<{ userId: string }> }) {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer className="flex flex-col gap-3 py-8">
+          <h1 className="text-3xl font-semibold">User</h1>
+          <p className="text-sm text-muted-foreground">Loading user…</p>
+        </PageContainer>
+      }
+    >
+      <UserPageContent params={params} />
+    </Suspense>
+  )
+}
+
+async function UserPageContent({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = await params
   const session = await readSessionFromCookies()
   if (!session) {

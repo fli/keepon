@@ -4,8 +4,6 @@ import { z } from 'zod'
 import { db, type Json } from '@/lib/db'
 import { buildErrorResponse } from '../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const mandrillWebhookSchema = z
   .object({
     id: z.number(),

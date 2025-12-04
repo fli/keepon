@@ -3,8 +3,6 @@ import path from 'node:path'
 import { z } from 'zod'
 import { buildErrorResponse } from '../../../../_lib/accessToken'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   imageUrl: z.string(),
 })

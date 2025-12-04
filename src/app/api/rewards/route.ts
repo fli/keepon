@@ -11,8 +11,6 @@ import {
   rewardRowSchema,
 } from './shared'
 
-export const runtime = 'nodejs'
-
 export async function GET(request: Request) {
   try {
     const authorization = await authenticateTrainerRequest(request, {

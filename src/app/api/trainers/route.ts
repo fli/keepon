@@ -4,8 +4,6 @@ import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
 import { createTrainerAccount, trainerSignupSchema } from '@/server/trainers'
 
-export const runtime = 'nodejs'
-
 const responseSchema = z.object({
   id: z.string(),
   userId: z.string(),

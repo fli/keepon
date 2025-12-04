@@ -8,8 +8,6 @@ import {
 } from '../../../_lib/accessToken'
 import { getStripeClient } from '../../../_lib/stripeClient'
 
-export const runtime = 'nodejs'
-
 const paramsSchema = z.object({
   trainerId: z
     .string()

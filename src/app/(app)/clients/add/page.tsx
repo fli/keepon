@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 
@@ -49,7 +50,22 @@ async function addClient(formData: FormData) {
   redirect(`/clients/${client.id}`)
 }
 
-export default async function AddClientPage() {
+export default function AddClientPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer className="flex flex-col items-center gap-6 py-8">
+          <h1 className="text-3xl font-semibold leading-tight">Add client</h1>
+          <p className="text-sm text-muted-foreground">Loading form…</p>
+        </PageContainer>
+      }
+    >
+      <AddClientContent />
+    </Suspense>
+  )
+}
+
+async function AddClientContent() {
   const session = await readSessionFromCookies()
   if (!session) {
     redirect('/auth')
