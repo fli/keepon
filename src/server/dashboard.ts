@@ -34,6 +34,7 @@ const dashboardRowSchema = z.object({
   trainerCreatedAt: z.union([z.date(), z.string(), z.null()]),
   trialStartTime: z.union([z.date(), z.string(), z.null()]),
   trialEndTime: z.union([z.date(), z.string(), z.null()]),
+  stripePaymentsBlocked: z.union([z.boolean(), z.null()]),
   missions: missionListSchema.nullable(),
   paymentsPaid7: z.union([z.number(), z.string(), z.null()]),
   paymentsPaidToday: z.union([z.number(), z.string(), z.null()]),
@@ -57,6 +58,7 @@ const dashboardRowSchema = z.object({
     })
     .nullable(),
   onlineBookableCount: z.union([z.number(), z.string(), z.null()]),
+  serviceCount: z.union([z.number(), z.string(), z.null()]),
 })
 
 const money = (value: unknown) => {
@@ -78,6 +80,7 @@ export type DashboardSummary = {
     trialEndsAt: string | null
     trialDaysRemaining: number | null
     defaultCurrency: string
+    paymentsSetupRequired: boolean
   }
   missions: z.infer<typeof missionListSchema>
   payments: {
@@ -106,6 +109,7 @@ export type DashboardSummary = {
   } | null
   onlineBookings: {
     bookableCount: number
+    serviceCount: number
   }
   notifications: {
     hasUnread: boolean
@@ -200,6 +204,7 @@ export async function getDashboardSummary(
       't.default_currency as trainerDefaultCurrency',
       't.timezone as trainerTimezone',
       't.created_at as trainerCreatedAt',
+      'tr.stripe_payments_blocked as stripePaymentsBlocked',
     ])
     .select((eb) => [
       eb
@@ -310,6 +315,12 @@ export async function getDashboardSummary(
           .where('bookable_online', '=', true)
           .where('start', '>', sql<Date>`NOW()`)
           .as('onlineBookableCount'),
+      eb
+        .selectFrom('product as p')
+        .select(({ fn }) => fn.countAll().as('count'))
+        .where('p.trainer_id', '=', trainerId)
+        .where('p.is_service', '=', true)
+        .as('serviceCount'),
     ])
     .where('t.id', '=', trainerId)
     .executeTakeFirst()
@@ -372,6 +383,8 @@ export async function getDashboardSummary(
   const overdueTotal = money(parsed.pendingOverdueTotal)
   const hasUnreadNotifications =
     Number(parsed.unreadNotifications ?? 0) > 0
+  const paymentsSetupRequired = Boolean(parsed.stripePaymentsBlocked ?? false)
+  const serviceCount = Number(parsed.serviceCount ?? 0)
 
   return {
     trainer: {
@@ -379,10 +392,11 @@ export async function getDashboardSummary(
       smsCredits:
         parsed.trainerSmsCredits === null
           ? null
-          : money(parsed.trainerSmsCredits),
+      : money(parsed.trainerSmsCredits),
       trialEndsAt: trialEndsAt ? trialEndsAt.toISOString() : null,
       trialDaysRemaining: trialDaysRemaining || null,
       defaultCurrency: currency,
+      paymentsSetupRequired,
     },
     missions,
     payments: {
@@ -412,6 +426,7 @@ export async function getDashboardSummary(
     nextAppointment: nextSession,
     onlineBookings: {
       bookableCount: Number(parsed.onlineBookableCount ?? 0),
+      serviceCount,
     },
     notifications: {
       hasUnread: hasUnreadNotifications,

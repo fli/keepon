@@ -50,7 +50,7 @@ export const loadCreditPacks = cache(async (): Promise<CreditPack[]> => {
 const sellSchema = z.object({
   clientId: z.string().min(1, 'clientId is required'),
   productId: z.string().min(1, 'productId is required'),
-  paymentKind: z.enum(['record', 'request', 'card']),
+  paymentKind: z.enum(['record', 'request']),
   note: z.string().trim().max(500).optional(),
   passOnFee: z.boolean().optional(),
   dueDate: z.string().trim().optional(), // ISO date string
@@ -150,7 +150,5 @@ export async function completeCreditPackSale(input: unknown): Promise<SellResult
     return { status: 'requested', saleId: sale.id }
   }
 
-  throw new Error(
-    'Card payments are not supported on the web yet. Please use the mobile app to charge a card.'
-  )
+  throw new Error('Unsupported payment kind.')
 }

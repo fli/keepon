@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import type { Route } from 'next'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -33,9 +34,9 @@ export function CreditPackSelector({ clientId, creditPacks, backQuery }: Props) 
         </Card>
       ) : (
         creditPacks.map((pack) => {
-          const href = backQuery
+          const href = (backQuery
             ? `/dashboard/sell/credit-pack/${clientId}/pack/${pack.id}?${backQuery}`
-            : `/dashboard/sell/credit-pack/${clientId}/pack/${pack.id}`
+            : `/dashboard/sell/credit-pack/${clientId}/pack/${pack.id}`) as Route
 
           return (
             <Card

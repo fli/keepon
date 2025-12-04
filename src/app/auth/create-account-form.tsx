@@ -85,6 +85,17 @@ export function CreateAccountForm({ defaultCountry }: CreateAccountFormProps) {
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="confirmPassword">Confirm password</Label>
+          <Input
+            id="confirmPassword"
+            name="confirmPassword"
+            type="password"
+            required
+            autoComplete="new-password"
+          />
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="country">Country</Label>
           <NativeSelect
             id="country"

@@ -1,19 +1,19 @@
 "use client"
 
 import { useCallback, useMemo, useState, useTransition, type FormEvent } from 'react'
+import type { Route } from 'next'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import type { Client } from '@/lib/api'
-import { CheckCircle2, Clock, CreditCard, Send, Wallet } from 'lucide-react'
+import { CheckCircle2, Clock, Send, Wallet } from 'lucide-react'
 import { CreditPack, completeCreditPackSale } from './actions'
 
-type PaymentKind = 'record' | 'request' | 'card'
+type PaymentKind = 'record' | 'request'
 type RecordMethod = 'cash' | 'eft'
 
 type Props = {
@@ -53,18 +53,13 @@ export function PaymentForm({ client, pack }: Props) {
   const priceParam = searchParams.get('packPrice') ?? pack.price
   const creditsParam = searchParams.get('packCredits') ?? String(pack.totalCredits)
 
-  const [cardNumber, setCardNumber] = useState('')
-  const [cardExpiry, setCardExpiry] = useState('')
-  const [cardCvc, setCardCvc] = useState('')
-
   const [pending, startTransition] = useTransition()
   const [result, setResult] = useState<null | { status: 'paid' | 'requested'; saleId: string }>(
     null
   )
   const [error, setError] = useState<string | null>(null)
 
-  const paymentKind: PaymentKind =
-    paymentParam === 'request' || paymentParam === 'card' ? paymentParam : 'record'
+  const paymentKind: PaymentKind = paymentParam === 'request' ? 'request' : 'record'
   const recordMethod: RecordMethod = methodParam === 'eft' ? 'eft' : 'cash'
   const eftType = eftParam ?? EFT_OPTIONS[0]?.id ?? 'bank_transfer'
   const passFee = passFeeParam === 'true'
@@ -82,7 +77,8 @@ export function PaymentForm({ client, pack }: Props) {
       else params.set(key, value)
 
       const qs = params.toString()
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+      const href = (qs ? `${pathname}?${qs}` : pathname) as Route
+      router.replace(href, { scroll: false })
     },
     [pathname, router, searchParams]
   )
@@ -92,11 +88,6 @@ export function PaymentForm({ client, pack }: Props) {
       event.preventDefault()
       setError(null)
       setResult(null)
-
-      if (paymentKind === 'card') {
-        setError('Card payments are mobile-only right now. Please use request or record payment.')
-        return
-      }
 
       startTransition(async () => {
         try {
@@ -141,12 +132,7 @@ export function PaymentForm({ client, pack }: Props) {
     ]
   )
 
-  const paymentLabel =
-    paymentKind === 'request'
-      ? 'Send request'
-      : paymentKind === 'card'
-        ? 'Process card'
-        : 'Record payment'
+  const paymentLabel = paymentKind === 'request' ? 'Send request' : 'Record payment'
 
   const statusBadge = useMemo(() => {
     if (!result) return null
@@ -164,16 +150,17 @@ export function PaymentForm({ client, pack }: Props) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl">Collect payment</CardTitle>
-          <CardDescription>
+      <section className="space-y-4">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold">Collect payment</h2>
+          <p className="text-sm text-muted-foreground">
             You&apos;re selling <strong>{packName}</strong> to{' '}
             <strong>{`${client.firstName ?? ''} ${client.lastName ?? ''}`.trim() || 'this client'}</strong>{' '}
             for {formatPrice(packPrice, pack.currency)}.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          </p>
+        </div>
+
+        <div className="space-y-3 text-sm text-muted-foreground">
           <div className="flex flex-wrap gap-2">
             <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium uppercase tracking-wide">
               Step 1: Select client
@@ -227,8 +214,8 @@ export function PaymentForm({ client, pack }: Props) {
               />
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {statusBadge}
       {error ? (
@@ -238,13 +225,13 @@ export function PaymentForm({ client, pack }: Props) {
       ) : null}
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">Payment type</CardTitle>
-            <CardDescription>Pick how you want to collect this payment.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
+        <section className="space-y-4">
+          <div className="space-y-1">
+            <h3 className="text-xl font-semibold">Payment type</h3>
+            <p className="text-sm text-muted-foreground">Pick how you want to collect this payment.</p>
+          </div>
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={() => setParam('payment', 'record')}
@@ -274,22 +261,6 @@ export function PaymentForm({ client, pack }: Props) {
                 <div>
                   <p className="font-medium">Request</p>
                   <p className="text-xs text-muted-foreground">Send a payment request</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setParam('payment', 'card')}
-                className={`flex items-center gap-2 rounded-md border px-3 py-3 text-left transition ${
-                  paymentKind === 'card'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/40'
-                }`}
-              >
-                <CreditCard className="size-4" aria-hidden />
-                <div>
-                  <p className="font-medium">Card</p>
-                  <p className="text-xs text-muted-foreground">Charge a card (mobile)</p>
                 </div>
               </button>
             </div>
@@ -363,57 +334,6 @@ export function PaymentForm({ client, pack }: Props) {
               </div>
             ) : null}
 
-            {paymentKind === 'card' ? (
-              <div className="space-y-4 rounded-md border border-border/80 bg-muted/30 p-4">
-                <p className="text-sm text-muted-foreground">
-                  Card charging is only available in the mobile app right now. You can still capture
-                  the card details here, but submitting is disabled to avoid losing data.
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="cardNumber">Card number</Label>
-                    <Input
-                      id="cardNumber"
-                      value={cardNumber}
-                      onChange={(event) => setCardNumber(event.target.value)}
-                      inputMode="numeric"
-                      placeholder="4242 4242 4242 4242"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cardExpiry">Expiry</Label>
-                    <Input
-                      id="cardExpiry"
-                      value={cardExpiry}
-                      onChange={(event) => setCardExpiry(event.target.value)}
-                      placeholder="MM / YY"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cardCvc">CVC</Label>
-                    <Input
-                      id="cardCvc"
-                      value={cardCvc}
-                      onChange={(event) => setCardCvc(event.target.value)}
-                      inputMode="numeric"
-                      placeholder="CVC"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cardPassFee">Pass fee to client</Label>
-                    <NativeSelect
-                      id="cardPassFee"
-                      value={passFee ? 'yes' : 'no'}
-                      onChange={(event) => setParam('passFee', event.target.value === 'yes' ? 'true' : 'false')}
-                    >
-                      <option value="no">No</option>
-                      <option value="yes">Yes</option>
-                    </NativeSelect>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
             <div className="space-y-2">
               <Label htmlFor="note">Note / memo</Label>
               <Textarea
@@ -427,23 +347,21 @@ export function PaymentForm({ client, pack }: Props) {
                 Notes are kept in the URL while you work so you don&apos;t lose them on refresh.
               </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm text-muted-foreground">
             {paymentKind === 'request'
               ? 'We will create the sale and send a payment request.'
-              : paymentKind === 'card'
-                ? 'Card charging is mobile-only right now.'
-                : 'We will create the sale and mark it as paid.'}
+              : 'We will create the sale and mark it as paid.'}
           </div>
 
           <div className="flex items-center gap-2">
             <Button
               type="submit"
               size="sm"
-              disabled={pending || paymentKind === 'card'}
+              disabled={pending}
               className="min-w-[140px]"
             >
               {pending ? 'Working...' : paymentLabel}

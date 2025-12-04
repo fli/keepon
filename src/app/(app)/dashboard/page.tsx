@@ -65,16 +65,49 @@ export default async function DashboardPage() {
     return `Good evening, ${name}`
   })()
 
+  const trialDaysRemaining = data?.trainer.trialDaysRemaining ?? 0
+  const showTrial = trialDaysRemaining > 0
+  const trialText = showTrial
+    ? `${trialDaysRemaining} day${trialDaysRemaining === 1 ? '' : 's'} left on trial`
+    : null
+  const showSetupPayments = Boolean(data?.trainer.paymentsSetupRequired)
+  const showOnlineBookingsOnboarding =
+    typeof data?.onlineBookings.serviceCount === 'number'
+      ? data.onlineBookings.serviceCount <= 2
+      : false
+
   return (
     <PageContainer className="flex flex-col gap-8 py-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="flex flex-col gap-3">
           <h1 className="text-3xl font-semibold leading-tight">{greeting}</h1>
-          {typeof data?.trainer.smsCredits === 'number' ? (
-            <Badge variant="secondary" className="w-fit">
-              {data.trainer.smsCredits.toLocaleString()} text credits
-            </Badge>
-          ) : null}
+          <div className="flex flex-wrap gap-2">
+            {showTrial && trialText ? (
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                className="gap-1 pr-2"
+              >
+                <span>{trialText}</span>
+                <ChevronRight className="size-4" aria-hidden />
+                <span className="sr-only">View plan</span>
+              </Button>
+            ) : null}
+            {typeof data?.trainer.smsCredits === 'number' ? (
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                className="gap-1 pr-2"
+                render={<Link href="/settings/credit-packs" />}
+              >
+                <span>{data.trainer.smsCredits.toLocaleString()} text credits</span>
+                <ChevronRight className="size-4" aria-hidden />
+                <span className="sr-only">Manage credits</span>
+              </Button>
+            ) : null}
+          </div>
           {dashboardError ? (
             <p className="text-sm text-destructive">{dashboardError}</p>
           ) : null}
@@ -187,6 +220,24 @@ export default async function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+
+          {showSetupPayments ? (
+            <Card className="flex flex-col gap-3 border-dashed">
+              <CardHeader className="pb-2 space-y-2">
+                <CardDescription className="text-sm font-semibold text-foreground">
+                  Setup payments
+                </CardDescription>
+                <p className="text-sm text-muted-foreground">
+                  Get verified to accept card payments and enable payouts.
+                </p>
+              </CardHeader>
+              <CardContent className="pt-0 mt-auto">
+                <Button className="w-fit" variant="default">
+                  Get paid
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       </section>
 
@@ -283,7 +334,41 @@ export default async function DashboardPage() {
 
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Online Bookings</h2>
-        <div className="grid">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {showOnlineBookingsOnboarding ? (
+            <Card className="flex flex-col border-dashed">
+              <CardHeader className="pb-2 space-y-2">
+                <CardDescription className="text-sm font-semibold text-foreground">
+                  Setup online bookings
+                </CardDescription>
+                <p className="text-sm text-muted-foreground">
+                  Share your services and start taking bookings in minutes.
+                </p>
+              </CardHeader>
+              <CardContent className="pt-0 mt-auto">
+                <Button className="w-fit">Setup your booking page</Button>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {showOnlineBookingsOnboarding ? (
+            <Card className="flex flex-col">
+              <CardHeader className="pb-2 space-y-1">
+                <CardDescription className="text-sm font-semibold text-foreground">
+                  Example booking page
+                </CardDescription>
+                <p className="text-sm text-muted-foreground">
+                  Preview what your clients will see when they book.
+                </p>
+              </CardHeader>
+              <CardContent className="pt-0 mt-auto">
+                <Button variant="secondary" className="w-fit">
+                  View example
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card className="flex flex-col">
             <CardHeader className="pb-0">
               <div className="flex items-center justify-between">

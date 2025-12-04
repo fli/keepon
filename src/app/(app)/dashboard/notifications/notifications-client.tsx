@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useMemo, useState, useTransition } from 'react'
-
+import type { Route } from 'next'
 import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
@@ -19,13 +19,13 @@ type NotificationsClientProps = {
   initialError?: string | null
 }
 
-const buildTargetHref = (notification: Notification): string | null => {
+const buildTargetHref = (notification: Notification): Route | null => {
   if (notification.modelName === 'client' && notification.modelId) {
-    return `/clients/${notification.modelId}`
+    return `/clients/${notification.modelId}` as Route
   }
 
   if (notification.clientId) {
-    return `/clients/${notification.clientId}`
+    return `/clients/${notification.clientId}` as Route
   }
 
   return null

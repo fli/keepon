@@ -69,9 +69,22 @@ export async function createAccountAction(
   const lastName = getFormString(formData, 'lastName').trim() || null
   const email = getFormString(formData, 'email').trim()
   const password = getFormString(formData, 'password')
+  const confirmPassword = getFormString(formData, 'confirmPassword')
   const country = getFormString(formData, 'country', 'US').trim().slice(0, 2).toUpperCase()
 
   try {
+    if (password !== confirmPassword) {
+      return {
+        error: 'Passwords do not match',
+        defaultValues: {
+          firstName,
+          lastName,
+          email,
+          country,
+        },
+      }
+    }
+
     const json = await createTrainerAccount({
       firstName,
       lastName,

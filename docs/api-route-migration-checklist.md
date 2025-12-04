@@ -6,12 +6,12 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 ## Access Token (accessToken)
 
-- [ ] `GET` `/accessToken` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/access-token.get.ts)_
+- [x] `GET` `/accessToken` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/access-token.get.ts)_
 
 ## Account Subscription (accountSubscription)
 
-- [ ] `PATCH` `/accountSubscription` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/account-subscription.patch.ts)_
-- [ ] `PUT` `/accountSubscription` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/account-subscription.put.ts)_
+- [x] `PATCH` `/accountSubscription` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/account-subscription.patch.ts)_
+- [x] `PUT` `/accountSubscription` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/account-subscription.put.ts)_
 - [x] `POST` `/accountSubscription/billingPortalSessions` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/account-subscription.billing-portal-sessions.post.ts)_
 
 ## Account Subscription Plan (accountSubscriptionPlan)
@@ -24,20 +24,20 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 ## App Store Receipts (appStoreReceipts)
 
-- [ ] `POST` `/appStoreReceipts` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/app-store-receipts.post.ts)_
+- [x] `POST` `/appStoreReceipts` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/app-store-receipts.post.ts)_
 
 ## App Store Server Notifications (appStoreServerNotifications)
 
-- [ ] `POST` `/appStoreServerNotifications` — security: none _(source: ../keepon-full/api-server/src/routes/app-store-server-notifications.post.ts)_
+- [x] `POST` `/appStoreServerNotifications` — security: none _(source: ../keepon-full/api-server/src/routes/app-store-server-notifications.post.ts)_
 
 ## Bookings (bookings)
 
-- [ ] `POST` `/bookings` — security: none _(source: ../keepon-full/api-server/src/routes/bookings.post.ts)_
+- [x] `POST` `/bookings` — security: none _(source: ../keepon-full/api-server/src/routes/bookings.post.ts)_
 
 ## Buckets (buckets)
 
-- [ ] `GET` `/buckets/ptbizapp-images/download/:imageUrl` — security: none _(source: ../keepon-full/api-server/src/routes/buckets.ptbizapp-images.download.[imageUrl].get.ts)_
-- [ ] `POST` `/buckets/ptbizapp-images/upload` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/buckets.ptbizapp-images.upload.post.ts)_
+- [x] `GET` `/buckets/ptbizapp-images/download/:imageUrl` — security: none _(source: ../keepon-full/api-server/src/routes/buckets.ptbizapp-images.download.[imageUrl].get.ts)_
+- [x] `POST` `/buckets/ptbizapp-images/upload` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/buckets.ptbizapp-images.upload.post.ts)_
 
 ## Busy Times (busyTimes)
 
@@ -77,33 +77,33 @@ Security values reflect middleware expectations from the legacy server (`null` m
 - [x] `GET` `/clients` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.get.ts)_
 - [x] `DELETE` `/clients/:clientId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].delete.ts)_
 - [x] `GET` `/clients/:clientId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].get.ts)_
-- [ ] `PUT` `/clients/:clientId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].put.ts)_
-- [ ] `PUT` `/clients/:clientId/dashboardLink` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].dashboardLink.put.ts)_
+- [x] `PUT` `/clients/:clientId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].put.ts)_
+- [x] `PUT` `/clients/:clientId/dashboardLink` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].dashboardLink.put.ts)_
 - [x] `POST` `/clients/:clientId/notes` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].notes.post.ts)_
-- [ ] `PUT` `/clients/:clientId/notes/:noteId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].notes.[noteId].put.ts)_
-- [ ] `POST` `/clients/:clientId/plans` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].plans.post.ts)_
-- [ ] `PUT` `/clients/:clientId/plans/:planId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].plans.[planId].put.ts)_
+- [x] `PUT` `/clients/:clientId/notes/:noteId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].notes.[noteId].put.ts)_
+- [x] `POST` `/clients/:clientId/plans` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].plans.post.ts)_
+- [x] `PUT` `/clients/:clientId/plans/:planId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].plans.[planId].put.ts)_
 - [x] `POST` `/clients/:clientId/plans/:planId/cancel` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].plans.[planId].cancel.post.ts)_
 - [x] `PUT` `/clients/:clientId/plans/:planId/pause` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].plans.[planId].pause.put.ts)_
-- [ ] `DELETE` `/clients/:clientId/plans/:planId/sessionSeries/:sessionSeriesId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].plans.[planId].sessionSeries.[sessionSeriesId].delete.ts)_
-- [ ] `PUT` `/clients/:clientId/plans/:planId/sessionSeries/:sessionSeriesId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].plans.[planId].sessionSeries.[sessionSeriesId].put.ts)_
+- [x] `DELETE` `/clients/:clientId/plans/:planId/sessionSeries/:sessionSeriesId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].plans.[planId].sessionSeries.[sessionSeriesId].delete.ts)_
+- [x] `PUT` `/clients/:clientId/plans/:planId/sessionSeries/:sessionSeriesId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].plans.[planId].sessionSeries.[sessionSeriesId].put.ts)_
 - [x] `PUT` `/clients/:clientId/plans/:planId/unpause` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].plans.[planId].unpause.put.ts)_
 - [x] `PUT` `/clients/:clientId/termsAccepted` — security: `client` _(source: ../keepon-full/api-server/src/routes/clients.[clientId].termsAccepted.put.ts)_
-- [ ] `GET` `/clients/members` — security: none _(source: ../keepon-full/api-server/src/routes/clients.[[members.get.ts)_
+- [x] `GET` `/clients/members` — security: none _(source: ../keepon-full/api-server/src/routes/clients.[[members.get.ts)_
 
 ## Client Sessions (clientSessions)
 
 - [x] `GET` `/clientSessions` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.get.ts)_
 - [x] `GET` `/clientSessions/:clientSessionId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.[clientSessionId].get.ts)_
-- [ ] `PUT` `/clientSessions/:clientSessionId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.[clientSessionId].put.ts)_
+- [x] `PUT` `/clientSessions/:clientSessionId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.[clientSessionId].put.ts)_
 - [x] `POST` `/clientSessions/:clientSessionId/cancel` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.[clientSessionId].cancel.post.ts)_
 - [x] `POST` `/clientSessions/:clientSessionId/confirm` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.[clientSessionId].confirm.post.ts)_
-- [ ] `POST` `/clientSessions/:clientSessionId/invite` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.[clientSessionId].invite.post.ts)_
+- [x] `POST` `/clientSessions/:clientSessionId/invite` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.[clientSessionId].invite.post.ts)_
 - [x] `POST` `/clientSessions/:clientSessionId/maybe` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.[clientSessionId].maybe.post.ts)_
 - [x] `POST` `/clientSessions/:clientSessionId/notes` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.[clientSessionId].notes.post.ts)_
-- [ ] `PUT` `/clientSessions/:clientSessionId/notes/:noteId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.[clientSessionId].notes.[noteId].put.ts)_
-- [ ] `POST` `/clientSessions/:clientSessionId/share` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.[clientSessionId].share.post.ts)_
-- [ ] `POST` `/clientSessions/invite` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.invite.post.ts)_
+- [x] `PUT` `/clientSessions/:clientSessionId/notes/:noteId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.[clientSessionId].notes.[noteId].put.ts)_
+- [x] `POST` `/clientSessions/:clientSessionId/share` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.[clientSessionId].share.post.ts)_
+- [x] `POST` `/clientSessions/invite` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/client-sessions.invite.post.ts)_
 
 ## Config (config)
 
@@ -117,10 +117,10 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 - [x] `DELETE` `/financeItems/:financeItemId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/finance-items.[financeItem].delete.ts)_
 - [x] `GET` `/financeItems/:financeItemId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/finance-items.[financeItemId].get.ts)_
-- [ ] `PUT` `/financeItems/:financeItemId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/finance-items.[financeItemId].put.ts)_
+- [x] `PUT` `/financeItems/:financeItemId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/finance-items.[financeItemId].put.ts)_
 - [x] `POST` `/financeItems/:financeItemId/notes` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/finance-items.[financeItemId].notes.post.ts)_
-- [ ] `PUT` `/financeItems/:financeItemId/notes/:noteId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/finance-items.[financeItemId].notes.[noteId].put.ts)_
-- [ ] `POST` `/financeItems/:financeItemId/upload` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/finance-items.[financeItemId].upload.post.ts)_
+- [x] `PUT` `/financeItems/:financeItemId/notes/:noteId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/finance-items.[financeItemId].notes.[noteId].put.ts)_
+- [x] `POST` `/financeItems/:financeItemId/upload` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/finance-items.[financeItemId].upload.post.ts)_
 
 ## Geolocation (geolocation)
 
@@ -132,23 +132,23 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 ## Icalendar (icalendar)
 
-- [ ] `GET` `/icalendar/:id` — security: none _(source: ../keepon-full/api-server/src/routes/icalendar.[id].get.ts)_
+- [x] `GET` `/icalendar/:id` — security: none _(source: ../keepon-full/api-server/src/routes/icalendar.[id].get.ts)_
 
 ## Ics (ics)
 
-- [ ] `GET` `/ics` — security: none _(source: ../keepon-full/api-server/src/routes/ics.get.ts)_
+- [x] `GET` `/ics` — security: none _(source: ../keepon-full/api-server/src/routes/ics.get.ts)_
 
 ## Lytics (lytics)
 
-- [ ] `POST` `/lytics/batch` — security: none _(source: ../keepon-full/api-server/src/routes/lytics.batch.post.ts)_
+- [x] `POST` `/lytics/batch` — security: none _(source: ../keepon-full/api-server/src/routes/lytics.batch.post.ts)_
 
 ## Mandrill Events (mandrillEvents)
 
-- [ ] `POST` `/mandrillEvents` — security: none _(source: ../keepon-full/api-server/src/routes/mandrill-events.post.ts)_
+- [x] `POST` `/mandrillEvents` — security: none _(source: ../keepon-full/api-server/src/routes/mandrill-events.post.ts)_
 
 ## Members (members)
 
-- [ ] `POST` `/members/:memberId/devices` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/members.[memberId].devices.post.ts)_
+- [x] `POST` `/members/:memberId/devices` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/members.[memberId].devices.post.ts)_
 - [x] `GET` `/members/:userId` — security: none _(source: ../keepon-full/api-server/src/routes/members.[userId].get.ts)_
 - [x] `POST` `/members/:userId/password` — security: none _(source: ../keepon-full/api-server/src/routes/members.[userId].password.post.ts)_
 - [x] `POST` `/members/login` — security: none _(source: ../keepon-full/api-server/src/routes/members.login.post.ts)_
@@ -162,11 +162,11 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 ## Online Bookings (onlineBookings)
 
-- [ ] `GET` `/onlineBookings/bookings/:bookingId` — security: none _(source: ../keepon-full/api-server/src/routes/online-bookings.bookings.[bookingId].get.ts)_
-- [ ] `POST` `/onlineBookings/bookings/:bookingId/cancel` — security: none _(source: ../keepon-full/api-server/src/routes/online-bookings.bookings.[bookingId].cancel.post.ts)_
-- [ ] `GET` `/onlineBookings/providers/:pageUrlSlug` — security: none _(source: ../keepon-full/api-server/src/routes/online-bookings.providers.[pageUrlSlug].get.ts)_
+- [x] `GET` `/onlineBookings/bookings/:bookingId` — security: none _(source: ../keepon-full/api-server/src/routes/online-bookings.bookings.[bookingId].get.ts)_
+- [x] `POST` `/onlineBookings/bookings/:bookingId/cancel` — security: none _(source: ../keepon-full/api-server/src/routes/online-bookings.bookings.[bookingId].cancel.post.ts)_
+- [x] `GET` `/onlineBookings/providers/:pageUrlSlug` — security: none _(source: ../keepon-full/api-server/src/routes/online-bookings.providers.[pageUrlSlug].get.ts)_
 - [x] `GET` `/onlineBookings/settings` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/online-bookings.settings.get.ts)_
-- [ ] `PATCH` `/onlineBookings/settings` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/online-bookings.settings.patch.ts)_
+- [x] `PATCH` `/onlineBookings/settings` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/online-bookings.settings.patch.ts)_
 
 ## Payment Plan Payments (paymentPlanPayments)
 
@@ -183,19 +183,19 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 ## Plan Payments (planPayments)
 
-- [ ] `PUT` `/planPayments/:paymentPlanPaymentId/refund` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/plan-payments.[paymentPlanPaymentId].refund.put.ts)_
+- [x] `PUT` `/planPayments/:paymentPlanPaymentId/refund` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/plan-payments.[paymentPlanPaymentId].refund.put.ts)_
 
 ## Plans (plans)
 
 - [x] `GET` `/plans` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/plans.get.ts)_
 - [x] `GET` `/plans/:planId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/plans.[planId].get.ts)_
-- [ ] `PUT` `/plans/:planId/accept` — security: `client` _(source: ../keepon-full/api-server/src/routes/plans.[planId].accept.put.ts)_
-- [ ] `PUT` `/plans/:planId/retry` — security: `client` _(source: ../keepon-full/api-server/src/routes/plans.[planId].retry.put.ts)_
+- [x] `PUT` `/plans/:planId/accept` — security: `client` _(source: ../keepon-full/api-server/src/routes/plans.[planId].accept.put.ts)_
+- [x] `PUT` `/plans/:planId/retry` — security: `client` _(source: ../keepon-full/api-server/src/routes/plans.[planId].retry.put.ts)_
 
 ## Products (products)
 
 - [x] `GET` `/products` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/products.get.ts)_
-- [ ] `POST` `/products` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/products.post.ts)_
+- [x] `POST` `/products` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/products.post.ts)_
 - [ ] `DELETE` `/products/:productId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/products.[productId].delete.ts)_
 - [ ] `GET` `/products/:productId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/products.[productId].get.ts)_
 - [ ] `PATCH` `/products/:productId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/products.[productId].patch.ts)_

@@ -1,5 +1,7 @@
+import type { Route } from 'next'
+
 export type SettingAction =
-  | { type: 'route'; href: string }
+  | { type: 'route'; href: Route }
   | { type: 'external'; url: string }
   | { type: 'mailto'; email: string; subject?: string }
   | { type: 'systemSettings' }
@@ -49,7 +51,7 @@ const baseSections: SettingSection[] = [
         glyph: '🏷️',
         accent: '#a855f7',
         badge: 'web',
-        action: { type: 'external', url: 'https://app.keepon.com/items' },
+        action: { type: 'route', href: '/settings/items' },
       },
     ],
   },
@@ -103,11 +105,7 @@ const baseSections: SettingSection[] = [
         subtitle: 'Configure reminder timing for sessions.',
         glyph: '🔔',
         accent: '#6366f1',
-        badge: 'web',
-        action: {
-          type: 'external',
-          url: 'https://app.keepon.com/settings/reminders',
-        },
+        action: { type: 'route', href: '/settings/reminders' },
       },
       {
         id: 'text-credits',
@@ -161,8 +159,7 @@ const baseSections: SettingSection[] = [
         subtitle: 'Profile, password, and subscription.',
         glyph: '👤',
         accent: '#2563eb',
-        badge: 'web',
-        action: { type: 'external', url: 'https://app.keepon.com/account' },
+        action: { type: 'route', href: '/settings/account' },
       },
       {
         id: 'support',

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import type { Trainer } from '@/lib/db'
 import { z } from 'zod'
+import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
+import type { CountryCode } from 'libphonenumber-js'
 import {
   authenticateTrainerRequest,
   buildErrorResponse,
@@ -96,6 +99,86 @@ const onlineBookingsSettingsSchema = z.object({
   termsAndConditions: z.string().nullable(),
   cancellationPolicy: z.string().nullable(),
 })
+
+const patchAvailabilitySchema = z
+  .object({
+    acceptingBookings: z.boolean().optional(),
+    availableIntervals: z
+      .array(availabilityIntervalSchema)
+      .refine(
+        intervals =>
+          intervals.every(
+            ([start, end]) =>
+              start !== end && timeToMinutes(start) < timeToMinutes(end)
+          ),
+        'Intervals must represent non-zero durations'
+      )
+      .optional(),
+  })
+  .strict()
+
+const patchOverrideAvailabilitySchema = z
+  .object({
+    acceptingBookings: z.boolean().nullable().optional(),
+    availableIntervals: z
+      .array(availabilityIntervalSchema)
+      .refine(
+        intervals =>
+          intervals.every(
+            ([start, end]) =>
+              start !== end && timeToMinutes(start) < timeToMinutes(end)
+          ),
+        'Intervals must represent non-zero durations'
+      )
+      .nullable()
+      .optional(),
+  })
+  .strict()
+
+const patchRequestSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    pageUrlSlug: z
+      .string()
+      .trim()
+      .min(4, 'Page slug must be at least 4 characters long')
+      .optional(),
+    contactEmail: z.string().email().nullable().optional(),
+    contactNumber: z.string().nullable().optional(),
+    businessName: z.string().trim().nullable().optional(),
+    showContactNumber: z.boolean().optional(),
+    durationUntilBookingWindowOpens: z
+      .string()
+      .regex(ISO_DURATION_PATTERN, 'Duration must be an ISO 8601 string')
+      .optional(),
+    durationUntilBookingWindowCloses: z
+      .string()
+      .regex(ISO_DURATION_PATTERN, 'Duration must be an ISO 8601 string')
+      .optional(),
+    availability: z
+      .object({
+        defaults: z
+          .object({
+            monday: patchAvailabilitySchema.optional(),
+            tuesday: patchAvailabilitySchema.optional(),
+            wednesday: patchAvailabilitySchema.optional(),
+            thursday: patchAvailabilitySchema.optional(),
+            friday: patchAvailabilitySchema.optional(),
+            saturday: patchAvailabilitySchema.optional(),
+            sunday: patchAvailabilitySchema.optional(),
+          })
+          .partial()
+          .optional(),
+        overrides: z
+          .record(z.string(), patchOverrideAvailabilitySchema.nullable())
+          .optional(),
+      })
+      .optional(),
+    bookingNote: z.string().trim().nullable().optional(),
+    termsAndConditions: z.string().trim().nullable().optional(),
+    cancellationPolicy: z.string().trim().nullable().optional(),
+  })
+  .strict()
 
 type Availability = z.infer<typeof availabilitySchema>
 
@@ -263,6 +346,59 @@ const parseTimerangeList = (
         timeToMinutes(a[0]) - timeToMinutes(b[0]) ||
         timeToMinutes(a[1]) - timeToMinutes(b[1])
     )
+}
+
+const toTimerangeArray = (intervals: Array<[string, string]>) =>
+  intervals
+    .filter(
+      ([start, end]) => start !== end && timeToMinutes(start) < timeToMinutes(end)
+    )
+    .map(([start, end]) => `[${start},${end})`)
+
+const normalizeNullableTrimmed = (
+  value: string | null | undefined
+): string | null | undefined => {
+  if (value === undefined) {
+    return undefined
+  }
+  if (value === null) {
+    return null
+  }
+  const trimmed = value.trim()
+  return trimmed.length === 0 ? null : trimmed
+}
+
+const parseOverrideDateKey = (value: string) => {
+  const trimmed = value.trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return null
+  }
+  const parsed = new Date(`${trimmed}T00:00:00.000Z`)
+  if (Number.isNaN(parsed.getTime())) {
+    return null
+  }
+  return parsed
+}
+
+const isValidSlug = (value: string) => /^[A-Za-z0-9-_]+$/.test(value)
+
+const formatContactNumber = (value: string, countryCode?: string | null) => {
+  const normalizedCountry =
+    countryCode && /^[a-zA-Z]{2}$/.test(countryCode.trim())
+      ? (countryCode.trim().toUpperCase() as CountryCode)
+      : undefined
+
+  const parsed = parsePhoneNumberFromString(value, normalizedCountry)
+  const finalParsed =
+    parsed && parsed.isValid()
+      ? parsed
+      : parsePhoneNumberFromString(value, normalizedCountry)
+
+  if (!finalParsed || !finalParsed.isValid()) {
+    throw new Error('Invalid phone number')
+  }
+
+  return finalParsed.format('E.164')
 }
 
 const convertIntervalToIsoString = (value: unknown, fieldName: string) => {
@@ -530,6 +666,347 @@ export async function GET(request: Request) {
       buildErrorResponse({
         status: 500,
         title: 'Failed to fetch online bookings settings',
+        type: '/internal-server-error',
+      }),
+      { status: 500 }
+    )
+  }
+}
+
+export async function PATCH(request: Request) {
+  let body: unknown
+
+  try {
+    body = await request.json()
+  } catch (error) {
+    console.error('Failed to parse online bookings settings body as JSON', error)
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Invalid JSON payload',
+        detail: 'Request body must be valid JSON.',
+        type: '/invalid-json',
+      }),
+      { status: 400 }
+    )
+  }
+
+  const parsedBody = patchRequestSchema.safeParse(body)
+  if (!parsedBody.success) {
+    const detail = parsedBody.error.issues.map(issue => issue.message).join('; ')
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
+      }),
+      { status: 400 }
+    )
+  }
+
+  const auth = await authenticateTrainerRequest(request, {
+    extensionFailureLogMessage:
+      'Failed to extend access token expiry while updating online bookings settings',
+  })
+
+  if (!auth.ok) {
+    return auth.response
+  }
+
+  const data = parsedBody.data
+
+  if (
+    data.availability?.overrides &&
+    Object.keys(data.availability.overrides).length > 0
+  ) {
+    const invalidDateKey = Object.keys(data.availability.overrides).find(
+      dateKey => !parseOverrideDateKey(dateKey)
+    )
+
+    if (invalidDateKey) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 400,
+          title: 'Invalid availability override date',
+          detail: `${invalidDateKey} is not a valid YYYY-MM-DD date.`,
+          type: '/invalid-body',
+        }),
+        { status: 400 }
+      )
+    }
+  }
+
+  if (data.pageUrlSlug !== undefined) {
+    const trimmedSlug = data.pageUrlSlug.trim()
+    if (!isValidSlug(trimmedSlug)) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 400,
+          title: 'Invalid page URL slug',
+          detail:
+            'Page slug can only contain letters, numbers, hyphens, and underscores.',
+          type: '/invalid-body',
+        }),
+        { status: 400 }
+      )
+    }
+
+    const slugOwner = await db
+      .selectFrom('trainer')
+      .select('trainer.id')
+      .where('trainer.online_bookings_page_url_slug', '=', trimmedSlug)
+      .where('trainer.id', '<>', auth.trainerId)
+      .executeTakeFirst()
+
+    if (slugOwner) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 409,
+          title: 'Page URL slug already in use',
+          detail: 'Choose a different online bookings page URL.',
+          type: '/page-url-slug-in-use',
+        }),
+        { status: 409 }
+      )
+    }
+  }
+
+  const trainerMeta = await db
+    .selectFrom('trainer')
+    .leftJoin('country', 'country.id', 'trainer.country_id')
+    .select(({ ref }) => [
+      ref('trainer.id').as('trainerId'),
+      ref('country.alpha_2_code').as('countryCode'),
+    ])
+    .where('trainer.id', '=', auth.trainerId)
+    .executeTakeFirst()
+
+  if (!trainerMeta) {
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 404,
+        title: 'Trainer not found',
+        detail:
+          'No trainer record was found for the authenticated access token.',
+        type: '/trainer-not-found',
+      }),
+      { status: 404 }
+    )
+  }
+
+  let formattedContactNumber: string | null | undefined
+
+  if (data.contactNumber !== undefined) {
+    if (data.contactNumber === null) {
+      formattedContactNumber = null
+    } else {
+      try {
+        formattedContactNumber = formatContactNumber(
+          data.contactNumber,
+          trainerMeta.countryCode
+        )
+      } catch (error) {
+        console.error('Invalid contact number provided', error)
+        return NextResponse.json(
+          buildErrorResponse({
+            status: 400,
+            title: 'Invalid contact number',
+            detail: 'contactNumber must be a valid phone number.',
+            type: '/invalid-body',
+          }),
+          { status: 400 }
+        )
+      }
+    }
+  }
+
+  try {
+    await db.transaction().execute(async trx => {
+      // Handle availability overrides
+      const overrides = data.availability?.overrides
+      if (overrides) {
+        for (const dateKey of Object.keys(overrides)) {
+          const override = overrides[dateKey]
+          const parsedDate = parseOverrideDateKey(dateKey)
+          if (!parsedDate) {
+            // This should be impossible due to prior validation
+            continue
+          }
+
+          if (override === null) {
+            await trx
+              .deleteFrom('availability')
+              .where('trainer_id', '=', auth.trainerId)
+              .where('date', '=', parsedDate)
+              .execute()
+            continue
+          }
+
+          if (!override) {
+            continue
+          }
+
+          if (
+            override.acceptingBookings === null &&
+            override.availableIntervals === null
+          ) {
+            await trx
+              .deleteFrom('availability')
+              .where('trainer_id', '=', auth.trainerId)
+              .where('date', '=', parsedDate)
+              .execute()
+            continue
+          }
+
+          if (
+            override.acceptingBookings === undefined &&
+            override.availableIntervals === undefined
+          ) {
+            continue
+          }
+
+          const insertValues = {
+            trainer_id: auth.trainerId,
+            date: parsedDate,
+            accepting_bookings:
+              override.acceptingBookings === undefined
+                ? null
+                : override.acceptingBookings,
+            available_intervals:
+              override.availableIntervals === undefined
+                ? null
+                : override.availableIntervals === null
+                  ? null
+                  : toTimerangeArray(override.availableIntervals),
+          }
+
+          const updateSet: Partial<{
+            accepting_bookings: boolean | null
+            available_intervals: string[] | null
+          }> = {}
+
+          if (override.acceptingBookings !== undefined) {
+            updateSet.accepting_bookings = override.acceptingBookings
+          }
+
+          if (override.availableIntervals !== undefined) {
+            updateSet.available_intervals =
+              override.availableIntervals === null
+                ? null
+                : toTimerangeArray(override.availableIntervals)
+          }
+
+          await trx
+            .insertInto('availability')
+            .values(insertValues)
+            .onConflict(oc =>
+              oc.columns(['trainer_id', 'date']).doUpdateSet(updateSet)
+            )
+            .execute()
+        }
+      }
+
+      const updateData: Record<string, unknown> = {}
+
+      if (data.enabled !== undefined) {
+        updateData.online_bookings_enabled = data.enabled
+      }
+
+      if (data.pageUrlSlug !== undefined) {
+        updateData.online_bookings_page_url_slug = data.pageUrlSlug.trim()
+      }
+
+      if (data.contactEmail !== undefined) {
+        const value = normalizeNullableTrimmed(data.contactEmail)
+        updateData.online_bookings_contact_email =
+          value === undefined ? null : value
+      }
+
+      if (formattedContactNumber !== undefined) {
+        updateData.online_bookings_contact_number = formattedContactNumber
+      }
+
+      if (data.businessName !== undefined) {
+        const value = normalizeNullableTrimmed(data.businessName)
+        updateData.online_bookings_business_name =
+          value === undefined ? null : value
+      }
+
+      if (data.showContactNumber !== undefined) {
+        updateData.online_bookings_show_contact_number = data.showContactNumber
+      }
+
+      if (data.durationUntilBookingWindowOpens !== undefined) {
+        updateData.online_bookings_duration_until_booking_window_opens =
+          data.durationUntilBookingWindowOpens
+      }
+
+      if (data.durationUntilBookingWindowCloses !== undefined) {
+        updateData.online_bookings_duration_until_booking_window_closes =
+          data.durationUntilBookingWindowCloses
+      }
+
+      if (data.bookingNote !== undefined) {
+        const value = normalizeNullableTrimmed(data.bookingNote)
+        updateData.online_bookings_booking_note =
+          value === undefined ? null : value
+      }
+
+      if (data.termsAndConditions !== undefined) {
+        const value = normalizeNullableTrimmed(data.termsAndConditions)
+        updateData.online_bookings_terms_and_conditions =
+          value === undefined ? null : value
+      }
+
+      if (data.cancellationPolicy !== undefined) {
+        const value = normalizeNullableTrimmed(data.cancellationPolicy)
+        updateData.online_bookings_cancellation_policy =
+          value === undefined ? null : value
+      }
+
+      const defaults = data.availability?.defaults
+      if (defaults) {
+        dayFieldMap.forEach(({ day }) => {
+          const dayUpdate = defaults[day]
+          if (!dayUpdate) {
+            return
+          }
+
+          const acceptingColumn =
+            `online_bookings_${day}_accepting_bookings` as keyof Trainer
+          const intervalsColumn =
+            `online_bookings_${day}_available_intervals` as keyof Trainer
+
+          if (dayUpdate.acceptingBookings !== undefined) {
+            updateData[acceptingColumn] = dayUpdate.acceptingBookings
+          }
+
+          if (dayUpdate.availableIntervals !== undefined) {
+            updateData[intervalsColumn] = toTimerangeArray(
+              dayUpdate.availableIntervals
+            )
+          }
+        })
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await trx
+          .updateTable('trainer')
+          .set(updateData)
+          .where('id', '=', auth.trainerId)
+          .execute()
+      }
+    })
+
+    return GET(request)
+  } catch (error) {
+    console.error('Failed to update online bookings settings', error)
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 500,
+        title: 'Failed to update online bookings settings',
         type: '/internal-server-error',
       }),
       { status: 500 }

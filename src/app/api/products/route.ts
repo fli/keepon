@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import {
   authenticateTrainerRequest,
@@ -9,19 +9,112 @@ import {
   sanitizeProductQuery,
   listProducts,
   moneyString,
-  fetchProductsForTrainer,
-  productListSchema,
 } from '@/server/products'
+import type { Insertable } from 'kysely'
+import type { Service } from '@/lib/db/generated'
 
 export const runtime = 'nodejs'
 
-const createCreditPackSchema = z.object({
+const nonNegativeMoneyString = moneyString.refine(
+  value => Number.parseFloat(value) >= 0,
+  'Price must be non-negative'
+)
+
+const priceSchema = z
+  .union([z.string(), z.number()])
+  .transform(value => {
+    const raw =
+      typeof value === 'number'
+        ? value.toString()
+        : typeof value === 'string'
+          ? value.trim()
+          : value
+
+    if (typeof raw !== 'string') return raw
+
+    const numeric = Number.parseFloat(raw)
+    if (Number.isNaN(numeric)) return raw
+
+    return numeric.toFixed(2)
+  })
+  .pipe(nonNegativeMoneyString)
+
+const nullableTrimmedToNull = z
+  .union([z.string(), z.null()])
+  .optional()
+  .transform(value => {
+    if (value === undefined) return undefined
+    if (value === null) return null
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  })
+
+const descriptionSchema = z
+  .union([z.string(), z.null()])
+  .optional()
+  .transform(value => {
+    if (value === undefined || value === null) return ''
+    return value.trim()
+  })
+
+const geoSchema = z
+  .object({
+    lat: z.number(),
+    lng: z.number(),
+  })
+  .nullable()
+  .optional()
+
+const baseProductSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
-  description: z.string().trim().default(''),
-  price: moneyString,
-  totalCredits: z.number().int().min(1, 'totalCredits must be at least 1'),
+  description: descriptionSchema,
+  price: priceSchema,
+  currency: z.string().trim().min(1).optional(),
   displayOrder: z.number().int().nullable().optional(),
 })
+
+const creditPackProductSchema = baseProductSchema.extend({
+  type: z.literal('creditPack'),
+  totalCredits: z.number().int().min(0, 'totalCredits must be at least 0'),
+})
+
+const itemProductSchema = baseProductSchema.extend({
+  type: z.literal('item'),
+})
+
+const serviceProductSchema = baseProductSchema.extend({
+  type: z.literal('service'),
+  durationMinutes: z
+    .number()
+    .int()
+    .min(1, 'durationMinutes must be at least 1'),
+  bookableOnline: z.boolean().optional(),
+  showPriceOnline: z.boolean().nullable().optional(),
+  bookingPaymentType: z
+    .enum(['hidePrice', 'noPrepayment', 'fullPrepayment'])
+    .nullable()
+    .optional(),
+  location: nullableTrimmedToNull,
+  address: nullableTrimmedToNull,
+  geo: geoSchema,
+  googlePlaceId: nullableTrimmedToNull,
+  bufferMinutesBefore: z.number().int().min(0).optional(),
+  bufferMinutesAfter: z.number().int().min(0).optional(),
+  timeSlotFrequencyMinutes: z.number().int().min(1).optional(),
+  requestClientAddressOnline: z
+    .union([z.literal('optional'), z.literal('required'), z.null()])
+    .optional(),
+  bookingQuestion: nullableTrimmedToNull,
+  bookingQuestionState: z
+    .union([z.literal('optional'), z.literal('required'), z.null()])
+    .optional(),
+})
+
+const createProductSchema = z.discriminatedUnion('type', [
+  creditPackProductSchema,
+  itemProductSchema,
+  serviceProductSchema,
+])
 
 export async function GET(request: Request) {
   const paramsOrResponse = sanitizeProductQuery(request)
@@ -85,7 +178,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const parsed = createCreditPackSchema.safeParse(body)
+  const parsed = createProductSchema.safeParse(body)
   if (!parsed.success) {
     const detail = parsed.error.issues.map(issue => issue.message).join('; ')
     return NextResponse.json(
@@ -134,7 +227,20 @@ export async function POST(request: Request) {
       )
     }
 
-    const inserted = await db.transaction().execute(async trx => {
+    const resolveBookingPaymentType = (
+      service: z.infer<typeof serviceProductSchema>
+    ) => {
+      if (service.bookingPaymentType) {
+        return service.bookingPaymentType
+      }
+
+      const showPrice =
+        service.showPriceOnline === true || service.showPriceOnline === null
+
+      return showPrice ? 'noPrepayment' : 'hidePrice'
+    }
+
+    const productId = await db.transaction().execute(async trx => {
       const productRow = await trx
         .insertInto('product')
         .values({
@@ -143,39 +249,97 @@ export async function POST(request: Request) {
           description: data.description,
           price: data.price,
           currency_id: currencyRow.currencyId,
-          is_credit_pack: true,
-          is_item: null,
-          is_service: null,
+          is_credit_pack: data.type === 'creditPack' ? true : null,
+          is_item: data.type === 'item' ? true : null,
+          is_service: data.type === 'service' ? true : null,
           is_membership: null,
           display_order: data.displayOrder ?? null,
         })
-        .returning(['id', 'created_at', 'updated_at'])
+        .returning('id')
         .executeTakeFirst()
 
       if (!productRow) {
         throw new Error('Failed to insert product')
       }
 
-      await trx
-        .insertInto('credit_pack')
-        .values({
+      if (data.type === 'creditPack') {
+        await trx
+          .insertInto('credit_pack')
+          .values({
+            id: productRow.id,
+            trainer_id: authorization.trainerId,
+            total_credits: data.totalCredits,
+            is_credit_pack: true,
+          })
+          .execute()
+      } else if (data.type === 'service') {
+        const bookingPaymentType = resolveBookingPaymentType(data)
+
+        const serviceValues: Record<string, unknown> = {
           id: productRow.id,
           trainer_id: authorization.trainerId,
-          total_credits: data.totalCredits,
-          is_credit_pack: true,
-        })
-        .execute()
+          duration: sql`make_interval(mins := ${data.durationMinutes})`,
+          location: data.location ?? null,
+          address: data.address ?? null,
+          google_place_id: data.googlePlaceId ?? null,
+          geo: data.geo
+            ? sql`point(${data.geo.lat}, ${data.geo.lng})`
+            : null,
+          bookable_online: data.bookableOnline ?? false,
+          booking_payment_type: bookingPaymentType,
+          is_service: true,
+        }
 
-      return productRow
+        if (data.bufferMinutesBefore !== undefined) {
+          serviceValues.buffer_minutes_before = data.bufferMinutesBefore
+        }
+
+        if (data.bufferMinutesAfter !== undefined) {
+          serviceValues.buffer_minutes_after = data.bufferMinutesAfter
+        }
+
+        if (data.timeSlotFrequencyMinutes !== undefined) {
+          serviceValues.time_slot_frequency_minutes = data.timeSlotFrequencyMinutes
+        }
+
+        if (data.requestClientAddressOnline !== undefined) {
+          serviceValues.request_client_address_online =
+            data.requestClientAddressOnline
+        }
+
+        if (data.bookingQuestion !== undefined) {
+          serviceValues.booking_question = data.bookingQuestion
+        }
+
+        if (data.bookingQuestionState !== undefined) {
+          serviceValues.booking_question_state = data.bookingQuestionState
+        }
+
+        await trx
+          .insertInto('service')
+          .values(serviceValues as Insertable<Service>)
+          .execute()
+      }
+
+      return productRow.id
     })
 
-    const rows = await fetchProductsForTrainer(authorization.trainerId, {
-      type: 'creditPack',
+    const products = await listProducts(authorization.trainerId, {
+      type: data.type,
     })
 
-    const product = productListSchema.parse(
-      rows.filter(row => row.id === inserted.id).map(row => row)
-    )[0]
+    const product = products.find(product => product.id === productId)
+
+    if (!product) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 500,
+          title: 'Failed to fetch product after creation',
+          type: '/product-not-found',
+        }),
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json(product, { status: 201 })
   } catch (error) {

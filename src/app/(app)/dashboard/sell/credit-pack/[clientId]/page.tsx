@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import type { Route } from 'next'
 import { redirect } from 'next/navigation'
 
 import { PageContainer } from '@/components/page-container'
@@ -33,13 +34,14 @@ export default async function SelectCreditPackPage({
     }, {})
   ).toString()
 
-  const currentHref = queryString
+  const currentHref = (queryString
     ? `/dashboard/sell/credit-pack/${clientId}?${queryString}`
-    : `/dashboard/sell/credit-pack/${clientId}`
-  const backHref = queryString
+    : `/dashboard/sell/credit-pack/${clientId}`) as Route
+  const backHref = (queryString
     ? `/dashboard/sell/credit-pack?${queryString}`
-    : '/dashboard/sell/credit-pack'
+    : '/dashboard/sell/credit-pack') as Route
   const redirectParam = encodeURIComponent(currentHref)
+  const addCreditPackHref = `/settings/credit-packs/add?redirect=${redirectParam}` as Route
 
   return (
     <PageContainer className="flex flex-col gap-6 py-8">
@@ -59,7 +61,7 @@ export default async function SelectCreditPackPage({
           </Button>
           <Button
             size="sm"
-            render={<Link href={`/settings/credit-packs/add?redirect=${redirectParam}`} />}
+            render={<Link href={addCreditPackHref} />}
           >
             New credit pack
           </Button>

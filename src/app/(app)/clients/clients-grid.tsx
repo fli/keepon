@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, type AnchorHTMLAttributes } from 'react'
 import Link from 'next/link'
+import type { Route } from 'next'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import {
@@ -88,7 +89,8 @@ export function ClientsGrid({ clients }: Props) {
       }
 
       const queryString = params.toString()
-      router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false })
+      const nextHref = (queryString ? `${pathname}?${queryString}` : pathname) as Route
+      router.replace(nextHref, { scroll: false })
     },
     [pathname, router, searchParams]
   )
@@ -354,11 +356,12 @@ export function ClientsGrid({ clients }: Props) {
 
               const hrefParams = new URLSearchParams(searchParams.toString())
               hrefParams.set('page', String(pageNumber))
+              const pageHref = (`${pathname}?${hrefParams.toString()}`) as Route
 
               return (
                 <PaginationItem key={pageNumber}>
                   <PaginationLink
-                    href={`${pathname}?${hrefParams.toString()}`}
+                    href={pageHref}
                     isActive={pageNumber === currentPage}
                     onClick={(event) => {
                       event.preventDefault()
@@ -366,13 +369,8 @@ export function ClientsGrid({ clients }: Props) {
                     }}
                     render={(props) => {
                       const anchorProps = props as AnchorHTMLAttributes<HTMLAnchorElement>
-                      return (
-                        <Link
-                          {...anchorProps}
-                          href={anchorProps.href ?? '#'}
-                          scroll={false}
-                        />
-                      )
+                      const href = (anchorProps.href ?? pageHref) as Route
+                      return <Link {...anchorProps} href={href} scroll={false} />
                     }}
                   >
                     {pageNumber}

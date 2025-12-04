@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import type { Route } from 'next'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import { Badge } from '@/components/ui/badge'
@@ -41,7 +42,8 @@ export function ClientPicker({ clients }: Props) {
       }
 
       const qs = params.toString()
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+      const href = (qs ? `${pathname}?${qs}` : pathname) as Route
+      router.replace(href, { scroll: false })
     },
     [pathname, router, searchParams]
   )
@@ -57,20 +59,19 @@ export function ClientPicker({ clients }: Props) {
   const goToClient = useCallback(
     (clientId: string) => {
       const params = new URLSearchParams(searchParams.toString())
-      router.push(
-        params.size > 0
-          ? `/dashboard/sell/credit-pack/${clientId}?${params.toString()}`
-          : `/dashboard/sell/credit-pack/${clientId}`
-      )
+      const href = (params.size > 0
+        ? `/dashboard/sell/credit-pack/${clientId}?${params.toString()}`
+        : `/dashboard/sell/credit-pack/${clientId}`) as Route
+      router.push(href)
     },
     [router, searchParams]
   )
 
-  const redirectParam = encodeURIComponent(
-    searchParams.size > 0
-      ? `/dashboard/sell/credit-pack?${searchParams.toString()}`
-      : '/dashboard/sell/credit-pack'
-  )
+  const redirectTarget = (searchParams.size > 0
+    ? `/dashboard/sell/credit-pack?${searchParams.toString()}`
+    : '/dashboard/sell/credit-pack') as Route
+  const redirectParam = encodeURIComponent(redirectTarget)
+  const addClientHref = `/clients/add?redirect=${redirectParam}` as Route
 
   return (
     <div className="space-y-4">
@@ -96,7 +97,7 @@ export function ClientPicker({ clients }: Props) {
           })}
           <Button
             size="sm"
-            render={<Link href={`/clients/add?redirect=${redirectParam}`} />}
+            render={<Link href={addClientHref} />}
             className="inline-flex items-center gap-2"
           >
             <Plus className="size-4" aria-hidden />

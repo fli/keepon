@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import type { Route } from 'next'
 import { redirect } from 'next/navigation'
 
 import { PageContainer } from '@/components/page-container'
@@ -35,14 +36,14 @@ export default async function SellPaymentPage({
   if (!client) redirect('/dashboard/sell/credit-pack')
   if (!pack)
     redirect(
-      queryString
+      (queryString
         ? `/dashboard/sell/credit-pack/${clientId}?${queryString}`
-        : `/dashboard/sell/credit-pack/${clientId}`
+        : `/dashboard/sell/credit-pack/${clientId}`) as Route
     )
 
-  const changePackHref = queryString
+  const changePackHref = (queryString
     ? `/dashboard/sell/credit-pack/${clientId}?${queryString}`
-    : `/dashboard/sell/credit-pack/${clientId}`
+    : `/dashboard/sell/credit-pack/${clientId}`) as Route
 
   return (
     <PageContainer className="flex flex-col gap-6 py-8">

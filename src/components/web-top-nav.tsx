@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import type { Route } from 'next'
 import { usePathname } from 'next/navigation'
 
 import {
@@ -18,9 +19,9 @@ const NAV_ITEMS = [
   { label: 'Finance', href: '/finance' },
   { label: 'Clients', href: '/clients' },
   { label: 'Settings', href: '/settings' },
-]
+] as const satisfies ReadonlyArray<{ label: string; href: Route }>
 
-function isActive(pathname: string | null, href: string) {
+function isActive(pathname: string | null, href: Route) {
   if (!pathname) return false
   if (href === '/dashboard')
     return pathname === '/' || pathname.startsWith('/dashboard')

@@ -1,5 +1,6 @@
 import { Fragment } from 'react'
 import Link from 'next/link'
+import type { Route } from 'next'
 
 import { PageContainer } from '@/components/page-container'
 import {
@@ -15,7 +16,7 @@ import { loadClientsServer } from '../../clients/actions'
 import { loadCreditPacks } from '../../dashboard/sell/credit-pack/actions'
 
 type Crumb = {
-  href: string
+  href: Route
   label: string
 }
 
@@ -97,7 +98,7 @@ async function buildCrumbs(segments: string[]): Promise<Crumb[]> {
   const crumbs: Crumb[] = normalized.map((segment, index) => {
     path += `/${segment}`
     const label = dynamicLabels[index] ?? formatSegment(segment, normalized[index - 1])
-    return { href: path, label }
+    return { href: path as Route, label }
   })
 
   return crumbs
