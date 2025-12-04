@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import type { Route } from 'next'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
 import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { CreditPackSelector } from '../credit-pack-selector'
 import { loadClients, loadCreditPacks } from '../actions'
 import { readSessionFromCookies } from '../../../../../session.server'
@@ -21,11 +23,9 @@ export default async function SelectCreditPackPage({
   const session = await readSessionFromCookies()
   if (!session) redirect('/auth')
 
-  const [clients, creditPacks] = await Promise.all([loadClients(), loadCreditPacks()])
-  const client = clients.find((item) => item.id === clientId)
-  if (!client) {
-    redirect('/dashboard/sell/credit-pack')
-  }
+  // Single fetch fan-out reused in nested Suspense boundaries.
+  const clientsPromise = loadClients()
+  const creditPacksPromise = loadCreditPacks()
 
   const queryString = new URLSearchParams(
     Object.entries(qs).reduce<Record<string, string>>((acc, [key, value]) => {
@@ -48,12 +48,16 @@ export default async function SelectCreditPackPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm uppercase tracking-wide text-muted-foreground">Dashboard</p>
-          <h1 className="text-3xl font-semibold leading-tight">
-            Choose a credit pack for {client.firstName || 'this client'}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Your selection is stored in the URL so you can refresh or share safely.
-          </p>
+          <Suspense
+            fallback={
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-80" />
+                <Skeleton className="h-4 w-96" />
+              </div>
+            }
+          >
+            <Heading clientId={clientId} clientsPromise={clientsPromise} />
+          </Suspense>
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" render={<Link href={backHref} />}>
@@ -68,7 +72,59 @@ export default async function SelectCreditPackPage({
         </div>
       </div>
 
-      <CreditPackSelector clientId={clientId} creditPacks={creditPacks} backQuery={queryString} />
+      <Suspense
+        fallback={
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <Skeleton key={idx} className="h-32" />
+            ))}
+          </div>
+        }
+      >
+        <CreditPackSelectorLoader
+          clientId={clientId}
+          backQuery={queryString}
+          creditPacksPromise={creditPacksPromise}
+        />
+      </Suspense>
     </PageContainer>
   )
+}
+
+async function Heading({
+  clientId,
+  clientsPromise,
+}: {
+  clientId: string
+  clientsPromise: ReturnType<typeof loadClients>
+}) {
+  const clients = await clientsPromise
+  const client = clients.find((item) => item.id === clientId)
+  if (!client) {
+    redirect('/dashboard/sell/credit-pack')
+  }
+
+  return (
+    <>
+      <h1 className="text-3xl font-semibold leading-tight">
+        Choose a credit pack for {client.firstName || 'this client'}
+      </h1>
+      <p className="text-sm text-muted-foreground">
+        Your selection is stored in the URL so you can refresh or share safely.
+      </p>
+    </>
+  )
+}
+
+async function CreditPackSelectorLoader({
+  clientId,
+  backQuery,
+  creditPacksPromise,
+}: {
+  clientId: string
+  backQuery: string
+  creditPacksPromise: ReturnType<typeof loadCreditPacks>
+}) {
+  const creditPacks = await creditPacksPromise
+  return <CreditPackSelector clientId={clientId} creditPacks={creditPacks} backQuery={backQuery} />
 }

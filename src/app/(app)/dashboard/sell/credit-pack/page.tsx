@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
 import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { ClientPicker } from './client-picker'
 import { loadClients } from './actions'
 import { readSessionFromCookies } from '../../../../session.server'
@@ -13,7 +15,8 @@ export default async function SellCreditPackStartPage() {
     redirect('/auth')
   }
 
-  const clients = await loadClients()
+  // Fetch once at the top; Suspense below unwraps the promise.
+  const clientsPromise = loadClients()
 
   return (
     <PageContainer className="flex flex-col gap-6 py-8">
@@ -28,7 +31,26 @@ export default async function SellCreditPackStartPage() {
         </Button>
       </div>
 
-      <ClientPicker clients={clients} />
+      <Suspense
+        fallback={
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <Skeleton key={idx} className="h-24" />
+            ))}
+          </div>
+        }
+      >
+        <ClientPickerLoader clientsPromise={clientsPromise} />
+      </Suspense>
     </PageContainer>
   )
+}
+
+async function ClientPickerLoader({
+  clientsPromise,
+}: {
+  clientsPromise: ReturnType<typeof loadClients>
+}) {
+  const clients = await clientsPromise
+  return <ClientPicker clients={clients} />
 }

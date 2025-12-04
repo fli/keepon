@@ -113,7 +113,11 @@ export default async function DashboardPage() {
           ) : null}
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" type="button" render={<Link href="/dashboard/sell/credit-pack" />}>
+              <Button
+                variant="secondary"
+                type="button"
+                render={<Link href="/dashboard/sell/credit-pack" prefetch />}
+              >
                 Sell credit pack
               </Button>
               <Button variant="secondary" type="button">

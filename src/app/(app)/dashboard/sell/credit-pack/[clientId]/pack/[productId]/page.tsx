@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import type { Route } from 'next'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
 import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { PaymentForm } from '../../../payment-form'
 import { loadClients, loadCreditPacks } from '../../../actions'
 import { readSessionFromCookies } from '../../../../../../../session.server'
@@ -21,10 +23,8 @@ export default async function SellPaymentPage({
   const session = await readSessionFromCookies()
   if (!session) redirect('/auth')
 
-  const [clients, creditPacks] = await Promise.all([loadClients(), loadCreditPacks()])
-
-  const client = clients.find((item) => item.id === clientId)
-  const pack = creditPacks.find((item) => item.id === productId)
+  const clientsPromise = loadClients()
+  const creditPacksPromise = loadCreditPacks()
 
   const queryString = new URLSearchParams(
     Object.entries(qs).reduce<Record<string, string>>((acc, [key, value]) => {
@@ -32,14 +32,6 @@ export default async function SellPaymentPage({
       return acc
     }, {})
   ).toString()
-
-  if (!client) redirect('/dashboard/sell/credit-pack')
-  if (!pack)
-    redirect(
-      (queryString
-        ? `/dashboard/sell/credit-pack/${clientId}?${queryString}`
-        : `/dashboard/sell/credit-pack/${clientId}`) as Route
-    )
 
   const changePackHref = (queryString
     ? `/dashboard/sell/credit-pack/${clientId}?${queryString}`
@@ -65,7 +57,62 @@ export default async function SellPaymentPage({
         </div>
       </div>
 
-      <PaymentForm client={client} pack={pack} />
+      <Suspense fallback={<PaymentSkeleton />}>
+        <PaymentFormLoader
+          clientId={clientId}
+          productId={productId}
+          clientsPromise={clientsPromise}
+          creditPacksPromise={creditPacksPromise}
+          backQuery={queryString}
+        />
+      </Suspense>
     </PageContainer>
+  )
+}
+
+async function PaymentFormLoader({
+  clientId,
+  productId,
+  clientsPromise,
+  creditPacksPromise,
+  backQuery,
+}: {
+  clientId: string
+  productId: string
+  clientsPromise: ReturnType<typeof loadClients>
+  creditPacksPromise: ReturnType<typeof loadCreditPacks>
+  backQuery: string
+}) {
+  const [clients, creditPacks] = await Promise.all([clientsPromise, creditPacksPromise])
+  const client = clients.find((item) => item.id === clientId)
+  const pack = creditPacks.find((item) => item.id === productId)
+
+  if (!client) redirect('/dashboard/sell/credit-pack')
+  if (!pack)
+    redirect(
+      backQuery
+        ? (`/dashboard/sell/credit-pack/${clientId}?${backQuery}` as Route)
+        : (`/dashboard/sell/credit-pack/${clientId}` as Route)
+    )
+
+  return <PaymentForm client={client} pack={pack} />
+}
+
+function PaymentSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-44" />
+        <Skeleton className="h-4 w-80" />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Skeleton className="h-24" />
+        <Skeleton className="h-24" />
+      </div>
+      <Skeleton className="h-32" />
+      <div className="flex justify-end">
+        <Skeleton className="h-9 w-36" />
+      </div>
+    </div>
   )
 }
