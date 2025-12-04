@@ -396,32 +396,32 @@ export async function GET(request: Request) {
   try {
     const trainerRow = (await db
       .selectFrom('trainer')
-      .select(({ ref }) => [
-        ref('trainer.online_bookings_enabled').as('enabled'),
-        ref('trainer.online_bookings_page_url_slug').as('pageUrlSlug'),
-        ref('trainer.online_bookings_contact_email').as('contactEmail'),
-        ref('trainer.online_bookings_contact_number').as('contactNumber'),
-        ref('trainer.online_bookings_business_name').as('businessName'),
-        ref('trainer.online_bookings_show_contact_number').as('showContactNumber'),
-        ref('trainer.online_bookings_booking_note').as('bookingNote'),
-        ref('trainer.online_bookings_terms_and_conditions').as('termsAndConditions'),
-        ref('trainer.online_bookings_cancellation_policy').as('cancellationPolicy'),
-        ref('trainer.online_bookings_duration_until_booking_window_opens').as('durationUntilBookingWindowOpens'),
-        ref('trainer.online_bookings_duration_until_booking_window_closes').as('durationUntilBookingWindowCloses'),
-        ref('trainer.online_bookings_monday_accepting_bookings').as('mondayAcceptingBookings'),
-        ref('trainer.online_bookings_monday_available_intervals').as('mondayAvailableIntervals'),
-        ref('trainer.online_bookings_tuesday_accepting_bookings').as('tuesdayAcceptingBookings'),
-        ref('trainer.online_bookings_tuesday_available_intervals').as('tuesdayAvailableIntervals'),
-        ref('trainer.online_bookings_wednesday_accepting_bookings').as('wednesdayAcceptingBookings'),
-        ref('trainer.online_bookings_wednesday_available_intervals').as('wednesdayAvailableIntervals'),
-        ref('trainer.online_bookings_thursday_accepting_bookings').as('thursdayAcceptingBookings'),
-        ref('trainer.online_bookings_thursday_available_intervals').as('thursdayAvailableIntervals'),
-        ref('trainer.online_bookings_friday_accepting_bookings').as('fridayAcceptingBookings'),
-        ref('trainer.online_bookings_friday_available_intervals').as('fridayAvailableIntervals'),
-        ref('trainer.online_bookings_saturday_accepting_bookings').as('saturdayAcceptingBookings'),
-        ref('trainer.online_bookings_saturday_available_intervals').as('saturdayAvailableIntervals'),
-        ref('trainer.online_bookings_sunday_accepting_bookings').as('sundayAcceptingBookings'),
-        ref('trainer.online_bookings_sunday_available_intervals').as('sundayAvailableIntervals'),
+      .select((eb) => [
+        eb.ref('trainer.online_bookings_enabled').as('enabled'),
+        eb.ref('trainer.online_bookings_page_url_slug').as('pageUrlSlug'),
+        eb.ref('trainer.online_bookings_contact_email').as('contactEmail'),
+        eb.ref('trainer.online_bookings_contact_number').as('contactNumber'),
+        eb.ref('trainer.online_bookings_business_name').as('businessName'),
+        eb.ref('trainer.online_bookings_show_contact_number').as('showContactNumber'),
+        eb.ref('trainer.online_bookings_booking_note').as('bookingNote'),
+        eb.ref('trainer.online_bookings_terms_and_conditions').as('termsAndConditions'),
+        eb.ref('trainer.online_bookings_cancellation_policy').as('cancellationPolicy'),
+        eb.ref('trainer.online_bookings_duration_until_booking_window_opens').as('durationUntilBookingWindowOpens'),
+        eb.ref('trainer.online_bookings_duration_until_booking_window_closes').as('durationUntilBookingWindowCloses'),
+        eb.ref('trainer.online_bookings_monday_accepting_bookings').as('mondayAcceptingBookings'),
+        eb.ref('trainer.online_bookings_monday_available_intervals').as('mondayAvailableIntervals'),
+        eb.ref('trainer.online_bookings_tuesday_accepting_bookings').as('tuesdayAcceptingBookings'),
+        eb.ref('trainer.online_bookings_tuesday_available_intervals').as('tuesdayAvailableIntervals'),
+        eb.ref('trainer.online_bookings_wednesday_accepting_bookings').as('wednesdayAcceptingBookings'),
+        eb.ref('trainer.online_bookings_wednesday_available_intervals').as('wednesdayAvailableIntervals'),
+        eb.ref('trainer.online_bookings_thursday_accepting_bookings').as('thursdayAcceptingBookings'),
+        eb.ref('trainer.online_bookings_thursday_available_intervals').as('thursdayAvailableIntervals'),
+        eb.ref('trainer.online_bookings_friday_accepting_bookings').as('fridayAcceptingBookings'),
+        eb.ref('trainer.online_bookings_friday_available_intervals').as('fridayAvailableIntervals'),
+        eb.ref('trainer.online_bookings_saturday_accepting_bookings').as('saturdayAcceptingBookings'),
+        eb.ref('trainer.online_bookings_saturday_available_intervals').as('saturdayAvailableIntervals'),
+        eb.ref('trainer.online_bookings_sunday_accepting_bookings').as('sundayAcceptingBookings'),
+        eb.ref('trainer.online_bookings_sunday_available_intervals').as('sundayAvailableIntervals'),
       ])
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()) as RawTrainerSettingsRow | undefined
@@ -480,10 +480,10 @@ export async function GET(request: Request) {
 
     const overridesRows = (await db
       .selectFrom('availability')
-      .select(({ ref }) => [
-        ref('availability.date').as('date'),
-        ref('availability.accepting_bookings').as('acceptingBookings'),
-        ref('availability.available_intervals').as('availableIntervals'),
+      .select((eb) => [
+        eb.ref('availability.date').as('date'),
+        eb.ref('availability.accepting_bookings').as('acceptingBookings'),
+        eb.ref('availability.available_intervals').as('availableIntervals'),
       ])
       .where('availability.trainer_id', '=', authorization.trainerId)
       .execute()) as AvailabilityOverrideRow[]
@@ -658,7 +658,7 @@ export async function PATCH(request: Request) {
   const trainerMeta = await db
     .selectFrom('trainer')
     .leftJoin('country', 'country.id', 'trainer.country_id')
-    .select(({ ref }) => [ref('trainer.id').as('trainerId'), ref('country.alpha_2_code').as('countryCode')])
+    .select((eb) => [eb.ref('trainer.id').as('trainerId'), eb.ref('country.alpha_2_code').as('countryCode')])
     .where('trainer.id', '=', auth.trainerId)
     .executeTakeFirst()
 

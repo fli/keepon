@@ -119,7 +119,7 @@ export async function GET(request: Request) {
     trainerRow = await db
       .selectFrom('trainer')
       .innerJoin('country', 'country.id', 'trainer.country_id')
-      .select(({ ref }) => [ref('country.alpha_2_code').as('country')])
+      .select((eb) => [eb.ref('country.alpha_2_code').as('country')])
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()
   } catch (error) {

@@ -48,15 +48,15 @@ export type ChangePasswordPayload = {
 export async function getTrainerAccount(trainerId: string): Promise<AccountDetails> {
   const row = await db
     .selectFrom('trainer')
-    .select(({ ref }) => [
-      ref('trainer.id').as('id'),
-      ref('trainer.first_name').as('firstName'),
-      ref('trainer.last_name').as('lastName'),
-      ref('trainer.email').as('email'),
-      ref('trainer.business_name').as('businessName'),
-      ref('trainer.timezone').as('timezone'),
-      ref('trainer.locale').as('locale'),
-      ref('trainer.brand_color').as('brandColor'),
+    .select((eb) => [
+      eb.ref('trainer.id').as('id'),
+      eb.ref('trainer.first_name').as('firstName'),
+      eb.ref('trainer.last_name').as('lastName'),
+      eb.ref('trainer.email').as('email'),
+      eb.ref('trainer.business_name').as('businessName'),
+      eb.ref('trainer.timezone').as('timezone'),
+      eb.ref('trainer.locale').as('locale'),
+      eb.ref('trainer.brand_color').as('brandColor'),
     ])
     .where('trainer.id', '=', trainerId)
     .executeTakeFirst()
@@ -91,15 +91,15 @@ export async function updateTrainerAccount(trainerId: string, payload: UpdateAcc
       business_name: parsed.businessName ?? null,
     })
     .where('id', '=', trainerId)
-    .returning(({ ref }) => [
-      ref('trainer.id').as('id'),
-      ref('trainer.first_name').as('firstName'),
-      ref('trainer.last_name').as('lastName'),
-      ref('trainer.email').as('email'),
-      ref('trainer.business_name').as('businessName'),
-      ref('trainer.timezone').as('timezone'),
-      ref('trainer.locale').as('locale'),
-      ref('trainer.brand_color').as('brandColor'),
+    .returning((eb) => [
+      eb.ref('trainer.id').as('id'),
+      eb.ref('trainer.first_name').as('firstName'),
+      eb.ref('trainer.last_name').as('lastName'),
+      eb.ref('trainer.email').as('email'),
+      eb.ref('trainer.business_name').as('businessName'),
+      eb.ref('trainer.timezone').as('timezone'),
+      eb.ref('trainer.locale').as('locale'),
+      eb.ref('trainer.brand_color').as('brandColor'),
     ])
     .executeTakeFirst()
 

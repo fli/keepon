@@ -15,7 +15,7 @@ export default function RemindersSettingsPage() {
     <Suspense
       fallback={
         <PageContainer className="flex flex-col gap-6 py-8">
-          <h1 className="text-3xl font-semibold leading-tight">Reminders</h1>
+          <h1 className="text-3xl leading-tight font-semibold">Reminders</h1>
           <p className="text-sm text-muted-foreground">Loading your reminder settings…</p>
         </PageContainer>
       }
@@ -44,8 +44,8 @@ async function RemindersSettingsContent() {
   return (
     <PageContainer className="flex flex-col gap-6 py-8">
       <div className="space-y-2">
-        <p className="text-sm uppercase tracking-wide text-muted-foreground">Settings</p>
-        <h1 className="text-3xl font-semibold leading-tight">Reminders</h1>
+        <p className="text-sm tracking-wide text-muted-foreground uppercase">Settings</p>
+        <h1 className="text-3xl leading-tight font-semibold">Reminders</h1>
         <p className="text-sm text-muted-foreground">
           Default reminders for you and your clients. To add or edit, open the manage page.
         </p>
@@ -127,7 +127,7 @@ function ReminderSection({
   return (
     <section className="space-y-3">
       <div>
-        <p className="text-lg font-semibold leading-tight">{title}</p>
+        <p className="text-lg leading-tight font-semibold">{title}</p>
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       {items.length === 0 ? (

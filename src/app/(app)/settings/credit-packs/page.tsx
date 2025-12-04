@@ -59,8 +59,8 @@ export default async function CreditPacksPage() {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm uppercase tracking-wide text-muted-foreground">Settings</p>
-            <h1 className="text-3xl font-semibold leading-tight">Credit packs</h1>
+            <p className="text-sm tracking-wide text-muted-foreground uppercase">Settings</p>
+            <h1 className="text-3xl leading-tight font-semibold">Credit packs</h1>
             <p className="text-sm text-muted-foreground">
               Review packs of credits that clients can purchase and apply toward sessions.
             </p>
@@ -73,7 +73,7 @@ export default async function CreditPacksPage() {
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border shadow-sm">
-        <div className="grid grid-cols-4 gap-3 bg-muted/50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="grid grid-cols-4 gap-3 bg-muted/50 px-4 py-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           <span>Credit pack</span>
           <span>Service name</span>
           <span className="text-right">Credits</span>

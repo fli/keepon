@@ -41,21 +41,21 @@ export function WebTopNav() {
           <span className="sr-only">Keepon home</span>
         </Link>
 
-        <NavigationMenu className="flex-1 min-w-0">
+        <NavigationMenu className="min-w-0 flex-1">
           <NavigationMenuList>
             {NAV_ITEMS.map((item) => {
               const active = isActive(pathname, item.href)
 
               return (
                 <NavigationMenuItem key={item.href}>
-                  <NavigationMenuLink
-                    className="h-8 px-2 text-[12px] leading-tight sm:h-9 sm:px-3 sm:text-sm"
-                    active={active}
-                    aria-current={active ? 'page' : undefined}
-                    render={<Link href={item.href} />}
-                  >
-                    {item.label}
-                  </NavigationMenuLink>
+                <NavigationMenuLink
+                  className="h-8 px-2 text-[12px] leading-tight sm:h-9 sm:px-3 sm:text-sm"
+                  active={active}
+                  aria-current={active ? 'page' : undefined}
+                  render={<Link href={item.href} />}
+                >
+                  {item.label}
+                </NavigationMenuLink>
                 </NavigationMenuItem>
               )
             })}

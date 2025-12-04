@@ -17,7 +17,7 @@ export function YearView({ date }: YearViewProps) {
             <h3 className="text-sm font-semibold text-foreground">
               {month} {year}
             </h3>
-            <div className="mt-3 grid grid-cols-7 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="mt-3 grid grid-cols-7 text-center text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
               <span>M</span>
               <span>T</span>
               <span>W</span>

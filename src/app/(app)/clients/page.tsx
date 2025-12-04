@@ -21,7 +21,7 @@ export default async function ClientsPage() {
     <PageContainer className="flex flex-col gap-6 py-8">
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-3xl font-semibold leading-tight">Clients</h1>
+          <h1 className="text-3xl leading-tight font-semibold">Clients</h1>
           <div className="flex items-center gap-2">
             <ImportClientsButton />
             <Button size="sm" render={<Link href="/clients/add" />}>

@@ -55,10 +55,10 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       .selectFrom('trainer')
       .innerJoin('vw_legacy_trainer as legacyTrainer', 'legacyTrainer.id', 'trainer.id')
       .innerJoin('country', 'country.id', 'trainer.country_id')
-      .select(({ ref }) => [
-        ref('trainer.email').as('email'),
-        ref('legacyTrainer.sms_credit_balance').as('smsCreditBalance'),
-        ref('country.alpha_2_code').as('country'),
+      .select((eb) => [
+        eb.ref('trainer.email').as('email'),
+        eb.ref('legacyTrainer.sms_credit_balance').as('smsCreditBalance'),
+        eb.ref('country.alpha_2_code').as('country'),
       ])
       .where('trainer.sms_credit_checkout_id', '=', id)
       .executeTakeFirst()

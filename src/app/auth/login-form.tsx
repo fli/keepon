@@ -18,7 +18,7 @@ export function LoginForm() {
       <form action={formAction} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
-          <Input autoFocus id="email" name="email" type="email" required autoComplete="email" />
+          <Input  id="email" name="email" type="email" required autoComplete="email" />
         </div>
 
         <div className="space-y-2">

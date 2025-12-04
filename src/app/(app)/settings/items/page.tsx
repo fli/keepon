@@ -60,8 +60,8 @@ export default async function ItemsPage() {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm uppercase tracking-wide text-muted-foreground">Settings</p>
-            <h1 className="text-3xl font-semibold leading-tight">Items</h1>
+            <p className="text-sm tracking-wide text-muted-foreground uppercase">Settings</p>
+            <h1 className="text-3xl leading-tight font-semibold">Items</h1>
             <p className="text-sm text-muted-foreground">Sell add-ons and one-off items.</p>
           </div>
           <Button size="sm" render={<Link href="/settings/items/add" />}>
@@ -72,7 +72,7 @@ export default async function ItemsPage() {
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border shadow-sm">
-        <div className="grid grid-cols-3 gap-3 bg-muted/50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="grid grid-cols-3 gap-3 bg-muted/50 px-4 py-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           <span>Item</span>
           <span>Description</span>
           <span className="text-right">Price</span>

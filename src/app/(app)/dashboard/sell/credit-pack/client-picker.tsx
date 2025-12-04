@@ -114,7 +114,7 @@ export function ClientPicker({ clients }: Props) {
             return (
               <button
                 key={client.id}
-                className="flex w-full items-center gap-3 rounded-lg border border-border bg-background p-4 text-left shadow-xs transition hover:-translate-y-px hover:border-primary/60 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                className="flex w-full items-center gap-3 rounded-lg border border-border bg-background p-4 text-left shadow-xs transition hover:-translate-y-px hover:border-primary/60 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
                 onClick={() => goToClient(client.id)}
               >
                 <div

@@ -50,7 +50,7 @@ export default function AddClientPage() {
     <Suspense
       fallback={
         <PageContainer className="flex flex-col items-center gap-6 py-8">
-          <h1 className="text-3xl font-semibold leading-tight">Add client</h1>
+          <h1 className="text-3xl leading-tight font-semibold">Add client</h1>
           <p className="text-sm text-muted-foreground">Loading form…</p>
         </PageContainer>
       }
@@ -69,14 +69,14 @@ async function AddClientContent() {
   return (
     <PageContainer className="flex flex-col items-center gap-6 py-8">
       <div className="flex w-full max-w-xl flex-col gap-2">
-        <h1 className="text-3xl font-semibold leading-tight">Add client</h1>
+        <h1 className="text-3xl leading-tight font-semibold">Add client</h1>
         <p className="text-sm text-muted-foreground">Create a client record to track status and contact details.</p>
       </div>
 
       <form action={addClient} className="w-full max-w-xl space-y-5">
         <div className="space-y-2">
           <Label htmlFor="firstName">First name</Label>
-          <Input id="firstName" name="firstName" required autoFocus autoComplete="given-name" />
+          <Input id="firstName" name="firstName" required  autoComplete="given-name" />
         </div>
 
         <div className="space-y-2">
@@ -105,7 +105,7 @@ async function AddClientContent() {
         </div>
 
         <div className="space-y-2">
-          <p className="text-sm font-medium leading-none">Status</p>
+          <p className="text-sm leading-none font-medium">Status</p>
           <div className="flex flex-wrap gap-2">
             {statusOptions.map((option) => (
               <label

@@ -64,7 +64,7 @@ export function ProjectedPaidCard({ payments }: ProjectedPaidCardProps) {
               {selected && currency ? formatCurrency(selected.projected, currency) : '—'}
             </p>
           </div>
-          <div className="h-10 w-px bg-border mx-3" aria-hidden />
+          <div className="mx-3 h-10 w-px bg-border" aria-hidden />
           <div className="space-y-1">
             <p className="text-sm font-medium text-muted-foreground">Paid</p>
             <p className="text-2xl font-semibold text-foreground">

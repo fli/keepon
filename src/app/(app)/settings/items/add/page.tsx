@@ -91,7 +91,7 @@ export default async function AddItemPage() {
   return (
     <PageContainer className="flex flex-col items-center gap-6 py-8">
       <div className="flex w-full max-w-xl flex-col gap-2">
-        <h1 className="text-3xl font-semibold leading-tight">Add item</h1>
+        <h1 className="text-3xl leading-tight font-semibold">Add item</h1>
         <p className="text-sm text-muted-foreground">
           Create an item you can sell alongside services and credit packs.
         </p>
@@ -100,7 +100,7 @@ export default async function AddItemPage() {
       <form action={createItem} className="w-full max-w-xl space-y-5">
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>
-          <Input id="name" name="name" required autoFocus />
+          <Input id="name" name="name" required  />
         </div>
 
         <div className="space-y-2">

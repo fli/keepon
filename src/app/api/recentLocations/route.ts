@@ -168,24 +168,24 @@ export async function GET(request: Request) {
     const [sessionRows, serviceRows] = await Promise.all([
       db
         .selectFrom('session')
-        .select(({ ref }) => [
-          ref('session.location').as('location'),
-          ref('session.address').as('address'),
-          ref('session.geo').as('geo'),
-          ref('session.google_place_id').as('googlePlaceId'),
-          ref('session.created_at').as('createdAt'),
+        .select((eb) => [
+          eb.ref('session.location').as('location'),
+          eb.ref('session.address').as('address'),
+          eb.ref('session.geo').as('geo'),
+          eb.ref('session.google_place_id').as('googlePlaceId'),
+          eb.ref('session.created_at').as('createdAt'),
         ])
         .where('session.trainer_id', '=', trainerId)
         .where('session.location', 'is not', null)
         .execute(),
       db
         .selectFrom('service')
-        .select(({ ref }) => [
-          ref('service.location').as('location'),
-          ref('service.address').as('address'),
-          ref('service.geo').as('geo'),
-          ref('service.google_place_id').as('googlePlaceId'),
-          ref('service.created_at').as('createdAt'),
+        .select((eb) => [
+          eb.ref('service.location').as('location'),
+          eb.ref('service.address').as('address'),
+          eb.ref('service.geo').as('geo'),
+          eb.ref('service.google_place_id').as('googlePlaceId'),
+          eb.ref('service.created_at').as('createdAt'),
         ])
         .where('service.trainer_id', '=', trainerId)
         .where('service.location', 'is not', null)

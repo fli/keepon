@@ -164,7 +164,7 @@ export function ClientsGrid({ clients }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3 justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="w-full sm:w-80">
           <Input
             value={quickFilter}
@@ -245,9 +245,8 @@ export function ClientsGrid({ clients }: Props) {
                 return (
                   <TableRow
                     key={client.id}
-                    role="button"
                     tabIndex={0}
-                    className="cursor-pointer hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                    className="cursor-pointer hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
                     onClick={() => handleRowClick(client.id)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
@@ -257,7 +256,7 @@ export function ClientsGrid({ clients }: Props) {
                     }}
                   >
                     <TableCell className="py-4">
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex min-w-0 items-center gap-3">
                         <Avatar className="h-9 w-9 border-0 shadow-xs">
                           <AvatarFallback
                             className="text-xs font-semibold text-background"
@@ -267,7 +266,7 @@ export function ClientsGrid({ clients }: Props) {
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex min-w-0 flex-col">
-                          <span className="truncate font-medium text-sm">
+                          <span className="truncate text-sm font-medium">
                             {`${client.firstName ?? ''} ${client.lastName ?? ''}`.trim() || 'Unnamed client'}
                           </span>
                           <span className="truncate text-xs text-muted-foreground">

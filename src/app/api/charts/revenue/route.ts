@@ -155,7 +155,7 @@ export async function GET(request: Request) {
       .selectFrom('trainer')
       .innerJoin('supported_country_currency', 'supported_country_currency.country_id', 'trainer.country_id')
       .innerJoin('currency', 'currency.id', 'supported_country_currency.currency_id')
-      .select(({ ref }) => [ref('currency.alpha_code').as('currency')])
+      .select((eb) => [eb.ref('currency.alpha_code').as('currency')])
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()
 

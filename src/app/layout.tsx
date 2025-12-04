@@ -16,8 +16,8 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn('root min-h-screen bg-background text-foreground font-sans antialiased')}>
-        <div className="min-h-screen flex flex-col">
+      <body className={cn('root min-h-screen bg-background font-sans text-foreground antialiased')}>
+        <div className="flex min-h-screen flex-col">
           <Suspense fallback={null}>{children}</Suspense>
         </div>
       </body>

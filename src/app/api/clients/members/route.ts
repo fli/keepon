@@ -54,12 +54,12 @@ export async function GET(request: Request) {
       .innerJoin('user_', (join) =>
         join.onRef('user_.id', '=', 'client.user_id').onRef('user_.type', '=', 'client.user_type')
       )
-      .select(({ ref }) => [
-        ref('user_.id').as('id'),
-        ref('trainer.first_name').as('trainerFirstName'),
-        ref('trainer.last_name').as('trainerLastName'),
-        ref('client.first_name').as('clientFirstName'),
-        ref('client.last_name').as('clientLastName'),
+      .select((eb) => [
+        eb.ref('user_.id').as('id'),
+        eb.ref('trainer.first_name').as('trainerFirstName'),
+        eb.ref('trainer.last_name').as('trainerLastName'),
+        eb.ref('client.first_name').as('clientFirstName'),
+        eb.ref('client.last_name').as('clientLastName'),
       ])
       .where('client.email', '=', email)
       .execute()

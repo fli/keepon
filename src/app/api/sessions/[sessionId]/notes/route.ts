@@ -110,7 +110,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         })
         .where('id', '=', sessionId)
         .where('trainer_id', '=', authorization.trainerId)
-        .returning(({ ref }) => [ref('session.note').as('note')])
+        .returning((eb) => [eb.ref('session.note').as('note')])
         .executeTakeFirst()
 
       if (!updated) {

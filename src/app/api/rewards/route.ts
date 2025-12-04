@@ -18,12 +18,12 @@ export async function GET(request: Request) {
     const rows = await db
       .selectFrom('reward')
       .innerJoin('reward_type', 'reward_type.type', 'reward.type')
-      .select(({ ref }) => [
-        ref('reward.id').as('id'),
-        ref('reward.type').as('type'),
-        ref('reward_type.title').as('title'),
-        ref('reward_type.description').as('description'),
-        ref('reward.claimed_at').as('claimedAt'),
+      .select((eb) => [
+        eb.ref('reward.id').as('id'),
+        eb.ref('reward.type').as('type'),
+        eb.ref('reward_type.title').as('title'),
+        eb.ref('reward_type.description').as('description'),
+        eb.ref('reward.claimed_at').as('claimedAt'),
       ])
       .where('reward.trainer_id', '=', trainerId)
       .orderBy('reward.created_at', 'desc')

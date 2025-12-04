@@ -204,8 +204,8 @@ export const fetchSaleProducts = async (
 
   const creditUsage = db
     .selectFrom('payment_credit_pack as paymentCreditPack')
-    .select(({ ref }) => [
-      ref('paymentCreditPack.sale_credit_pack_id').as('saleCreditPackId'),
+    .select((eb) => [
+      eb.ref('paymentCreditPack.sale_credit_pack_id').as('saleCreditPackId'),
       sql<number>`
         COALESCE(SUM(${sql.ref('paymentCreditPack.credits_used')}), 0)::int4
       `.as('creditsUsed'),
@@ -227,33 +227,33 @@ export const fetchSaleProducts = async (
     .leftJoin('sale_service as saleService', 'saleService.id', 'saleProduct.id')
     .leftJoin('sale_item as saleItem', 'saleItem.id', 'saleProduct.id')
     .leftJoin(creditUsage, 'creditUsage.saleCreditPackId', 'saleCreditPack.id')
-    .select(({ ref }) => [
-      ref('saleProduct.id').as('id'),
-      ref('saleProduct.client_id').as('clientId'),
-      ref('saleProduct.sale_id').as('saleId'),
-      ref('saleProduct.product_id').as('productId'),
-      ref('saleProduct.name').as('name'),
-      ref('saleProduct.price').as('price'),
-      ref('currency.alpha_code').as('currency'),
-      ref('saleProduct.created_at').as('createdAt'),
+    .select((eb) => [
+      eb.ref('saleProduct.id').as('id'),
+      eb.ref('saleProduct.client_id').as('clientId'),
+      eb.ref('saleProduct.sale_id').as('saleId'),
+      eb.ref('saleProduct.product_id').as('productId'),
+      eb.ref('saleProduct.name').as('name'),
+      eb.ref('saleProduct.price').as('price'),
+      eb.ref('currency.alpha_code').as('currency'),
+      eb.ref('saleProduct.created_at').as('createdAt'),
       combinedUpdatedAt.as('combinedUpdatedAt'),
-      ref('saleProduct.is_credit_pack').as('isCreditPack'),
-      ref('saleProduct.is_item').as('isItem'),
-      ref('saleProduct.is_service').as('isService'),
-      ref('saleProduct.is_membership').as('isMembership'),
-      ref('saleCreditPack.total_credits').as('totalCredits'),
+      eb.ref('saleProduct.is_credit_pack').as('isCreditPack'),
+      eb.ref('saleProduct.is_item').as('isItem'),
+      eb.ref('saleProduct.is_service').as('isService'),
+      eb.ref('saleProduct.is_membership').as('isMembership'),
+      eb.ref('saleCreditPack.total_credits').as('totalCredits'),
       sql<number | null>`
         CASE
           WHEN ${sql.ref('saleService.duration')} IS NULL THEN NULL
           ELSE EXTRACT(EPOCH FROM ${sql.ref('saleService.duration')}) / 60
         END
       `.as('durationMinutes'),
-      ref('saleService.location').as('location'),
-      ref('saleService.address').as('address'),
-      ref('saleService.google_place_id').as('googlePlaceId'),
-      ref('saleService.geo').as('geo'),
-      ref('saleItem.quantity').as('quantity'),
-      ref('creditUsage.creditsUsed').as('creditsUsed'),
+      eb.ref('saleService.location').as('location'),
+      eb.ref('saleService.address').as('address'),
+      eb.ref('saleService.google_place_id').as('googlePlaceId'),
+      eb.ref('saleService.geo').as('geo'),
+      eb.ref('saleItem.quantity').as('quantity'),
+      eb.ref('creditUsage.creditsUsed').as('creditsUsed'),
     ])
     .where('saleProduct.trainer_id', '=', trainerId)
 

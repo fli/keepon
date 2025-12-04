@@ -19,8 +19,8 @@ export default function AddReminderPage({ params }: { params: Promise<{ target: 
     <Suspense
       fallback={
         <PageContainer className="flex flex-col gap-6 py-8">
-          <p className="text-sm uppercase tracking-wide text-muted-foreground">Settings</p>
-          <h1 className="text-3xl font-semibold leading-tight">Add reminder</h1>
+          <p className="text-sm tracking-wide text-muted-foreground uppercase">Settings</p>
+          <h1 className="text-3xl leading-tight font-semibold">Add reminder</h1>
           <p className="text-sm text-muted-foreground">Loading reminder form…</p>
         </PageContainer>
       }
@@ -84,8 +84,8 @@ async function AddReminderContent({ params }: { params: Promise<{ target: Target
   return (
     <PageContainer className="flex flex-col gap-6 py-8">
       <div className="space-y-2">
-        <p className="text-sm uppercase tracking-wide text-muted-foreground">Settings</p>
-        <h1 className="text-3xl font-semibold leading-tight">
+        <p className="text-sm tracking-wide text-muted-foreground uppercase">Settings</p>
+        <h1 className="text-3xl leading-tight font-semibold">
           Add {targetKey === 'serviceProvider' ? 'my' : 'client'} reminder
         </h1>
         <p className="text-sm text-muted-foreground">

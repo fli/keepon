@@ -156,13 +156,13 @@ export function PaymentForm({ client, pack }: Props) {
 
         <div className="space-y-3 text-sm text-muted-foreground">
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium uppercase tracking-wide">
+            <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium tracking-wide uppercase">
               Step 1: Select client
             </span>
-            <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium uppercase tracking-wide">
+            <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium tracking-wide uppercase">
               Step 2: Choose credit pack
             </span>
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-primary">
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium tracking-wide text-primary uppercase">
               Step 3: Payment type
             </span>
           </div>

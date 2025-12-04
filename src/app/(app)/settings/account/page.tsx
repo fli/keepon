@@ -26,8 +26,8 @@ export default async function AccountSettingsPage() {
   return (
     <PageContainer className="flex flex-col gap-6 py-8">
       <div className="space-y-2">
-        <p className="text-sm uppercase tracking-wide text-muted-foreground">Settings</p>
-        <h1 className="text-3xl font-semibold leading-tight">My account</h1>
+        <p className="text-sm tracking-wide text-muted-foreground uppercase">Settings</p>
+        <h1 className="text-3xl leading-tight font-semibold">My account</h1>
         <p className="text-sm text-muted-foreground">Update your profile details and keep your account secure.</p>
         {loadError ? <p className="text-sm text-destructive">{loadError}</p> : null}
       </div>

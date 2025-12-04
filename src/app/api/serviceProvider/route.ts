@@ -32,16 +32,16 @@ export async function GET(request: Request) {
       .innerJoin('trainer', 'trainer.id', 'client.trainer_id')
       .innerJoin('vw_legacy_trainer', 'vw_legacy_trainer.id', 'trainer.id')
       .innerJoin('country', 'country.id', 'trainer.country_id')
-      .select(({ ref, fn }) => [
-        ref('trainer.first_name').as('firstName'),
-        ref('trainer.last_name').as('lastName'),
-        fn.coalesce(ref('trainer.business_name'), ref('trainer.online_bookings_business_name')).as('businessName'),
-        ref('trainer.online_bookings_contact_email').as('contactEmail'),
-        ref('trainer.online_bookings_contact_number').as('contactNumber'),
-        ref('trainer.brand_color').as('brandColor'),
-        ref('trainer.business_logo_url').as('businessLogoUrl'),
-        ref('country.alpha_2_code').as('country'),
-        ref('vw_legacy_trainer.default_currency').as('currency'),
+      .select((eb) => [
+        eb.ref('trainer.first_name').as('firstName'),
+        eb.ref('trainer.last_name').as('lastName'),
+        eb.fn.coalesce(eb.ref('trainer.business_name'), eb.ref('trainer.online_bookings_business_name')).as('businessName'),
+        eb.ref('trainer.online_bookings_contact_email').as('contactEmail'),
+        eb.ref('trainer.online_bookings_contact_number').as('contactNumber'),
+        eb.ref('trainer.brand_color').as('brandColor'),
+        eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
+        eb.ref('country.alpha_2_code').as('country'),
+        eb.ref('vw_legacy_trainer.default_currency').as('currency'),
       ])
       .where('client.id', '=', authorization.clientId)
       .limit(1)

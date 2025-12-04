@@ -22,11 +22,11 @@ export default async function SellCreditPackStartPage() {
     <PageContainer className="flex flex-col gap-6 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm uppercase tracking-wide text-muted-foreground">Dashboard</p>
-          <h1 className="text-3xl font-semibold leading-tight">Sell credit pack</h1>
+          <p className="text-sm tracking-wide text-muted-foreground uppercase">Dashboard</p>
+          <h1 className="text-3xl leading-tight font-semibold">Sell credit pack</h1>
           <p className="text-sm text-muted-foreground">Pick a client to start this sale.</p>
         </div>
-        <Button size="sm" variant="outline" render={<Link href="/dashboard" />}>
+        <Button size="sm" variant="outline" render={<Link href="/dashboard" />}> 
           Back to dashboard
         </Button>
       </div>

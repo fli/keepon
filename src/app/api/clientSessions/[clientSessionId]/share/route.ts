@@ -264,24 +264,24 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         .innerJoin('client', 'client.id', 'cs.client_id')
         .innerJoin('country', 'country.id', 'trainer.country_id')
         .leftJoin('sms_balance', 'sms_balance.trainer_id', 'trainer.id')
-        .select(({ ref }) => [
-          ref('cs.booking_id').as('bookingId'),
+        .select((eb) => [
+          eb.ref('cs.booking_id').as('bookingId'),
           sql<string>`COALESCE(sms_balance.credit_balance, '0')`.as('smsCreditBalance'),
           sql<string>`COALESCE(trainer.online_bookings_business_name, trainer.business_name, trainer.first_name || COALESCE(' ' || trainer.last_name, ''))`.as(
             'serviceProviderName'
           ),
           sql<string>`COALESCE(trainer.online_bookings_contact_email, trainer.email)`.as('serviceProviderEmail'),
-          ref('trainer.brand_color').as('brandColor'),
-          ref('trainer.business_logo_url').as('businessLogoUrl'),
-          ref('client.email').as('clientEmail'),
-          ref('client.mobile_number').as('clientMobileNumber'),
-          ref('country.alpha_2_code').as('country'),
-          ref('trainer.id').as('trainerId'),
-          ref('client.id').as('clientId'),
+          eb.ref('trainer.brand_color').as('brandColor'),
+          eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
+          eb.ref('client.email').as('clientEmail'),
+          eb.ref('client.mobile_number').as('clientMobileNumber'),
+          eb.ref('country.alpha_2_code').as('country'),
+          eb.ref('trainer.id').as('trainerId'),
+          eb.ref('client.id').as('clientId'),
           sql<string>`COALESCE(ss.name, 'Appointment')`.as('appointmentName'),
-          ref('s.start').as('startsAt'),
-          ref('trainer.locale').as('locale'),
-          ref('s.timezone').as('timezone'),
+          eb.ref('s.start').as('startsAt'),
+          eb.ref('trainer.locale').as('locale'),
+          eb.ref('s.timezone').as('timezone'),
         ])
         .where('cs.id', '=', clientSessionId)
         .where('cs.trainer_id', '=', authorization.trainerId)

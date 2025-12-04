@@ -191,18 +191,18 @@ export async function GET(request: Request) {
       .innerJoin('trainer', 'trainer.id', 'payment_plan.trainer_id')
       .innerJoin('supported_country_currency', 'supported_country_currency.country_id', 'trainer.country_id')
       .innerJoin('currency', 'currency.id', 'supported_country_currency.currency_id')
-      .select(({ ref }) => [
-        ref('payment_plan_payment.created_at').as('createdAt'),
-        ref('payment_plan_payment.updated_at').as('updatedAt'),
-        ref('payment_plan_payment.id').as('id'),
-        ref('payment_plan_payment.payment_plan_id').as('paymentPlanId'),
-        ref('payment_plan_payment.date').as('dueAt'),
-        ref('payment_plan_payment.status').as('status'),
-        ref('payment_plan_payment.amount').as('amount'),
-        ref('payment_plan_payment.amount_outstanding').as('amountOutstanding'),
-        ref('payment_plan_payment.retry_count').as('retryCount'),
-        ref('payment_plan_payment.last_retry_time').as('lastRetriedAt'),
-        ref('currency.alpha_code').as('currency'),
+      .select((eb) => [
+        eb.ref('payment_plan_payment.created_at').as('createdAt'),
+        eb.ref('payment_plan_payment.updated_at').as('updatedAt'),
+        eb.ref('payment_plan_payment.id').as('id'),
+        eb.ref('payment_plan_payment.payment_plan_id').as('paymentPlanId'),
+        eb.ref('payment_plan_payment.date').as('dueAt'),
+        eb.ref('payment_plan_payment.status').as('status'),
+        eb.ref('payment_plan_payment.amount').as('amount'),
+        eb.ref('payment_plan_payment.amount_outstanding').as('amountOutstanding'),
+        eb.ref('payment_plan_payment.retry_count').as('retryCount'),
+        eb.ref('payment_plan_payment.last_retry_time').as('lastRetriedAt'),
+        eb.ref('currency.alpha_code').as('currency'),
       ])
       .where('payment_plan.client_id', '=', authorization.clientId)
       .where('payment_plan.trainer_id', '=', authorization.trainerId)

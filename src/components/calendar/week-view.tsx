@@ -13,7 +13,7 @@ type WeekViewProps = {
 export function WeekView({ date: selectedDate, onDateChange }: WeekViewProps) {
   return (
     <div className="overflow-hidden rounded-2xl border shadow-sm">
-      <div className="grid grid-cols-7 border-b bg-muted/60 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="grid grid-cols-7 border-b bg-muted/60 text-center text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
         {weekColumns.map((day) => {
           const isSelected = day.date === selectedDate
           return (
@@ -51,7 +51,7 @@ export function WeekView({ date: selectedDate, onDateChange }: WeekViewProps) {
                 {day.events.length ? (
                   day.events.map((event) => (
                     <div key={event.id} className="rounded-xl border bg-card px-3 py-2 text-sm shadow-xs">
-                      <p className="font-semibold leading-tight">{event.name}</p>
+                      <p className="leading-tight font-semibold">{event.name}</p>
                       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                         <Clock3 className="size-4" aria-hidden />
                         {event.time}

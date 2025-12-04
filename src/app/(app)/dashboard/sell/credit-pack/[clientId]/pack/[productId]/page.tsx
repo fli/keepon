@@ -41,8 +41,8 @@ export default async function SellPaymentPage({
     <PageContainer className="flex flex-col gap-6 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm uppercase tracking-wide text-muted-foreground">Dashboard</p>
-          <h1 className="text-3xl font-semibold leading-tight">Payment</h1>
+          <p className="text-sm tracking-wide text-muted-foreground uppercase">Dashboard</p>
+          <h1 className="text-3xl leading-tight font-semibold">Payment</h1>
           <p className="text-sm text-muted-foreground">
             Payment type, notes, fees, and due dates are kept in the URL while you work.
           </p>

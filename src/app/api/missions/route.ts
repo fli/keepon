@@ -62,15 +62,15 @@ export async function GET(request: Request) {
       .selectFrom('mission')
       .innerJoin('mission_type', 'mission_type.id', 'mission.id')
       .leftJoin('reward', 'reward.id', 'mission.reward_id')
-      .select(({ ref }) => [
-        ref('mission.id').as('id'),
-        ref('mission.display_order').as('displayOrder'),
-        ref('mission.reward_id').as('rewardId'),
-        ref('mission.completed_at').as('completedAt'),
-        ref('mission_type.title').as('title'),
-        ref('mission_type.description').as('description'),
-        ref('mission_type.action_url').as('actionUrl'),
-        ref('reward.claimed_at').as('rewardClaimedAt'),
+      .select((eb) => [
+        eb.ref('mission.id').as('id'),
+        eb.ref('mission.display_order').as('displayOrder'),
+        eb.ref('mission.reward_id').as('rewardId'),
+        eb.ref('mission.completed_at').as('completedAt'),
+        eb.ref('mission_type.title').as('title'),
+        eb.ref('mission_type.description').as('description'),
+        eb.ref('mission_type.action_url').as('actionUrl'),
+        eb.ref('reward.claimed_at').as('rewardClaimedAt'),
       ])
       .where('mission.trainer_id', '=', trainerId)
       .orderBy('mission.display_order')

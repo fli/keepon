@@ -137,9 +137,9 @@ export async function PATCH(request: Request) {
     subscriptionRow = await db
       .selectFrom('vw_legacy_trainer')
       .innerJoin('trainer', 'trainer.id', 'vw_legacy_trainer.id')
-      .select(({ ref }) => [
-        ref('vw_legacy_trainer.subscription').as('subscription'),
-        ref('trainer.stripe_subscription_id').as('stripeSubscriptionId'),
+      .select((eb) => [
+        eb.ref('vw_legacy_trainer.subscription').as('subscription'),
+        eb.ref('trainer.stripe_subscription_id').as('stripeSubscriptionId'),
       ])
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()
@@ -352,14 +352,14 @@ export async function PUT(request: Request) {
       .selectFrom('trainer')
       .innerJoin('country', 'country.id', 'trainer.country_id')
       .innerJoin('vw_legacy_trainer', 'vw_legacy_trainer.id', 'trainer.id')
-      .select(({ ref }) => [
-        ref('trainer.stripe_customer_id').as('stripeCustomerId'),
-        ref('trainer.stripe_subscription_id').as('stripeSubscriptionId'),
-        ref('trainer.email').as('email'),
-        ref('country.alpha_2_code').as('country'),
-        ref('vw_legacy_trainer.subscription').as('subscription'),
-        ref('trainer.monthly_price_override').as('monthlyPriceOverride'),
-        ref('trainer.yearly_price_override').as('yearlyPriceOverride'),
+      .select((eb) => [
+        eb.ref('trainer.stripe_customer_id').as('stripeCustomerId'),
+        eb.ref('trainer.stripe_subscription_id').as('stripeSubscriptionId'),
+        eb.ref('trainer.email').as('email'),
+        eb.ref('country.alpha_2_code').as('country'),
+        eb.ref('vw_legacy_trainer.subscription').as('subscription'),
+        eb.ref('trainer.monthly_price_override').as('monthlyPriceOverride'),
+        eb.ref('trainer.yearly_price_override').as('yearlyPriceOverride'),
       ])
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()

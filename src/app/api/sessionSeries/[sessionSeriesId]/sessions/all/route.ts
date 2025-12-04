@@ -191,7 +191,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         .deleteFrom('session')
         .where('session.id', 'in', sessionIds)
         .where('session.trainer_id', '=', authorization.trainerId)
-        .returning(({ ref }) => [ref('session.id').as('id')])
+        .returning((eb) => [eb.ref('session.id').as('id')])
         .execute()
 
       if (deletedSessions.length !== sessionIds.length) {

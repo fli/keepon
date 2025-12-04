@@ -108,7 +108,7 @@ export async function GET(request: Request) {
     const rows = await db
       .selectFrom('stripe.payout as payout')
       .innerJoin('trainer', 'trainer.stripe_account_id', 'payout.account')
-      .select(({ ref }) => [ref('payout.object').as('stripeObject'), ref('payout.updated_at').as('updatedAt')])
+      .select((eb) => [eb.ref('payout.object').as('stripeObject'), eb.ref('payout.updated_at').as('updatedAt')])
       .where('trainer.id', '=', authorization.trainerId)
       .execute()
 

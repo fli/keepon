@@ -72,18 +72,18 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   try {
     const row = (await db
       .selectFrom('vw_legacy_finance_item as v')
-      .select(({ ref }) => [
-        ref('v.id').as('id'),
-        ref('v.trainerId').as('trainerId'),
-        ref('v.amount').as('amount'),
-        ref('v.imageUrl').as('imageUrl'),
-        ref('v.name').as('name'),
-        ref('v.status').as('status'),
-        ref('v.paymentType').as('paymentType'),
-        ref('v.stripeApplicationFeeId').as('stripeApplicationFeeId'),
-        ref('v.startDate').as('startDate'),
-        ref('v.createdAt').as('createdAt'),
-        ref('v.updatedAt').as('updatedAt'),
+      .select((eb) => [
+        eb.ref('v.id').as('id'),
+        eb.ref('v.trainerId').as('trainerId'),
+        eb.ref('v.amount').as('amount'),
+        eb.ref('v.imageUrl').as('imageUrl'),
+        eb.ref('v.name').as('name'),
+        eb.ref('v.status').as('status'),
+        eb.ref('v.paymentType').as('paymentType'),
+        eb.ref('v.stripeApplicationFeeId').as('stripeApplicationFeeId'),
+        eb.ref('v.startDate').as('startDate'),
+        eb.ref('v.createdAt').as('createdAt'),
+        eb.ref('v.updatedAt').as('updatedAt'),
       ])
       .where('v.trainerId', '=', authorization.trainerId)
       .where('v.id', '=', financeItemId)
@@ -212,18 +212,18 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const fetchFinanceItem = async () =>
     (await db
       .selectFrom('vw_legacy_finance_item as v')
-      .select(({ ref }) => [
-        ref('v.id').as('id'),
-        ref('v.trainerId').as('trainerId'),
-        ref('v.amount').as('amount'),
-        ref('v.imageUrl').as('imageUrl'),
-        ref('v.name').as('name'),
-        ref('v.status').as('status'),
-        ref('v.paymentType').as('paymentType'),
-        ref('v.stripeApplicationFeeId').as('stripeApplicationFeeId'),
-        ref('v.startDate').as('startDate'),
-        ref('v.createdAt').as('createdAt'),
-        ref('v.updatedAt').as('updatedAt'),
+      .select((eb) => [
+        eb.ref('v.id').as('id'),
+        eb.ref('v.trainerId').as('trainerId'),
+        eb.ref('v.amount').as('amount'),
+        eb.ref('v.imageUrl').as('imageUrl'),
+        eb.ref('v.name').as('name'),
+        eb.ref('v.status').as('status'),
+        eb.ref('v.paymentType').as('paymentType'),
+        eb.ref('v.stripeApplicationFeeId').as('stripeApplicationFeeId'),
+        eb.ref('v.startDate').as('startDate'),
+        eb.ref('v.createdAt').as('createdAt'),
+        eb.ref('v.updatedAt').as('updatedAt'),
       ])
       .where('v.trainerId', '=', authorization.trainerId)
       .where('v.id', '=', financeItemId)
@@ -300,7 +300,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       .set(updates)
       .where('finance_item.trainer_id', '=', authorization.trainerId)
       .where('finance_item.id', '=', financeItemId)
-      .returning(({ ref }) => [ref('finance_item.id').as('id')])
+      .returning((eb) => [eb.ref('finance_item.id').as('id')])
       .executeTakeFirst()
 
     if (!updated) {
@@ -402,7 +402,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
       .deleteFrom('finance_item')
       .where('finance_item.id', '=', financeItemId)
       .where('finance_item.trainer_id', '=', authorization.trainerId)
-      .returning(({ ref }) => [ref('finance_item.id').as('id')])
+      .returning((eb) => [eb.ref('finance_item.id').as('id')])
       .executeTakeFirst()
 
     if (!deleted) {

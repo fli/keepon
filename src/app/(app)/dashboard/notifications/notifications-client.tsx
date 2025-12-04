@@ -108,35 +108,29 @@ export default function NotificationsClient({ initialNotifications, initialError
       ) : (
         <ul className="divide-y divide-border overflow-hidden rounded-lg border bg-card/40">
           {notifications.map((notification) => (
-            <li
-              key={notification.id}
-              className="flex items-start justify-between gap-3 px-6 py-4 hover:bg-muted/40 cursor-pointer"
-              onClick={() => handleSelect(notification)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  handleSelect(notification)
-                }
-              }}
-              role="button"
-              tabIndex={0}
-            >
-              <div className="space-y-1">
-                <p className="text-sm text-foreground whitespace-pre-line">{notification.alert}</p>
-                <p className="text-xs text-muted-foreground">
-                  {notification.created
-                    ? new Date(notification.created).toLocaleString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })
-                    : 'Unknown time'}
-                </p>
-              </div>
-              {!notification.viewed ? (
-                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-primary" aria-label="New" />
-              ) : null}
+            <li key={notification.id}>
+              <button
+                type="button"
+                className="flex w-full cursor-pointer items-start justify-between gap-3 px-6 py-4 text-left hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
+                onClick={() => handleSelect(notification)}
+              >
+                <div className="space-y-1">
+                  <p className="text-sm whitespace-pre-line text-foreground">{notification.alert}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {notification.created
+                      ? new Date(notification.created).toLocaleString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })
+                      : 'Unknown time'}
+                  </p>
+                </div>
+                {!notification.viewed ? (
+                  <span className="inline-flex h-2.5 w-2.5 rounded-full bg-primary" aria-label="New" />
+                ) : null}
+              </button>
             </li>
           ))}
         </ul>

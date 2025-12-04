@@ -81,7 +81,7 @@ export function SettingsGrid() {
       {sections.map((section) => (
         <div key={section.title} className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">{section.title}</p>
+            <p className="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase">{section.title}</p>
             <div className="ml-4 h-px flex-1 bg-border" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
@@ -107,7 +107,7 @@ export function SettingsGrid() {
                     </CardDescription>
                   </div>
                 </CardHeader>
-                <CardContent className="flex items-center justify-between gap-3 px-4 pb-3 pt-0">
+                <CardContent className="flex items-center justify-between gap-3 px-4 pt-0 pb-3">
                   <Button
                     size="sm"
                     variant={tile.action.type === 'external' ? 'outline' : 'default'}

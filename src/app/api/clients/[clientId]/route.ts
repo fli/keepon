@@ -321,11 +321,11 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         .selectFrom('client as client')
         .innerJoin('trainer as trainer', 'trainer.id', 'client.trainer_id')
         .leftJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
-        .select(({ ref }) => [
-          ref('client.email').as('email'),
-          ref('client.user_id').as('userId'),
-          ref('client.stripe_customer_id').as('stripeCustomerId'),
-          ref('trainer.stripe_account_id').as('stripeAccountId'),
+        .select((eb) => [
+          eb.ref('client.email').as('email'),
+          eb.ref('client.user_id').as('userId'),
+          eb.ref('client.stripe_customer_id').as('stripeCustomerId'),
+          eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
           sql<string | null>`stripeAccount.object ->> 'type'`.as('stripeAccountType'),
         ])
         .where('client.id', '=', clientId)
@@ -547,7 +547,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
     const deleteResult = await db.transaction().execute(async (trx) => {
       const client = await trx
         .selectFrom('client')
-        .select(({ ref }) => [ref('client.id').as('id')])
+        .select((eb) => [eb.ref('client.id').as('id')])
         .where('client.id', '=', clientId)
         .where('client.trainer_id', '=', authorization.trainerId)
         .executeTakeFirst()
@@ -574,7 +574,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         .deleteFrom('client')
         .where('client.id', '=', clientId)
         .where('client.trainer_id', '=', authorization.trainerId)
-        .returning(({ ref }) => [ref('client.id').as('id')])
+        .returning((eb) => [eb.ref('client.id').as('id')])
         .executeTakeFirst()
 
       if (!deleted) {

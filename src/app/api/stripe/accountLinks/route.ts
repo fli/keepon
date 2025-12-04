@@ -116,7 +116,7 @@ export async function POST(request: Request) {
   try {
     const row = await db
       .selectFrom('trainer')
-      .select(({ ref }) => [ref('trainer.stripe_account_id').as('stripeAccountId')])
+      .select((eb) => [eb.ref('trainer.stripe_account_id').as('stripeAccountId')])
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()
 

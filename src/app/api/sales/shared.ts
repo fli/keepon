@@ -150,8 +150,8 @@ export const adaptSaleRow = (row: RawSaleRow) => {
 const buildSaleProductSummary = () =>
   db
     .selectFrom('sale_product as saleProduct')
-    .select(({ ref }) => [
-      ref('saleProduct.sale_id').as('saleId'),
+    .select((eb) => [
+      eb.ref('saleProduct.sale_id').as('saleId'),
       sql<string>`
         TO_CHAR(
           COALESCE(SUM(${sql.ref('saleProduct.price')}), 0.00),
@@ -166,8 +166,8 @@ const buildSaleProductSummary = () =>
 const buildPaymentSummary = () =>
   db
     .selectFrom('payment as payment')
-    .select(({ ref }) => [
-      ref('payment.sale_id').as('saleId'),
+    .select((eb) => [
+      eb.ref('payment.sale_id').as('saleId'),
       sql<string>`
         TO_CHAR(
           COALESCE(SUM(${sql.ref('payment.amount')}), 0.00),
@@ -196,8 +196,8 @@ const buildPaymentSummary = () =>
 const buildClientSessionSummary = () =>
   db
     .selectFrom('client_session as clientSession')
-    .select(({ ref }) => [
-      ref('clientSession.sale_id').as('saleId'),
+    .select((eb) => [
+      eb.ref('clientSession.sale_id').as('saleId'),
       sql<string | null>`MAX(${sql.ref('clientSession.id')})`.as('clientSessionId'),
     ])
     .groupBy('clientSession.sale_id')
@@ -232,20 +232,20 @@ export const fetchSales = async (options: {
     .leftJoin(saleProductSummary, 'saleProductSummary.saleId', 'sale.id')
     .leftJoin(paymentSummary, 'paymentSummary.saleId', 'sale.id')
     .leftJoin(clientSessionSummary, 'clientSessionSummary.saleId', 'sale.id')
-    .select(({ ref }) => [
-      ref('sale.id').as('id'),
-      ref('sale.client_id').as('clientId'),
-      ref('sale.due_time').as('dueAt'),
-      ref('sale.created_at').as('createdAt'),
+    .select((eb) => [
+      eb.ref('sale.id').as('id'),
+      eb.ref('sale.client_id').as('clientId'),
+      eb.ref('sale.due_time').as('dueAt'),
+      eb.ref('sale.created_at').as('createdAt'),
       combinedUpdatedAt.as('combinedUpdatedAt'),
-      ref('sale.payment_request_time').as('paymentRequestTime'),
-      ref('sale.payment_request_pass_on_transaction_fee').as('paymentRequestPassOnTransactionFee'),
-      ref('sale.note').as('note'),
-      ref('currency.alpha_code').as('currency'),
-      ref('saleProductSummary.totalAmount').as('totalAmount'),
-      ref('paymentSummary.totalPaid').as('amountPaid'),
-      ref('paymentSummary.totalRefunded').as('amountRefunded'),
-      ref('clientSessionSummary.clientSessionId').as('clientSessionId'),
+      eb.ref('sale.payment_request_time').as('paymentRequestTime'),
+      eb.ref('sale.payment_request_pass_on_transaction_fee').as('paymentRequestPassOnTransactionFee'),
+      eb.ref('sale.note').as('note'),
+      eb.ref('currency.alpha_code').as('currency'),
+      eb.ref('saleProductSummary.totalAmount').as('totalAmount'),
+      eb.ref('paymentSummary.totalPaid').as('amountPaid'),
+      eb.ref('paymentSummary.totalRefunded').as('amountRefunded'),
+      eb.ref('clientSessionSummary.clientSessionId').as('clientSessionId'),
     ])
     .where('sale.trainer_id', '=', options.trainerId)
 

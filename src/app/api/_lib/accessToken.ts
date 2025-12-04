@@ -202,11 +202,11 @@ export const authenticateTrainerRequest = async (
   const authRow = await db
     .selectFrom('access_token')
     .innerJoin('vw_legacy_trainer', 'vw_legacy_trainer.member_id', 'access_token.user_id')
-    .select(({ ref }) => [
-      ref('access_token.id').as('accessToken'),
-      ref('access_token.user_id').as('userId'),
-      ref('vw_legacy_trainer.id').as('trainerId'),
-      ref('access_token.expires_at').as('expiresAt'),
+    .select((eb) => [
+      eb.ref('access_token.id').as('accessToken'),
+      eb.ref('access_token.user_id').as('userId'),
+      eb.ref('vw_legacy_trainer.id').as('trainerId'),
+      eb.ref('access_token.expires_at').as('expiresAt'),
     ])
     .where('access_token.id', '=', accessToken)
     .where('access_token.type', '=', 'api')
@@ -253,11 +253,11 @@ export async function validateTrainerToken(
   const authRow = await db
     .selectFrom('access_token')
     .innerJoin('vw_legacy_trainer', 'vw_legacy_trainer.member_id', 'access_token.user_id')
-    .select(({ ref }) => [
-      ref('access_token.id').as('accessToken'),
-      ref('access_token.user_id').as('userId'),
-      ref('vw_legacy_trainer.id').as('trainerId'),
-      ref('access_token.expires_at').as('expiresAt'),
+    .select((eb) => [
+      eb.ref('access_token.id').as('accessToken'),
+      eb.ref('access_token.user_id').as('userId'),
+      eb.ref('vw_legacy_trainer.id').as('trainerId'),
+      eb.ref('access_token.expires_at').as('expiresAt'),
     ])
     .where('access_token.id', '=', accessToken)
     .executeTakeFirst()
@@ -314,12 +314,12 @@ export const authenticateClientRequest = async (
   const authRow = await db
     .selectFrom('access_token')
     .innerJoin('client', 'client.user_id', 'access_token.user_id')
-    .select(({ ref }) => [
-      ref('access_token.id').as('accessToken'),
-      ref('access_token.user_id').as('userId'),
-      ref('client.id').as('clientId'),
-      ref('client.trainer_id').as('trainerId'),
-      ref('access_token.expires_at').as('expiresAt'),
+    .select((eb) => [
+      eb.ref('access_token.id').as('accessToken'),
+      eb.ref('access_token.user_id').as('userId'),
+      eb.ref('client.id').as('clientId'),
+      eb.ref('client.trainer_id').as('trainerId'),
+      eb.ref('access_token.expires_at').as('expiresAt'),
     ])
     .where('access_token.id', '=', accessToken)
     .where('access_token.type', '=', 'client_dashboard')
@@ -376,14 +376,14 @@ export const authenticateTrainerOrClientRequest = async (
     .selectFrom('access_token')
     .leftJoin('vw_legacy_trainer', 'vw_legacy_trainer.member_id', 'access_token.user_id')
     .leftJoin('client', 'client.user_id', 'access_token.user_id')
-    .select(({ ref }) => [
-      ref('access_token.id').as('accessToken'),
-      ref('access_token.user_id').as('userId'),
-      ref('access_token.type').as('type'),
-      ref('access_token.expires_at').as('expiresAt'),
-      ref('vw_legacy_trainer.id').as('trainerId'),
-      ref('client.id').as('clientId'),
-      ref('client.trainer_id').as('clientTrainerId'),
+    .select((eb) => [
+      eb.ref('access_token.id').as('accessToken'),
+      eb.ref('access_token.user_id').as('userId'),
+      eb.ref('access_token.type').as('type'),
+      eb.ref('access_token.expires_at').as('expiresAt'),
+      eb.ref('vw_legacy_trainer.id').as('trainerId'),
+      eb.ref('client.id').as('clientId'),
+      eb.ref('client.trainer_id').as('clientTrainerId'),
     ])
     .where('access_token.id', '=', accessToken)
     .where(({ eb }) => eb.or([eb('access_token.type', '=', 'api'), eb('access_token.type', '=', 'client_dashboard')]))

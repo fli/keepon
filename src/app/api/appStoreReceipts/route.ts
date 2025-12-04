@@ -201,15 +201,15 @@ const insertReceiptData = async ({
         .insertInto('app_store_transaction')
         .values(receipts)
         .onConflict((oc) =>
-          oc.columns(['transaction_id', 'trainer_id']).doUpdateSet(({ ref }) => ({
-            original_transaction_id: ref('excluded.original_transaction_id'),
-            product_id: ref('excluded.product_id'),
-            purchase_date: ref('excluded.purchase_date'),
-            expires_date: ref('excluded.expires_date'),
-            web_order_line_item_id: ref('excluded.web_order_line_item_id'),
-            is_trial_period: ref('excluded.is_trial_period'),
-            is_in_intro_offer_period: ref('excluded.is_in_intro_offer_period'),
-            encoded_receipt: ref('excluded.encoded_receipt'),
+          oc.columns(['transaction_id', 'trainer_id']).doUpdateSet((eb) => ({
+            original_transaction_id: eb.ref('excluded.original_transaction_id'),
+            product_id: eb.ref('excluded.product_id'),
+            purchase_date: eb.ref('excluded.purchase_date'),
+            expires_date: eb.ref('excluded.expires_date'),
+            web_order_line_item_id: eb.ref('excluded.web_order_line_item_id'),
+            is_trial_period: eb.ref('excluded.is_trial_period'),
+            is_in_intro_offer_period: eb.ref('excluded.is_in_intro_offer_period'),
+            encoded_receipt: eb.ref('excluded.encoded_receipt'),
           }))
         )
         .execute()
@@ -231,7 +231,7 @@ const insertReceiptData = async ({
           }))
         )
         .onConflict((oc) =>
-          oc.columns(['trainer_id', 'product_id']).doUpdateSet(({ ref }) => ({ data: ref('excluded.data') }))
+          oc.columns(['trainer_id', 'product_id']).doUpdateSet((eb) => ({ data: eb.ref('excluded.data') }))
         )
         .execute()
     }

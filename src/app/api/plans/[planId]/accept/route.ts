@@ -100,16 +100,16 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         .selectFrom('payment_plan as plan')
         .innerJoin('client', 'client.id', 'plan.client_id')
         .innerJoin('trainer', 'trainer.id', 'plan.trainer_id')
-        .select(({ ref }) => [
-          ref('plan.status').as('status'),
-          ref('plan.name').as('name'),
-          ref('plan.amount').as('amount'),
-          ref('plan.end_').as('endDate'),
-          ref('client.stripe_customer_id').as('stripeCustomerId'),
-          ref('trainer.user_id').as('trainerUserId'),
-          ref('trainer.id').as('trainerId'),
-          ref('client.first_name').as('clientFirstName'),
-          ref('client.last_name').as('clientLastName'),
+        .select((eb) => [
+          eb.ref('plan.status').as('status'),
+          eb.ref('plan.name').as('name'),
+          eb.ref('plan.amount').as('amount'),
+          eb.ref('plan.end_').as('endDate'),
+          eb.ref('client.stripe_customer_id').as('stripeCustomerId'),
+          eb.ref('trainer.user_id').as('trainerUserId'),
+          eb.ref('trainer.id').as('trainerId'),
+          eb.ref('client.first_name').as('clientFirstName'),
+          eb.ref('client.last_name').as('clientLastName'),
         ])
         .where('plan.id', '=', planId)
         .where('plan.client_id', '=', authorization.clientId)

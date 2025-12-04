@@ -94,7 +94,7 @@ export function ReminderSingleForm({
       ))}
 
       <div className="space-y-1">
-        <p className="text-lg font-semibold leading-tight">{mode === 'add' ? 'Add reminder' : 'Edit reminder'}</p>
+        <p className="text-lg leading-tight font-semibold">{mode === 'add' ? 'Add reminder' : 'Edit reminder'}</p>
         <p className="text-sm text-muted-foreground">
           {target === 'serviceProvider'
             ? 'Sent to you before sessions you host.'

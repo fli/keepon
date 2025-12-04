@@ -117,12 +117,12 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
     .select([sql`p.amount::numeric`.as('amount'), sql`p.created_at`.as('ts')])
     .where('p.trainer_id', '=', trainerId)
     .where('p.refunded_time', 'is', null)
-    .where(({ eb, ref }) =>
+    .where((eb) =>
       eb.or([
-        eb(ref('p.is_manual'), '=', true),
-        eb(ref('p.is_stripe'), '=', true),
-        eb(ref('p.is_credit_pack'), '=', true),
-        eb(ref('p.is_subscription'), '=', true),
+        eb(eb.ref('p.is_manual'), '=', true),
+        eb(eb.ref('p.is_stripe'), '=', true),
+        eb(eb.ref('p.is_credit_pack'), '=', true),
+        eb(eb.ref('p.is_subscription'), '=', true),
       ])
     )
     .unionAll(
@@ -205,9 +205,9 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
             sql`mission.reward_id::text`.as('rewardId'),
             sql`reward.claimed_at IS NOT NULL`.as('rewardClaimed'),
             sql`mission.completed_at IS NOT NULL`.as('completed'),
-            sub.ref('mission_type.title').as('title'),
-            sub.ref('mission_type.description').as('description'),
-            sub.ref('mission_type.action_url').as('actionUrl'),
+            sub.eb.ref('mission_type.title').as('title'),
+            sub.eb.ref('mission_type.description').as('description'),
+            sub.eb.ref('mission_type.action_url').as('actionUrl'),
           ])
           .orderBy('mission.display_order')
       ).as('missions'),
@@ -233,9 +233,9 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
       eb.selectFrom('pending').select('pendingTodayTotal').as('pendingTodayTotal'),
       eb
         .selectFrom('vw_legacy_plan')
-        .select(({ fn }) => fn.countAll().as('count'))
+        .select(() => eb.fn.countAll().as('count'))
         .where('trainerId', '=', trainerId)
-        .where(({ eb, ref }) => eb(ref('status'), 'not in', ['cancelled', 'ended']))
+        .where((eb) => eb(eb.ref('status'), 'not in', ['cancelled', 'ended']))
         .as('activePlans'),
       eb
         .selectFrom('sale_product as sp')
@@ -244,7 +244,7 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
         .where('sp.trainer_id', '=', trainerId)
         .where('sp.is_credit_pack', '=', true)
         .where(sql<boolean>`scp.total_credits > COALESCE(cu.credits_used, 0)`)
-        .select(({ fn }) => fn.countAll().as('count'))
+        .select(() => eb.fn.countAll().as('count'))
         .as('activePacks'),
       eb
         .selectFrom('stripe_balance as sb')
@@ -255,7 +255,7 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
         .as('balanceObject'),
       eb
         .selectFrom('vw_legacy_app_notification')
-        .select(({ fn }) => fn.countAll().as('count'))
+        .select(() => eb.fn.countAll().as('count'))
         .where('user_id', '=', userId)
         .where('viewed', '=', false)
         .as('unreadNotifications'),
@@ -279,14 +279,14 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
       ).as('nextSession'),
       eb
         .selectFrom('session')
-        .select(({ fn }) => fn.countAll().as('count'))
+        .select(() => eb.fn.countAll().as('count'))
         .where('trainer_id', '=', trainerId)
         .where('bookable_online', '=', true)
         .where('start', '>', sql<Date>`NOW()`)
         .as('onlineBookableCount'),
       eb
         .selectFrom('product as p')
-        .select(({ fn }) => fn.countAll().as('count'))
+        .select(() => eb.fn.countAll().as('count'))
         .where('p.trainer_id', '=', trainerId)
         .where('p.is_service', '=', true)
         .as('serviceCount'),

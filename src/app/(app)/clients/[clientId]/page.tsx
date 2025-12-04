@@ -13,7 +13,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ clientI
     <Suspense
       fallback={
         <PageContainer className="flex flex-col gap-6 py-8">
-          <h1 className="text-3xl font-semibold leading-tight">Client</h1>
+          <h1 className="text-3xl leading-tight font-semibold">Client</h1>
           <p className="text-sm text-muted-foreground">Loading client details…</p>
         </PageContainer>
       }
@@ -46,7 +46,7 @@ async function ClientDetailContent({ params }: { params: Promise<{ clientId: str
   return (
     <PageContainer className="flex flex-col gap-6 py-8">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-semibold leading-tight">
+        <h1 className="text-3xl leading-tight font-semibold">
           {client.firstName} {client.lastName}
         </h1>
         <p className="text-sm text-muted-foreground">{client.company || 'Independent client'}</p>
@@ -88,7 +88,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   const muted = value === 'Not provided'
   return (
     <div className="flex flex-col gap-1">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-xs tracking-wide text-muted-foreground uppercase">{label}</p>
       <p className={muted ? 'text-muted-foreground' : 'font-medium'}>{value}</p>
     </div>
   )

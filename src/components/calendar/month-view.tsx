@@ -30,8 +30,8 @@ export function MonthView({ date, onDateChange }: MonthViewProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="hidden lg:flex lg:flex-col gap-2">
-        <div className="grid grid-cols-7 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="hidden gap-2 lg:flex lg:flex-col">
+        <div className="grid grid-cols-7 text-center text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
           {weekdayLabels.map((label) => (
             <span key={label} className="py-1">
               {label}
@@ -50,7 +50,7 @@ export function MonthView({ date, onDateChange }: MonthViewProps) {
                 className={cn(
                   'relative min-h-[124px] bg-card px-3 py-2 text-xs transition-colors',
                   !day.isCurrentMonth && 'bg-muted/40 text-muted-foreground/70',
-                  isSelected && 'ring-2 ring-primary ring-offset-0 shadow-xs',
+                  isSelected && 'shadow-xs ring-2 ring-primary ring-offset-0',
                   isToday && 'outline outline-1 outline-primary/40'
                 )}
               >
@@ -152,8 +152,8 @@ export function MonthView({ date, onDateChange }: MonthViewProps) {
         <div className="overflow-hidden rounded-2xl border shadow-sm">
           <div className="flex flex-row items-center justify-between border-b px-6 py-4">
             <div className="space-y-0.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Upcoming highlights</p>
-              <h3 className="text-lg font-semibold leading-tight">
+              <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Upcoming highlights</p>
+              <h3 className="text-lg leading-tight font-semibold">
                 {shortDateFormatter.format(new Date(`${date}T12:00:00`))}
               </h3>
             </div>
@@ -178,7 +178,7 @@ function EventRow({ event }: { event: CalendarEvent }) {
   return (
     <li className="flex items-center justify-between gap-4 px-6 py-4">
       <div className="space-y-1">
-        <p className="text-sm font-semibold leading-tight">{event.name}</p>
+        <p className="text-sm leading-tight font-semibold">{event.name}</p>
         <p className="flex items-center gap-2 text-xs text-muted-foreground">
           <time dateTime={event.datetime}>{event.time}</time>
         </p>
@@ -201,8 +201,8 @@ function SelectedAgenda({
     <div className="lg:hidden">
       <div className="flex items-center justify-between rounded-t-xl border border-b-0 bg-card px-4 py-3 shadow-sm">
         <div className="space-y-0.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Selected day</p>
-          <p className="text-base font-semibold leading-tight">
+          <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Selected day</p>
+          <p className="text-base leading-tight font-semibold">
             {shortDateFormatter.format(new Date(`${selectedDate}T12:00:00`))}
           </p>
         </div>
@@ -223,7 +223,7 @@ function EventRowMobile({ event }: { event: CalendarEvent }) {
   return (
     <li className="flex items-center justify-between gap-4 px-4 py-3">
       <div className="space-y-1">
-        <p className="text-sm font-semibold leading-tight">{event.name}</p>
+        <p className="text-sm leading-tight font-semibold">{event.name}</p>
         <p className="flex items-center gap-1 text-xs text-muted-foreground">{event.time}</p>
       </div>
       <Button size="sm" variant="outline" className="px-3">

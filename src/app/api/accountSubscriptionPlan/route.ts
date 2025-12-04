@@ -64,10 +64,10 @@ export async function GET(request: Request) {
     const row = await db
       .selectFrom('trainer')
       .innerJoin('country', 'country.id', 'trainer.country_id')
-      .select(({ ref }) => [
-        ref('country.alpha_2_code').as('country'),
-        ref('trainer.monthly_price_override').as('monthlyPriceOverride'),
-        ref('trainer.yearly_price_override').as('yearlyPriceOverride'),
+      .select((eb) => [
+        eb.ref('country.alpha_2_code').as('country'),
+        eb.ref('trainer.monthly_price_override').as('monthlyPriceOverride'),
+        eb.ref('trainer.yearly_price_override').as('yearlyPriceOverride'),
       ])
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()

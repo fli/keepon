@@ -46,7 +46,7 @@ export function CreateAccountForm({ defaultCountry }: CreateAccountFormProps) {
             required
             autoComplete="given-name"
             defaultValue={state.defaultValues?.firstName}
-            autoFocus
+            
           />
         </div>
         <div className="space-y-2">

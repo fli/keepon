@@ -249,7 +249,7 @@ export async function POST(request: Request, context: HandlerContext) {
       .set(uploads)
       .where('service.id', '=', productId)
       .where('service.trainer_id', '=', auth.trainerId)
-      .returning(({ ref }) => [ref('service.id').as('id')])
+      .returning((eb) => [eb.ref('service.id').as('id')])
       .executeTakeFirst()
 
     if (!updated) {

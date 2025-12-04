@@ -51,20 +51,20 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       .innerJoin('trainer', 'trainer.id', 'payment_plan.trainer_id')
       .innerJoin('supported_country_currency', 'supported_country_currency.country_id', 'trainer.country_id')
       .innerJoin('currency', 'currency.id', 'supported_country_currency.currency_id')
-      .select(({ ref }) => [
-        ref('payment_plan.id').as('id'),
-        ref('payment_plan.status').as('status'),
-        ref('payment_plan.created_at').as('createdAt'),
-        ref('payment_plan.updated_at').as('updatedAt'),
-        ref('payment_plan.start').as('startAt'),
-        ref('payment_plan.end_').as('requestedEndAt'),
-        ref('payment_plan.accepted_end').as('endAt'),
-        ref('payment_plan.frequency_weekly_interval').as('weeklyRecurrenceInterval'),
-        ref('payment_plan.name').as('name'),
-        ref('payment_plan.amount').as('requestedAmount'),
-        ref('payment_plan.accepted_amount').as('amount'),
-        ref('payment_plan.acceptance_request_time').as('requestSentAt'),
-        ref('currency.alpha_code').as('currency'),
+      .select((eb) => [
+        eb.ref('payment_plan.id').as('id'),
+        eb.ref('payment_plan.status').as('status'),
+        eb.ref('payment_plan.created_at').as('createdAt'),
+        eb.ref('payment_plan.updated_at').as('updatedAt'),
+        eb.ref('payment_plan.start').as('startAt'),
+        eb.ref('payment_plan.end_').as('requestedEndAt'),
+        eb.ref('payment_plan.accepted_end').as('endAt'),
+        eb.ref('payment_plan.frequency_weekly_interval').as('weeklyRecurrenceInterval'),
+        eb.ref('payment_plan.name').as('name'),
+        eb.ref('payment_plan.amount').as('requestedAmount'),
+        eb.ref('payment_plan.accepted_amount').as('amount'),
+        eb.ref('payment_plan.acceptance_request_time').as('requestSentAt'),
+        eb.ref('currency.alpha_code').as('currency'),
       ])
       .where('payment_plan.id', '=', paymentPlanId)
       .where('payment_plan.client_id', '=', authorization.clientId)

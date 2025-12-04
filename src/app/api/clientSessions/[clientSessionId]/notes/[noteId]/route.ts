@@ -111,7 +111,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         })
         .where('id', '=', clientSessionId)
         .where('trainer_id', '=', authorization.trainerId)
-        .returning(({ ref }) => [ref('client_session.note').as('note')])
+        .returning((eb) => [eb.ref('client_session.note').as('note')])
         .executeTakeFirst()
 
       if (!updated) {

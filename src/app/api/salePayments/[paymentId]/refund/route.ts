@@ -133,13 +133,13 @@ export async function POST(request: NextRequest, context: HandlerContext) {
           .innerJoin('payment', 'payment.id', 'paymentStripe.id')
           .innerJoin('trainer', 'trainer.id', 'paymentStripe.trainer_id')
           .leftJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
-          .select(({ ref }) => [
-            ref('paymentStripe.stripe_charge_id').as('stripeChargeId'),
-            ref('paymentStripe.stripe_payment_intent_id').as('stripePaymentIntentId'),
-            ref('trainer.minimum_balance').as('minimumBalance'),
-            ref('trainer.stripe_account_id').as('stripeAccountId'),
-            ref('paymentStripe.fee').as('fee'),
-            ref('payment.amount').as('amount'),
+          .select((eb) => [
+            eb.ref('paymentStripe.stripe_charge_id').as('stripeChargeId'),
+            eb.ref('paymentStripe.stripe_payment_intent_id').as('stripePaymentIntentId'),
+            eb.ref('trainer.minimum_balance').as('minimumBalance'),
+            eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
+            eb.ref('paymentStripe.fee').as('fee'),
+            eb.ref('payment.amount').as('amount'),
             sql<string | null>`stripeAccount.object ->> 'type'`.as('stripeAccountType'),
           ])
           .where('paymentStripe.id', '=', paymentId)
@@ -231,34 +231,34 @@ export async function POST(request: NextRequest, context: HandlerContext) {
           'paymentStripe.stripe_payment_intent_id'
         )
         .leftJoin('stripe_charge as stripeCharge', 'stripeCharge.id', 'paymentStripe.stripe_charge_id')
-        .select(({ ref }) => [
-          ref('payment.id').as('id'),
-          ref('payment.client_id').as('clientId'),
-          ref('payment.sale_id').as('saleId'),
-          ref('payment.amount').as('amount'),
-          ref('payment.created_at').as('createdAt'),
-          ref('payment.updated_at').as('paymentUpdatedAt'),
-          ref('paymentManual.updated_at').as('paymentManualUpdatedAt'),
-          ref('paymentStripe.updated_at').as('paymentStripeUpdatedAt'),
-          ref('paymentCreditPack.updated_at').as('paymentCreditPackUpdatedAt'),
-          ref('paymentSubscription.updated_at').as('paymentSubscriptionUpdatedAt'),
-          ref('payment.refunded_time').as('refundedTime'),
-          ref('payment.is_manual').as('isManual'),
-          ref('payment.is_stripe').as('isStripe'),
-          ref('payment.is_credit_pack').as('isCreditPack'),
-          ref('payment.is_subscription').as('isSubscription'),
-          ref('paymentManual.transaction_time').as('manualTransactionTime'),
-          ref('paymentManual.method').as('manualMethod'),
-          ref('paymentManual.specific_method_name').as('manualSpecificMethodName'),
-          ref('paymentCreditPack.transaction_time').as('creditPackTransactionTime'),
-          ref('paymentCreditPack.credits_used').as('creditPackCreditsUsed'),
-          ref('paymentCreditPack.sale_credit_pack_id').as('creditPackSaleCreditPackId'),
-          ref('paymentStripe.fee').as('stripeFee'),
-          ref('stripePaymentIntent.object').as('stripePaymentIntentObject'),
-          ref('stripeCharge.object').as('stripeChargeObject'),
-          ref('paymentSubscription.subscription_id').as('subscriptionId'),
-          ref('paymentSubscription.created_at').as('subscriptionCreatedAt'),
-          ref('currency.alpha_code').as('currency'),
+        .select((eb) => [
+          eb.ref('payment.id').as('id'),
+          eb.ref('payment.client_id').as('clientId'),
+          eb.ref('payment.sale_id').as('saleId'),
+          eb.ref('payment.amount').as('amount'),
+          eb.ref('payment.created_at').as('createdAt'),
+          eb.ref('payment.updated_at').as('paymentUpdatedAt'),
+          eb.ref('paymentManual.updated_at').as('paymentManualUpdatedAt'),
+          eb.ref('paymentStripe.updated_at').as('paymentStripeUpdatedAt'),
+          eb.ref('paymentCreditPack.updated_at').as('paymentCreditPackUpdatedAt'),
+          eb.ref('paymentSubscription.updated_at').as('paymentSubscriptionUpdatedAt'),
+          eb.ref('payment.refunded_time').as('refundedTime'),
+          eb.ref('payment.is_manual').as('isManual'),
+          eb.ref('payment.is_stripe').as('isStripe'),
+          eb.ref('payment.is_credit_pack').as('isCreditPack'),
+          eb.ref('payment.is_subscription').as('isSubscription'),
+          eb.ref('paymentManual.transaction_time').as('manualTransactionTime'),
+          eb.ref('paymentManual.method').as('manualMethod'),
+          eb.ref('paymentManual.specific_method_name').as('manualSpecificMethodName'),
+          eb.ref('paymentCreditPack.transaction_time').as('creditPackTransactionTime'),
+          eb.ref('paymentCreditPack.credits_used').as('creditPackCreditsUsed'),
+          eb.ref('paymentCreditPack.sale_credit_pack_id').as('creditPackSaleCreditPackId'),
+          eb.ref('paymentStripe.fee').as('stripeFee'),
+          eb.ref('stripePaymentIntent.object').as('stripePaymentIntentObject'),
+          eb.ref('stripeCharge.object').as('stripeChargeObject'),
+          eb.ref('paymentSubscription.subscription_id').as('subscriptionId'),
+          eb.ref('paymentSubscription.created_at').as('subscriptionCreatedAt'),
+          eb.ref('currency.alpha_code').as('currency'),
         ])
         .where('payment.id', '=', paymentId)
         .where('payment.trainer_id', '=', authorization.trainerId)

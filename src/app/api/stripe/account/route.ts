@@ -116,7 +116,7 @@ export async function GET(request: Request) {
       const row = await db
         .selectFrom('trainer')
         .innerJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
-        .select(({ ref }) => [ref('stripeAccount.object').as('account')])
+        .select((eb) => [eb.ref('stripeAccount.object').as('account')])
         .where('trainer.id', '=', authorization.trainerId)
         .executeTakeFirst()
 

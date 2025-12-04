@@ -49,11 +49,11 @@ const mapClientTypeToDb = async (type: string | null | undefined) => {
 export async function getReminderSettings(trainerId: string): Promise<ReminderSettings> {
   const row = await db
     .selectFrom('vw_legacy_trainer')
-    .select(({ ref }) => [
-      ref('vw_legacy_trainer.default_service_provider_appointment_reminder_1').as('serviceProviderReminder1'),
-      ref('vw_legacy_trainer.default_service_provider_appointment_reminder_2').as('serviceProviderReminder2'),
-      ref('vw_legacy_trainer.default_client_appointment_reminder_1').as('clientReminder1'),
-      ref('vw_legacy_trainer.default_client_appointment_reminder_2').as('clientReminder2'),
+    .select((eb) => [
+      eb.ref('vw_legacy_trainer.default_service_provider_appointment_reminder_1').as('serviceProviderReminder1'),
+      eb.ref('vw_legacy_trainer.default_service_provider_appointment_reminder_2').as('serviceProviderReminder2'),
+      eb.ref('vw_legacy_trainer.default_client_appointment_reminder_1').as('clientReminder1'),
+      eb.ref('vw_legacy_trainer.default_client_appointment_reminder_2').as('clientReminder2'),
     ])
     .where('vw_legacy_trainer.id', '=', trainerId)
     .executeTakeFirst()

@@ -56,7 +56,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     const plan = await db.transaction().execute(async (trx) => {
       const planDetails = await trx
         .selectFrom('payment_plan as plan')
-        .select(({ ref }) => [ref('plan.status').as('status')])
+        .select((eb) => [eb.ref('plan.status').as('status')])
         .where('plan.id', '=', planId)
         .where('plan.client_id', '=', clientId)
         .where('plan.trainer_id', '=', authorization.trainerId)
@@ -88,7 +88,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         .where('id', '=', planId)
         .where('client_id', '=', clientId)
         .where('trainer_id', '=', authorization.trainerId)
-        .returning(({ ref }) => [ref('payment_plan.id').as('id')])
+        .returning((eb) => [eb.ref('payment_plan.id').as('id')])
         .executeTakeFirst()
 
       if (!updatedPlan) {

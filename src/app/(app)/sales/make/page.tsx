@@ -12,7 +12,7 @@ export default async function MakeSalePage() {
 
   return (
     <PageContainer className="flex flex-col gap-4 py-8">
-      <p className="text-sm uppercase tracking-wide text-muted-foreground">Sales</p>
+      <p className="text-sm tracking-wide text-muted-foreground uppercase">Sales</p>
       <h1 className="text-3xl font-semibold">Collect payment</h1>
       <Card className="max-w-2xl">
         <CardHeader>

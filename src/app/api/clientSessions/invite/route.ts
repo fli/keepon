@@ -250,27 +250,27 @@ export async function POST(request: NextRequest) {
         )
         .leftJoin('supported_country_currency as scc', 'scc.country_id', 'trainer.country_id')
         .leftJoin('currency', 'currency.id', 'scc.currency_id')
-        .select(({ ref }) => [
-          ref('ss.name').as('sessionName'),
-          ref('s.start').as('start'),
+        .select((eb) => [
+          eb.ref('ss.name').as('sessionName'),
+          eb.ref('s.start').as('start'),
           sql<Date>`s.start + s.duration`.as('end'),
           sql<boolean>`s.start <= NOW()`.as('isPastAppointment'),
-          ref('ss.location').as('location'),
-          ref('ss.price').as('price'),
-          ref('s.maximum_attendance').as('maximumAttendance'),
-          ref('client.email').as('email'),
-          ref('client.first_name').as('firstName'),
-          ref('client.last_name').as('lastName'),
+          eb.ref('ss.location').as('location'),
+          eb.ref('ss.price').as('price'),
+          eb.ref('s.maximum_attendance').as('maximumAttendance'),
+          eb.ref('client.email').as('email'),
+          eb.ref('client.first_name').as('firstName'),
+          eb.ref('client.last_name').as('lastName'),
           sql<string>`COALESCE(trainer.online_bookings_contact_email, trainer.email)`.as('serviceProviderEmail'),
           sql<string>`COALESCE(trainer.business_name, trainer.first_name || COALESCE(' ' || trainer.last_name, ''))`.as(
             'serviceProviderBusinessName'
           ),
-          ref('trainer.locale').as('locale'),
-          ref('trainer.timezone').as('timezone'),
-          ref('country.alpha_2_code').as('countryCode'),
-          ref('client.id').as('clientId'),
-          ref('s.id').as('sessionId'),
-          ref('currency.alpha_code').as('currency'),
+          eb.ref('trainer.locale').as('locale'),
+          eb.ref('trainer.timezone').as('timezone'),
+          eb.ref('country.alpha_2_code').as('countryCode'),
+          eb.ref('client.id').as('clientId'),
+          eb.ref('s.id').as('sessionId'),
+          eb.ref('currency.alpha_code').as('currency'),
         ])
         .where('s.id', '=', parsedBody.sessionId)
         .where('s.trainer_id', '=', authorization.trainerId)
@@ -362,25 +362,25 @@ export async function POST(request: NextRequest) {
       const row = (await trx
         .selectFrom('vw_legacy_client_session as v')
         .innerJoin('client_session as cs', 'cs.id', 'v.id')
-        .select(({ ref }) => [
-          ref('v.id').as('id'),
-          ref('v.clientId').as('clientId'),
-          ref('v.sessionId').as('sessionId'),
-          ref('v.createdAt').as('createdAt'),
-          ref('v.state').as('state'),
-          ref('v.bookingQuestion').as('bookingQuestion'),
-          ref('v.bookingQuestionResponse').as('bookingQuestionResponse'),
-          ref('v.price').as('price'),
-          ref('v.attended').as('attended'),
-          ref('v.payment').as('payment'),
-          ref('v.notes').as('notes'),
-          ref('v.saleId').as('saleId'),
-          ref('v.cancelTime').as('cancelTime'),
-          ref('v.cancelReason').as('cancelReason'),
-          ref('v.acceptTime').as('acceptTime'),
-          ref('v.declineTime').as('declineTime'),
-          ref('v.inviteTime').as('inviteTime'),
-          ref('v.confirmTime').as('confirmTime'),
+        .select((eb) => [
+          eb.ref('v.id').as('id'),
+          eb.ref('v.clientId').as('clientId'),
+          eb.ref('v.sessionId').as('sessionId'),
+          eb.ref('v.createdAt').as('createdAt'),
+          eb.ref('v.state').as('state'),
+          eb.ref('v.bookingQuestion').as('bookingQuestion'),
+          eb.ref('v.bookingQuestionResponse').as('bookingQuestionResponse'),
+          eb.ref('v.price').as('price'),
+          eb.ref('v.attended').as('attended'),
+          eb.ref('v.payment').as('payment'),
+          eb.ref('v.notes').as('notes'),
+          eb.ref('v.saleId').as('saleId'),
+          eb.ref('v.cancelTime').as('cancelTime'),
+          eb.ref('v.cancelReason').as('cancelReason'),
+          eb.ref('v.acceptTime').as('acceptTime'),
+          eb.ref('v.declineTime').as('declineTime'),
+          eb.ref('v.inviteTime').as('inviteTime'),
+          eb.ref('v.confirmTime').as('confirmTime'),
         ])
         .where('cs.trainer_id', '=', authorization.trainerId)
         .where('v.id', '=', clientSessionId)

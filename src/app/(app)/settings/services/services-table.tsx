@@ -24,7 +24,7 @@ export function ServicesTable({ services, error }: Props) {
 
   return (
     <div className="overflow-hidden rounded-lg border border-border shadow-sm">
-      <div className="grid grid-cols-4 gap-3 bg-muted/50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="grid grid-cols-4 gap-3 bg-muted/50 px-4 py-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         <span>Bookable online</span>
         <span>Service</span>
         <span>Duration</span>

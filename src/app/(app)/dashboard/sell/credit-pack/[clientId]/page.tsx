@@ -45,7 +45,7 @@ export default async function SelectCreditPackPage({
     <PageContainer className="flex flex-col gap-6 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm uppercase tracking-wide text-muted-foreground">Dashboard</p>
+          <p className="text-sm tracking-wide text-muted-foreground uppercase">Dashboard</p>
           <Suspense
             fallback={
               <div className="space-y-2">
@@ -97,7 +97,7 @@ async function Heading({
 
   return (
     <>
-      <h1 className="text-3xl font-semibold leading-tight">
+      <h1 className="text-3xl leading-tight font-semibold">
         Choose a credit pack for {client.firstName || 'this client'}
       </h1>
       <p className="text-sm text-muted-foreground">

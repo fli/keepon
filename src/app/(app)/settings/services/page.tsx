@@ -61,7 +61,7 @@ export default async function ServicesPage() {
     <PageContainer className="flex flex-col gap-6 py-8">
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-3xl font-semibold leading-tight">Services</h1>
+          <h1 className="text-3xl leading-tight font-semibold">Services</h1>
           <Button size="sm" render={<Link href="/settings/services/add" />}>
             Add service
           </Button>

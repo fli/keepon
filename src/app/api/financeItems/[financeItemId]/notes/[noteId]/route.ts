@@ -96,7 +96,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       })
       .where('id', '=', financeItemId)
       .where('trainer_id', '=', authorization.trainerId)
-      .returning(({ ref }) => [ref('finance_item.note').as('note')])
+      .returning((eb) => [eb.ref('finance_item.note').as('note')])
       .executeTakeFirst()
 
     if (!updatedRow) {

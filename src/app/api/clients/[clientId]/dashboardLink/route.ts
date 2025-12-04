@@ -164,10 +164,10 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       const row = await trx
         .selectFrom('client')
         .innerJoin('trainer', 'trainer.id', 'client.trainer_id')
-        .select(({ ref }) => [
-          ref('client.id').as('clientId'),
-          ref('client.email').as('email'),
-          ref('client.user_id').as('userId'),
+        .select((eb) => [
+          eb.ref('client.id').as('clientId'),
+          eb.ref('client.email').as('email'),
+          eb.ref('client.user_id').as('userId'),
           sql<string>`
             COALESCE(
               trainer.online_bookings_business_name,
@@ -175,8 +175,8 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
               trainer.first_name || COALESCE(' ' || trainer.last_name, '')
             )
           `.as('serviceProviderName'),
-          ref('trainer.brand_color').as('brandColor'),
-          ref('trainer.business_logo_url').as('businessLogoUrl'),
+          eb.ref('trainer.brand_color').as('brandColor'),
+          eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
         ])
         .where('client.id', '=', clientId)
         .where('trainer.id', '=', authorization.trainerId)

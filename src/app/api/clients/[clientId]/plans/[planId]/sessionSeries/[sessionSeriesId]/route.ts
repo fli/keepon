@@ -308,9 +308,9 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
       const planDetails = await trx
         .selectFrom('payment_plan as plan')
-        .select(({ ref }) => [
-          ref('plan.end_').as('end'),
-          ref('plan.frequency_weekly_interval').as('frequencyWeeklyInterval'),
+        .select((eb) => [
+          eb.ref('plan.end_').as('end'),
+          eb.ref('plan.frequency_weekly_interval').as('frequencyWeeklyInterval'),
         ])
         .where('plan.id', '=', planId)
         .where('plan.client_id', '=', clientId)

@@ -83,25 +83,25 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     const row = (await db
       .selectFrom('vw_legacy_client_session as v')
       .innerJoin('client_session as cs', 'cs.id', 'v.id')
-      .select(({ ref }) => [
-        ref('v.id').as('id'),
-        ref('v.clientId').as('clientId'),
-        ref('v.sessionId').as('sessionId'),
-        ref('v.createdAt').as('createdAt'),
-        ref('v.state').as('state'),
-        ref('v.bookingQuestion').as('bookingQuestion'),
-        ref('v.bookingQuestionResponse').as('bookingQuestionResponse'),
-        ref('v.price').as('price'),
-        ref('v.attended').as('attended'),
-        ref('v.payment').as('payment'),
-        ref('v.notes').as('notes'),
-        ref('v.saleId').as('saleId'),
-        ref('v.cancelTime').as('cancelTime'),
-        ref('v.cancelReason').as('cancelReason'),
-        ref('v.acceptTime').as('acceptTime'),
-        ref('v.declineTime').as('declineTime'),
-        ref('v.inviteTime').as('inviteTime'),
-        ref('v.confirmTime').as('confirmTime'),
+      .select((eb) => [
+        eb.ref('v.id').as('id'),
+        eb.ref('v.clientId').as('clientId'),
+        eb.ref('v.sessionId').as('sessionId'),
+        eb.ref('v.createdAt').as('createdAt'),
+        eb.ref('v.state').as('state'),
+        eb.ref('v.bookingQuestion').as('bookingQuestion'),
+        eb.ref('v.bookingQuestionResponse').as('bookingQuestionResponse'),
+        eb.ref('v.price').as('price'),
+        eb.ref('v.attended').as('attended'),
+        eb.ref('v.payment').as('payment'),
+        eb.ref('v.notes').as('notes'),
+        eb.ref('v.saleId').as('saleId'),
+        eb.ref('v.cancelTime').as('cancelTime'),
+        eb.ref('v.cancelReason').as('cancelReason'),
+        eb.ref('v.acceptTime').as('acceptTime'),
+        eb.ref('v.declineTime').as('declineTime'),
+        eb.ref('v.inviteTime').as('inviteTime'),
+        eb.ref('v.confirmTime').as('confirmTime'),
       ])
       .where('cs.trainer_id', '=', authorization.trainerId)
       .where('v.id', '=', clientSessionId)
@@ -273,25 +273,25 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       const row = (await trx
         .selectFrom('vw_legacy_client_session as v')
         .innerJoin('client_session as cs', 'cs.id', 'v.id')
-        .select(({ ref }) => [
-          ref('v.id').as('id'),
-          ref('v.clientId').as('clientId'),
-          ref('v.sessionId').as('sessionId'),
-          ref('v.createdAt').as('createdAt'),
-          ref('v.state').as('state'),
-          ref('v.bookingQuestion').as('bookingQuestion'),
-          ref('v.bookingQuestionResponse').as('bookingQuestionResponse'),
-          ref('v.price').as('price'),
-          ref('v.attended').as('attended'),
-          ref('v.payment').as('payment'),
-          ref('v.notes').as('notes'),
-          ref('v.saleId').as('saleId'),
-          ref('v.cancelTime').as('cancelTime'),
-          ref('v.cancelReason').as('cancelReason'),
-          ref('v.acceptTime').as('acceptTime'),
-          ref('v.declineTime').as('declineTime'),
-          ref('v.inviteTime').as('inviteTime'),
-          ref('v.confirmTime').as('confirmTime'),
+        .select((eb) => [
+          eb.ref('v.id').as('id'),
+          eb.ref('v.clientId').as('clientId'),
+          eb.ref('v.sessionId').as('sessionId'),
+          eb.ref('v.createdAt').as('createdAt'),
+          eb.ref('v.state').as('state'),
+          eb.ref('v.bookingQuestion').as('bookingQuestion'),
+          eb.ref('v.bookingQuestionResponse').as('bookingQuestionResponse'),
+          eb.ref('v.price').as('price'),
+          eb.ref('v.attended').as('attended'),
+          eb.ref('v.payment').as('payment'),
+          eb.ref('v.notes').as('notes'),
+          eb.ref('v.saleId').as('saleId'),
+          eb.ref('v.cancelTime').as('cancelTime'),
+          eb.ref('v.cancelReason').as('cancelReason'),
+          eb.ref('v.acceptTime').as('acceptTime'),
+          eb.ref('v.declineTime').as('declineTime'),
+          eb.ref('v.inviteTime').as('inviteTime'),
+          eb.ref('v.confirmTime').as('confirmTime'),
         ])
         .where('cs.trainer_id', '=', authorization.trainerId)
         .where('v.id', '=', clientSessionId)

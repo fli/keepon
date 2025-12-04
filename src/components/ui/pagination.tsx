@@ -6,6 +6,7 @@ import { useRender, type UseRenderRenderProp } from '@base-ui-components/react/u
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 
 type Renderable = UseRenderRenderProp<Record<string, unknown>>
 
@@ -36,12 +37,12 @@ type PaginationLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> &
 function PaginationLink({
   className,
   isActive,
-  render = (<a />) as React.ReactElement<Record<string, unknown>>,
+  render = (<Link href="/" aria-label="Page link">Page</Link>) as React.ReactElement<Record<string, unknown>>,
   ...props
 }: PaginationLinkProps) {
   const defaultProps = {
     className: cn(
-      'flex h-9 min-w-9 items-center justify-center rounded-md border px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+      'flex h-9 min-w-9 items-center justify-center rounded-md border px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
       isActive && 'border-primary/60 bg-primary text-primary-foreground shadow-xs hover:bg-primary',
       className
     ),
@@ -61,7 +62,11 @@ type PaginationButtonProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & Bas
 
 function PaginationPrevious({
   className,
-  render = (<a />) as React.ReactElement<Record<string, unknown>>,
+  render = (
+    <Link href="/" aria-label="Previous page">
+      Previous
+    </Link>
+  ) as React.ReactElement<Record<string, unknown>>,
   ...props
 }: PaginationButtonProps) {
   const element = useRender({
@@ -69,7 +74,7 @@ function PaginationPrevious({
     props: mergeProps(
       {
         className: cn(
-          'flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+          'flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
           className
         ),
         children: (
@@ -89,7 +94,11 @@ PaginationPrevious.displayName = 'PaginationPrevious'
 
 function PaginationNext({
   className,
-  render = (<a />) as React.ReactElement<Record<string, unknown>>,
+  render = (
+    <Link href="/" aria-label="Next page">
+      Next
+    </Link>
+  ) as React.ReactElement<Record<string, unknown>>,
   ...props
 }: PaginationButtonProps) {
   const element = useRender({
@@ -97,7 +106,7 @@ function PaginationNext({
     props: mergeProps(
       {
         className: cn(
-          'flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+          'flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
           className
         ),
         children: (

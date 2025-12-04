@@ -282,15 +282,15 @@ export async function GET(request: Request) {
       .innerJoin('trainer', 'trainer.id', 'series.trainer_id')
       .innerJoin('supported_country_currency as scc', 'scc.country_id', 'trainer.country_id')
       .innerJoin('currency', 'currency.id', 'scc.currency_id')
-      .select(({ ref }) => [
-        ref('s.id').as('id'),
-        ref('series.name').as('name'),
-        ref('s.start').as('startsAt'),
+      .select((eb) => [
+        eb.ref('s.id').as('id'),
+        eb.ref('series.name').as('name'),
+        eb.ref('s.start').as('startsAt'),
         sql<number>`
           (EXTRACT(EPOCH FROM ${sql.ref('s.duration')}) / 60)::int
         `.as('durationMinutes'),
-        ref('s.timezone').as('timezone'),
-        ref('currency.alpha_code').as('currency'),
+        eb.ref('s.timezone').as('timezone'),
+        eb.ref('currency.alpha_code').as('currency'),
         sql<number>`
           (
             SELECT COUNT(*)
@@ -299,16 +299,16 @@ export async function GET(request: Request) {
               AND client_session.state IN ('confirmed', 'accepted')
           )::int
         `.as('currentAttendance'),
-        ref('s.booking_payment_type').as('bookingPaymentType'),
-        ref('s.request_client_address_online').as('requestClientAddressOnline'),
-        ref('s.booking_question').as('bookingQuestion'),
-        ref('s.booking_question_state').as('bookingQuestionState'),
-        ref('s.maximum_attendance').as('maximumAttendance'),
-        ref('s.location').as('location'),
-        ref('s.address').as('address'),
-        ref('s.geo').as('geo'),
-        ref('s.google_place_id').as('googlePlaceId'),
-        ref('series.price').as('price'),
+        eb.ref('s.booking_payment_type').as('bookingPaymentType'),
+        eb.ref('s.request_client_address_online').as('requestClientAddressOnline'),
+        eb.ref('s.booking_question').as('bookingQuestion'),
+        eb.ref('s.booking_question_state').as('bookingQuestionState'),
+        eb.ref('s.maximum_attendance').as('maximumAttendance'),
+        eb.ref('s.location').as('location'),
+        eb.ref('s.address').as('address'),
+        eb.ref('s.geo').as('geo'),
+        eb.ref('s.google_place_id').as('googlePlaceId'),
+        eb.ref('series.price').as('price'),
       ])
       .where('series.trainer_id', '=', provider.id)
       .where('series.event_type', '=', 'group_session')

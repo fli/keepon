@@ -55,10 +55,10 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       const plan = await trx
         .selectFrom('payment_plan as plan')
         .innerJoin('client', 'client.id', 'plan.client_id')
-        .select(({ ref }) => [
-          ref('client.stripe_customer_id').as('stripeCustomerId'),
-          ref('plan.status').as('status'),
-          ref('plan.end_').as('endDate'),
+        .select((eb) => [
+          eb.ref('client.stripe_customer_id').as('stripeCustomerId'),
+          eb.ref('plan.status').as('status'),
+          eb.ref('plan.end_').as('endDate'),
         ])
         .where('plan.id', '=', planId)
         .where('plan.client_id', '=', authorization.clientId)
@@ -76,18 +76,18 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       const outstandingPayments = await trx
         .selectFrom('payment_plan_payment as paymentPlanPayment')
         .innerJoin('payment_plan as planRecord', 'planRecord.id', 'paymentPlanPayment.payment_plan_id')
-        .select(({ ref }) => [ref('paymentPlanPayment.id').as('id')])
+        .select((eb) => [eb.ref('paymentPlanPayment.id').as('id')])
         .where('paymentPlanPayment.payment_plan_id', '=', planId)
         .where('planRecord.client_id', '=', authorization.clientId)
         .where('planRecord.trainer_id', '=', authorization.trainerId)
-        .where(({ eb, ref }) =>
+        .where((eb) =>
           eb.or([
             eb.and([
-              eb(ref('paymentPlanPayment.status'), '=', 'pending'),
-              eb(ref('planRecord.status'), '=', 'active'),
-              eb(ref('planRecord.end_'), '>', sql<Date>`NOW()`),
+              eb(eb.ref('paymentPlanPayment.status'), '=', 'pending'),
+              eb(eb.ref('planRecord.status'), '=', 'active'),
+              eb(eb.ref('planRecord.end_'), '>', sql<Date>`NOW()`),
             ]),
-            eb(ref('paymentPlanPayment.status'), '=', 'rejected'),
+            eb(eb.ref('paymentPlanPayment.status'), '=', 'rejected'),
           ])
         )
         .where('paymentPlanPayment.date', '<=', sql<Date>`NOW()`)

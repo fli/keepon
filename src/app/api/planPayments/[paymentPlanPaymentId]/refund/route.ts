@@ -217,14 +217,14 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           'paymentPlanPayment.id'
         )
         .leftJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
-        .select(({ ref }) => [
-          ref('paymentPlanPayment.status').as('status'),
-          ref('paymentPlanPayment.amount').as('amount'),
-          ref('paymentPlanPayment.fee').as('applicationFeeAmount'),
-          ref('paymentPlanCharge.stripe_charge_id').as('stripeChargeId'),
-          ref('paymentPlanCharge.stripe_payment_intent_id').as('stripePaymentIntentId'),
-          ref('trainer.stripe_account_id').as('stripeAccountId'),
-          ref('trainer.minimum_balance').as('minimumBalance'),
+        .select((eb) => [
+          eb.ref('paymentPlanPayment.status').as('status'),
+          eb.ref('paymentPlanPayment.amount').as('amount'),
+          eb.ref('paymentPlanPayment.fee').as('applicationFeeAmount'),
+          eb.ref('paymentPlanCharge.stripe_charge_id').as('stripeChargeId'),
+          eb.ref('paymentPlanCharge.stripe_payment_intent_id').as('stripePaymentIntentId'),
+          eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
+          eb.ref('trainer.minimum_balance').as('minimumBalance'),
           sql<string | null>`stripeAccount.object ->> 'type'`.as('stripeAccountType'),
         ])
         .where('paymentPlanPayment.id', '=', paymentPlanPaymentId)

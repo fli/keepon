@@ -48,10 +48,10 @@ export async function GET(request: Request) {
       .selectFrom('client as c')
       .innerJoin('trainer as t', 't.id', 'c.trainer_id')
       .leftJoin('stripe.account as stripeAccount', 'stripeAccount.id', 't.stripe_account_id')
-      .select(({ ref }) => [
-        ref('c.email').as('email'),
-        ref('c.stripe_customer_id').as('stripeCustomerId'),
-        ref('t.stripe_account_id').as('stripeAccountId'),
+      .select((eb) => [
+        eb.ref('c.email').as('email'),
+        eb.ref('c.stripe_customer_id').as('stripeCustomerId'),
+        eb.ref('t.stripe_account_id').as('stripeAccountId'),
         sql<string | null>`stripeAccount.object->>'type'`.as('stripeAccountType'),
       ])
       .where('c.id', '=', authorization.clientId)

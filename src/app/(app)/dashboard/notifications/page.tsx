@@ -26,7 +26,7 @@ export default async function NotificationsPage() {
   return (
     <PageContainer className="flex flex-col gap-6 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-semibold leading-tight">Notifications</h1>
+        <h1 className="text-3xl leading-tight font-semibold">Notifications</h1>
       </div>
 
       <NotificationsClient initialNotifications={notifications} initialError={error} />

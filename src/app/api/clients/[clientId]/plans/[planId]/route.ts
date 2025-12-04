@@ -299,14 +299,14 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         .innerJoin('country', 'country.id', 'trainer.country_id')
         .innerJoin('supported_country_currency as scc', 'scc.country_id', 'trainer.country_id')
         .innerJoin('currency', 'currency.id', 'scc.currency_id')
-        .select(({ ref }) => [
-          ref('plan.name').as('name'),
-          ref('plan.status').as('status'),
-          ref('plan.frequency_weekly_interval').as('frequencyWeeklyInterval'),
-          ref('plan.start').as('start'),
-          ref('plan.end_').as('end'),
-          ref('plan.amount').as('amount'),
-          ref('trainer.locale').as('locale'),
+        .select((eb) => [
+          eb.ref('plan.name').as('name'),
+          eb.ref('plan.status').as('status'),
+          eb.ref('plan.frequency_weekly_interval').as('frequencyWeeklyInterval'),
+          eb.ref('plan.start').as('start'),
+          eb.ref('plan.end_').as('end'),
+          eb.ref('plan.amount').as('amount'),
+          eb.ref('trainer.locale').as('locale'),
           sql<string>`
             COALESCE(
               trainer.online_bookings_business_name,
@@ -314,12 +314,12 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
               trainer.first_name || COALESCE(' ' || trainer.last_name, '')
             )
           `.as('serviceProviderName'),
-          ref('trainer.brand_color').as('brandColor'),
-          ref('trainer.business_logo_url').as('businessLogoUrl'),
-          ref('client.email').as('clientEmail'),
-          ref('client.user_id').as('clientUserId'),
-          ref('client.id').as('clientId'),
-          ref('currency.alpha_code').as('currency'),
+          eb.ref('trainer.brand_color').as('brandColor'),
+          eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
+          eb.ref('client.email').as('clientEmail'),
+          eb.ref('client.user_id').as('clientUserId'),
+          eb.ref('client.id').as('clientId'),
+          eb.ref('currency.alpha_code').as('currency'),
         ])
         .where('plan.id', '=', planId)
         .where('plan.client_id', '=', clientId)
@@ -485,7 +485,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           .where('id', '=', planId)
           .where('client_id', '=', clientId)
           .where('trainer_id', '=', authorization.trainerId)
-          .returning(({ ref }) => [ref('payment_plan.id').as('id')])
+          .returning((eb) => [eb.ref('payment_plan.id').as('id')])
           .executeTakeFirst()
 
         if (!updatedPlanRow) {

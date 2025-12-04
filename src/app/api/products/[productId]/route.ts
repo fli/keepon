@@ -208,7 +208,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         .deleteFrom('product')
         .where('product.id', '=', productId)
         .where('product.trainer_id', '=', authorization.trainerId)
-        .returning(({ ref }) => [ref('product.id').as('id')])
+        .returning((eb) => [eb.ref('product.id').as('id')])
         .executeTakeFirst()
 
       return removed
@@ -346,19 +346,19 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         .selectFrom('product as product')
         .leftJoin('service as service', 'service.id', 'product.id')
         .leftJoin('credit_pack as creditPack', 'creditPack.id', 'product.id')
-        .select(({ ref }) => [
-          ref('product.id').as('id'),
-          ref('product.is_credit_pack').as('isCreditPack'),
-          ref('product.is_item').as('isItem'),
-          ref('product.is_service').as('isService'),
-          ref('service.cover_image_url').as('coverImageUrl'),
-          ref('service.icon_url').as('iconUrl'),
-          ref('service.image_0_url').as('image0Url'),
-          ref('service.image_1_url').as('image1Url'),
-          ref('service.image_2_url').as('image2Url'),
-          ref('service.image_3_url').as('image3Url'),
-          ref('service.image_4_url').as('image4Url'),
-          ref('service.image_5_url').as('image5Url'),
+        .select((eb) => [
+          eb.ref('product.id').as('id'),
+          eb.ref('product.is_credit_pack').as('isCreditPack'),
+          eb.ref('product.is_item').as('isItem'),
+          eb.ref('product.is_service').as('isService'),
+          eb.ref('service.cover_image_url').as('coverImageUrl'),
+          eb.ref('service.icon_url').as('iconUrl'),
+          eb.ref('service.image_0_url').as('image0Url'),
+          eb.ref('service.image_1_url').as('image1Url'),
+          eb.ref('service.image_2_url').as('image2Url'),
+          eb.ref('service.image_3_url').as('image3Url'),
+          eb.ref('service.image_4_url').as('image4Url'),
+          eb.ref('service.image_5_url').as('image5Url'),
         ])
         .where('product.id', '=', productId)
         .where('product.trainer_id', '=', authorization.trainerId)

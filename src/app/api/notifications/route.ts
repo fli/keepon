@@ -16,19 +16,19 @@ export async function GET(request: Request) {
   try {
     const rows = (await db
       .selectFrom('vw_legacy_app_notification')
-      .select(({ ref }) => [
-        ref('vw_legacy_app_notification.id').as('id'),
-        ref('vw_legacy_app_notification.user_id').as('userId'),
-        ref('vw_legacy_app_notification.alert').as('alert'),
-        ref('vw_legacy_app_notification.created').as('created'),
-        ref('vw_legacy_app_notification.viewed').as('viewed'),
-        ref('vw_legacy_app_notification.model_name').as('modelName'),
-        ref('vw_legacy_app_notification.model_id').as('modelId'),
-        ref('vw_legacy_app_notification.expiration_interval').as('expirationInterval'),
-        ref('vw_legacy_app_notification.notification_type').as('notificationType'),
-        ref('vw_legacy_app_notification.client_id').as('clientId'),
-        ref('vw_legacy_app_notification.message_type').as('messageType'),
-        ref('vw_legacy_app_notification.category').as('category'),
+      .select((eb) => [
+        eb.ref('vw_legacy_app_notification.id').as('id'),
+        eb.ref('vw_legacy_app_notification.user_id').as('userId'),
+        eb.ref('vw_legacy_app_notification.alert').as('alert'),
+        eb.ref('vw_legacy_app_notification.created').as('created'),
+        eb.ref('vw_legacy_app_notification.viewed').as('viewed'),
+        eb.ref('vw_legacy_app_notification.model_name').as('modelName'),
+        eb.ref('vw_legacy_app_notification.model_id').as('modelId'),
+        eb.ref('vw_legacy_app_notification.expiration_interval').as('expirationInterval'),
+        eb.ref('vw_legacy_app_notification.notification_type').as('notificationType'),
+        eb.ref('vw_legacy_app_notification.client_id').as('clientId'),
+        eb.ref('vw_legacy_app_notification.message_type').as('messageType'),
+        eb.ref('vw_legacy_app_notification.category').as('category'),
       ])
       .where('vw_legacy_app_notification.user_id', '=', authorization.userId)
       .orderBy('vw_legacy_app_notification.created', 'desc')

@@ -242,12 +242,12 @@ export async function GET(request: Request) {
   try {
     const rows = (await db
       .selectFrom('busy_time')
-      .select(({ ref }) => [
-        ref('busy_time.id').as('id'),
-        ref('busy_time.start_date').as('startDate'),
-        ref('busy_time.start_time').as('startTime'),
-        ref('busy_time.end_date').as('endDate'),
-        ref('busy_time.end_time').as('endTime'),
+      .select((eb) => [
+        eb.ref('busy_time.id').as('id'),
+        eb.ref('busy_time.start_date').as('startDate'),
+        eb.ref('busy_time.start_time').as('startTime'),
+        eb.ref('busy_time.end_date').as('endDate'),
+        eb.ref('busy_time.end_time').as('endTime'),
       ])
       .where('busy_time.trainer_id', '=', authorization.trainerId)
       .orderBy('busy_time.start_date')
@@ -327,12 +327,12 @@ export async function PUT(request: Request) {
 
       const rows = (await trx
         .selectFrom('busy_time')
-        .select(({ ref }) => [
-          ref('busy_time.id').as('id'),
-          ref('busy_time.start_date').as('startDate'),
-          ref('busy_time.start_time').as('startTime'),
-          ref('busy_time.end_date').as('endDate'),
-          ref('busy_time.end_time').as('endTime'),
+        .select((eb) => [
+          eb.ref('busy_time.id').as('id'),
+          eb.ref('busy_time.start_date').as('startDate'),
+          eb.ref('busy_time.start_time').as('startTime'),
+          eb.ref('busy_time.end_date').as('endDate'),
+          eb.ref('busy_time.end_time').as('endTime'),
         ])
         .where('busy_time.trainer_id', '=', authorization.trainerId)
         .orderBy('busy_time.start_date')

@@ -287,10 +287,10 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       .innerJoin('country', 'country.id', 'trainer.country_id')
       .innerJoin('supported_country_currency as scc', 'scc.country_id', 'trainer.country_id')
       .innerJoin('currency', 'currency.id', 'scc.currency_id')
-      .select(({ ref }) => [
-        ref('client.id').as('clientId'),
-        ref('client.email').as('clientEmail'),
-        ref('client.user_id').as('clientUserId'),
+      .select((eb) => [
+        eb.ref('client.id').as('clientId'),
+        eb.ref('client.email').as('clientEmail'),
+        eb.ref('client.user_id').as('clientUserId'),
         sql<string>`
           COALESCE(
             trainer.online_bookings_business_name,
@@ -298,10 +298,10 @@ export async function POST(request: NextRequest, context: HandlerContext) {
             trainer.first_name || COALESCE(' ' || trainer.last_name, '')
           )
         `.as('serviceProviderName'),
-        ref('trainer.brand_color').as('brandColor'),
-        ref('trainer.business_logo_url').as('businessLogoUrl'),
-        ref('currency.alpha_code').as('currency'),
-        ref('country.alpha_2_code').as('country'),
+        eb.ref('trainer.brand_color').as('brandColor'),
+        eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
+        eb.ref('currency.alpha_code').as('currency'),
+        eb.ref('country.alpha_2_code').as('country'),
       ])
       .where('client.id', '=', clientId)
       .where('trainer.id', '=', authorization.trainerId)
