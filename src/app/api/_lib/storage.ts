@@ -8,6 +8,10 @@ type UploadToPublicBucketArgs = {
   contentType?: string
 }
 
+type UploadBufferToPublicBucketArgs = UploadToPublicBucketArgs & {
+  cacheControl?: string
+}
+
 const storage = new Storage()
 
 const getPublicBucketName = () => process.env.PUBLIC_BUCKET_NAME?.trim()
@@ -67,6 +71,38 @@ export const uploadToPublicBucket = async ({
     stream.on('error', reject)
     stream.on('finish', resolve)
     stream.end(transformed)
+  })
+
+  return `${publicBucketUrl}/${filename}`
+}
+
+export const uploadBufferToPublicBucket = async ({
+  buffer,
+  filename,
+  contentType,
+  cacheControl,
+}: UploadBufferToPublicBucketArgs) => {
+  const bucketName = getPublicBucketName()
+  const publicBucketUrl = getPublicBucketUrl()
+
+  if (!bucketName || !publicBucketUrl) {
+    throw new PublicBucketNotConfiguredError()
+  }
+
+  const publicBucket = storage.bucket(bucketName)
+  const cloudFile = publicBucket.file(filename)
+
+  await new Promise<void>((resolve, reject) => {
+    const stream = cloudFile.createWriteStream({
+      metadata: {
+        contentType: contentType ?? 'application/octet-stream',
+        cacheControl: cacheControl ?? 'public, max-age=31536000, immutable',
+      },
+      resumable: false,
+    })
+    stream.on('error', reject)
+    stream.on('finish', resolve)
+    stream.end(buffer)
   })
 
   return `${publicBucketUrl}/${filename}`
