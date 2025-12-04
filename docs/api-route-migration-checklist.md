@@ -198,7 +198,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 - [x] `POST` `/products` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/products.post.ts)_
 - [x] `DELETE` `/products/:productId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/products.[productId].delete.ts)_
 - [x] `GET` `/products/:productId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/products.[productId].get.ts)_
-- [ ] `PATCH` `/products/:productId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/products.[productId].patch.ts)_
+- [x] `PATCH` `/products/:productId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/products.[productId].patch.ts)_
 - [ ] `POST` `/products/:productId/upload` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/products.[productId].upload.ts)_
 
 ## Recent Locations (recentLocations)
