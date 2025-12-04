@@ -5,34 +5,13 @@ import {
   authenticateTrainerRequest,
   buildErrorResponse,
 } from '../_lib/accessToken'
+import {
+  adaptRewardRow,
+  rewardListSchema,
+  rewardRowSchema,
+} from './shared'
 
 export const runtime = 'nodejs'
-
-const rewardSchema = z.object({
-  id: z.string(),
-  type: z.string(),
-  title: z.string(),
-  description: z.string(),
-  claimed: z.boolean(),
-})
-
-const rewardListSchema = z.array(rewardSchema)
-
-type RewardRow = {
-  id: string
-  type: string
-  title: string
-  description: string
-  claimedAt: Date | null
-}
-
-const adaptRowToReward = (row: RewardRow) => ({
-  id: row.id,
-  type: row.type,
-  title: row.title,
-  description: row.description,
-  claimed: row.claimedAt !== null,
-})
 
 export async function GET(request: Request) {
   try {
@@ -60,16 +39,18 @@ export async function GET(request: Request) {
       .orderBy('reward.created_at', 'desc')
       .execute()
 
-    const rewardRows: RewardRow[] = rows.map(row => ({
-      id: row.id,
-      type: row.type,
-      title: row.title,
-      description: row.description,
-      claimedAt: row.claimedAt,
-    }))
+    const rewardRows = rows.map(row =>
+      rewardRowSchema.parse({
+        id: row.id,
+        type: row.type,
+        title: row.title,
+        description: row.description,
+        claimedAt: row.claimedAt,
+      })
+    )
 
     const rewards = rewardListSchema.parse(
-      rewardRows.map(rewardRow => adaptRowToReward(rewardRow))
+      rewardRows.map(rewardRow => adaptRewardRow(rewardRow))
     )
 
     return NextResponse.json(rewards)

@@ -208,7 +208,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 ## Rewards (rewards)
 
 - [x] `GET` `/rewards` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/rewards.get.ts)_
-- [ ] `PATCH` `/rewards/:rewardId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/rewards.[rewardId].patch.ts)_
+- [x] `PATCH` `/rewards/:rewardId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/rewards.[rewardId].patch.ts)_
 
 ## Sale Payments (salePayments)
 
