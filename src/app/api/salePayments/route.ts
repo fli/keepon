@@ -1,13 +1,208 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import {
+  authenticateTrainerOrClientRequest,
   authenticateTrainerRequest,
   buildErrorResponse,
 } from '../_lib/accessToken'
-import { salePaymentSchema } from '../_lib/salePayments'
+import {
+  adaptSalePaymentRow,
+  salePaymentSchema,
+  type SalePaymentRow,
+} from '../_lib/salePayments'
 
 export const runtime = 'nodejs'
+
+const querySchema = z.object({
+  saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }).optional(),
+  updatedAfter: z
+    .string()
+    .transform(value => {
+      const parsed = new Date(value)
+      if (Number.isNaN(parsed.getTime())) {
+        throw new Error('updatedAfter must be a valid ISO 8601 datetime string')
+      }
+      return parsed
+    })
+    .optional(),
+  paymentPlanId: z
+    .string()
+    .uuid({ message: 'paymentPlanId must be a valid UUID' })
+    .optional(),
+  clientId: z
+    .string()
+    .uuid({ message: 'clientId must be a valid UUID' })
+    .optional(),
+})
+
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const normalize = (value: string | null) =>
+    value && value.trim().length > 0 ? value.trim() : undefined
+
+  const queryResult = querySchema.safeParse({
+    saleId: normalize(url.searchParams.get('saleId')),
+    updatedAfter: normalize(url.searchParams.get('updatedAfter')),
+    paymentPlanId: normalize(url.searchParams.get('paymentPlanId')),
+    clientId: normalize(url.searchParams.get('clientId')),
+  })
+
+  if (!queryResult.success) {
+    const detail = queryResult.error.issues.map(issue => issue.message).join('; ')
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Invalid query parameters',
+        detail: detail || 'Request query parameters did not match the expected schema.',
+        type: '/invalid-query',
+      }),
+      { status: 400 }
+    )
+  }
+
+  const authorization = await authenticateTrainerOrClientRequest(request, {
+    trainerExtensionFailureLogMessage:
+      'Failed to extend access token expiry while fetching sale payments for trainer request',
+    clientExtensionFailureLogMessage:
+      'Failed to extend access token expiry while fetching sale payments for client request',
+  })
+
+  if (!authorization.ok) {
+    return authorization.response
+  }
+
+  const filters = { ...queryResult.data }
+
+  if (authorization.actor === 'client') {
+    if (filters.clientId && filters.clientId !== authorization.clientId) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 403,
+          title: 'You are not authorized to view sale payments for other clients',
+          type: '/forbidden',
+        }),
+        { status: 403 }
+      )
+    }
+    filters.clientId = authorization.clientId
+  }
+
+  try {
+    const combinedUpdatedAt = sql<Date>`
+      GREATEST(
+        ${sql.ref('payment.updated_at')},
+        COALESCE(${sql.ref('paymentCreditPack.updated_at')}, ${sql.ref('payment.updated_at')}),
+        COALESCE(${sql.ref('paymentManual.updated_at')}, ${sql.ref('payment.updated_at')}),
+        COALESCE(${sql.ref('paymentStripe.updated_at')}, ${sql.ref('payment.updated_at')}),
+        COALESCE(${sql.ref('paymentSubscription.updated_at')}, ${sql.ref('payment.updated_at')})
+      )
+    `
+
+    let query = db
+      .selectFrom('payment as payment')
+      .innerJoin('trainer', 'trainer.id', 'payment.trainer_id')
+      .innerJoin(
+        'supported_country_currency as supportedCountryCurrency',
+        'supportedCountryCurrency.country_id',
+        'trainer.country_id'
+      )
+      .innerJoin('currency', 'currency.id', 'supportedCountryCurrency.currency_id')
+      .leftJoin('payment_manual as paymentManual', 'paymentManual.id', 'payment.id')
+      .leftJoin(
+        'payment_credit_pack as paymentCreditPack',
+        'paymentCreditPack.id',
+        'payment.id'
+      )
+      .leftJoin('payment_stripe as paymentStripe', 'paymentStripe.id', 'payment.id')
+      .leftJoin(
+        'payment_subscription as paymentSubscription',
+        'paymentSubscription.id',
+        'payment.id'
+      )
+      .leftJoin(
+        'stripe_payment_intent as stripePaymentIntent',
+        'stripePaymentIntent.id',
+        'paymentStripe.stripe_payment_intent_id'
+      )
+      .leftJoin('stripe_charge as stripeCharge', 'stripeCharge.id', 'paymentStripe.stripe_charge_id')
+      .select(({ ref }) => [
+        ref('payment.id').as('id'),
+        ref('payment.client_id').as('clientId'),
+        ref('payment.sale_id').as('saleId'),
+        ref('payment.amount').as('amount'),
+        ref('payment.created_at').as('createdAt'),
+        ref('payment.updated_at').as('paymentUpdatedAt'),
+        ref('paymentManual.updated_at').as('paymentManualUpdatedAt'),
+        ref('paymentStripe.updated_at').as('paymentStripeUpdatedAt'),
+        ref('paymentCreditPack.updated_at').as('paymentCreditPackUpdatedAt'),
+        ref('paymentSubscription.updated_at').as('paymentSubscriptionUpdatedAt'),
+        ref('payment.refunded_time').as('refundedTime'),
+        ref('payment.is_manual').as('isManual'),
+        ref('payment.is_stripe').as('isStripe'),
+        ref('payment.is_credit_pack').as('isCreditPack'),
+        ref('payment.is_subscription').as('isSubscription'),
+        ref('paymentManual.transaction_time').as('manualTransactionTime'),
+        ref('paymentManual.method').as('manualMethod'),
+        ref('paymentManual.specific_method_name').as('manualSpecificMethodName'),
+        ref('paymentCreditPack.transaction_time').as('creditPackTransactionTime'),
+        ref('paymentCreditPack.credits_used').as('creditPackCreditsUsed'),
+        ref('paymentCreditPack.sale_credit_pack_id').as('creditPackSaleCreditPackId'),
+        ref('paymentStripe.fee').as('stripeFee'),
+        ref('stripePaymentIntent.object').as('stripePaymentIntentObject'),
+        ref('stripeCharge.object').as('stripeChargeObject'),
+        ref('paymentSubscription.subscription_id').as('subscriptionId'),
+        ref('paymentSubscription.created_at').as('subscriptionCreatedAt'),
+        ref('currency.alpha_code').as('currency'),
+      ])
+      .where('payment.trainer_id', '=', authorization.trainerId)
+
+    if (filters.clientId) {
+      query = query.where('payment.client_id', '=', filters.clientId)
+    }
+
+    if (filters.saleId) {
+      query = query.where('payment.sale_id', '=', filters.saleId)
+    }
+
+    if (filters.paymentPlanId) {
+      query = query.where('paymentSubscription.subscription_id', '=', filters.paymentPlanId)
+    }
+
+    if (filters.updatedAfter) {
+      query = query.where(combinedUpdatedAt, '>', filters.updatedAfter)
+    }
+
+    const rows = (await query.orderBy('payment.created_at', 'desc').execute()) as SalePaymentRow[]
+
+    const salePayments = rows.map(row => adaptSalePaymentRow(row))
+    const responseBody = z.array(salePaymentSchema).parse(salePayments)
+
+    return NextResponse.json(responseBody)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 500,
+          title: 'Failed to parse sale payment data from database',
+          detail: 'Sale payment data did not match the expected response schema.',
+          type: '/invalid-response',
+        }),
+        { status: 500 }
+      )
+    }
+
+    console.error('Failed to fetch sale payments', error)
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 500,
+        title: 'Failed to fetch sale payments',
+        type: '/internal-server-error',
+      }),
+      { status: 500 }
+    )
+  }
+}
 
 const requestSchema = z.object({
   saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }),
