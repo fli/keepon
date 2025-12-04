@@ -100,21 +100,13 @@ export function CalendarShell() {
     <section className="flex flex-col gap-6">
       <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border px-6 py-4 shadow-sm">
         <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {view} view
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{view} view</p>
           <h2 className="text-2xl font-semibold leading-tight">{titleLabel}</h2>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 rounded-md border bg-background px-1 shadow-xs">
-            <Button
-              aria-label="Previous"
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
-              onClick={handlePrev}
-            >
+            <Button aria-label="Previous" size="icon" variant="ghost" className="h-9 w-9" onClick={handlePrev}>
               <ChevronLeft className="size-4" aria-hidden />
             </Button>
             <Button
@@ -125,13 +117,7 @@ export function CalendarShell() {
             >
               Today
             </Button>
-            <Button
-              aria-label="Next"
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9"
-              onClick={handleNext}
-            >
+            <Button aria-label="Next" size="icon" variant="ghost" className="h-9 w-9" onClick={handleNext}>
               <ChevronRight className="size-4" aria-hidden />
             </Button>
           </div>

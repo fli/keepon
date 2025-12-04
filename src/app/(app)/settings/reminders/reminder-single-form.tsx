@@ -51,14 +51,9 @@ export function ReminderSingleForm({
         ? initialSettings.clientReminder1
         : initialSettings.clientReminder2
 
-  const [reminder, setReminder] = useState<
-    ServiceProviderReminder | ClientReminder | null
-  >(
+  const [reminder, setReminder] = useState<ServiceProviderReminder | ClientReminder | null>(
     mode === 'add'
-      ? initialReminder ??
-          (target === 'serviceProvider'
-            ? defaultServiceProviderReminder
-            : defaultClientReminder)
+      ? (initialReminder ?? (target === 'serviceProvider' ? defaultServiceProviderReminder : defaultClientReminder))
       : initialReminder
   )
 
@@ -66,22 +61,15 @@ export function ReminderSingleForm({
   const [isPending, startTransition] = useTransition()
 
   const mergedHiddenFields = useMemo(() => {
-    const toPairs = (
-      current: ServiceProviderReminder | ClientReminder | null,
-      prefix: string
-    ) => [
+    const toPairs = (current: ServiceProviderReminder | ClientReminder | null, prefix: string) => [
       { name: `${prefix}Type`, value: current?.type ?? '' },
       { name: `${prefix}Time`, value: current?.timeBeforeStart ?? '' },
     ]
 
-    const sp1 =
-      target === 'serviceProvider' && slot === 1 ? reminder : initialSettings.serviceProviderReminder1
-    const sp2 =
-      target === 'serviceProvider' && slot === 2 ? reminder : initialSettings.serviceProviderReminder2
-    const c1 =
-      target === 'client' && slot === 1 ? reminder : initialSettings.clientReminder1
-    const c2 =
-      target === 'client' && slot === 2 ? reminder : initialSettings.clientReminder2
+    const sp1 = target === 'serviceProvider' && slot === 1 ? reminder : initialSettings.serviceProviderReminder1
+    const sp2 = target === 'serviceProvider' && slot === 2 ? reminder : initialSettings.serviceProviderReminder2
+    const c1 = target === 'client' && slot === 1 ? reminder : initialSettings.clientReminder1
+    const c2 = target === 'client' && slot === 2 ? reminder : initialSettings.clientReminder2
 
     return [
       ...toPairs(sp1, 'serviceProviderReminder1'),
@@ -94,21 +82,19 @@ export function ReminderSingleForm({
   return (
     <form
       className="space-y-6"
-      action={formData => {
+      action={(formData) => {
         startTransition(async () => {
           const result = await onSubmit(formData)
           setStatus(result)
         })
       }}
     >
-      {mergedHiddenFields.map(field => (
+      {mergedHiddenFields.map((field) => (
         <input key={field.name} type="hidden" name={field.name} value={field.value} />
       ))}
 
       <div className="space-y-1">
-        <p className="text-lg font-semibold leading-tight">
-          {mode === 'add' ? 'Add reminder' : 'Edit reminder'}
-        </p>
+        <p className="text-lg font-semibold leading-tight">{mode === 'add' ? 'Add reminder' : 'Edit reminder'}</p>
         <p className="text-sm text-muted-foreground">
           {target === 'serviceProvider'
             ? 'Sent to you before sessions you host.'
@@ -120,7 +106,7 @@ export function ReminderSingleForm({
         <ReminderFields
           value={reminder}
           target={target}
-          onChange={value => setReminder(value)}
+          onChange={(value) => setReminder(value)}
           onClear={mode === 'add' ? undefined : () => setReminder(null)}
           disabled={isPending}
         />
@@ -133,9 +119,7 @@ export function ReminderSingleForm({
           <p
             role="status"
             aria-live="polite"
-            className={`text-sm ${
-              status.status === 'success' ? 'text-emerald-600' : 'text-destructive'
-            }`}
+            className={`text-sm ${status.status === 'success' ? 'text-emerald-600' : 'text-destructive'}`}
           >
             {status.message}
           </p>
@@ -168,7 +152,7 @@ function ReminderFields({
   const typeOptions = target === 'serviceProvider' ? serviceProviderReminderTypes : clientReminderTypes
 
   const hasCustomTime = useMemo(
-    () => !reminderOptions.some(option => option.value === value.timeBeforeStart),
+    () => !reminderOptions.some((option) => option.value === value.timeBeforeStart),
     [value.timeBeforeStart]
   )
 
@@ -179,14 +163,14 @@ function ReminderFields({
           <Label className="text-sm text-muted-foreground">Reminder type</Label>
           <NativeSelect
             value={value.type}
-            onChange={event =>
+            onChange={(event) =>
               onChange({
                 ...value,
                 type: event.target.value as (typeof value)['type'],
               })
             }
           >
-            {typeOptions.map(option => (
+            {typeOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -198,19 +182,15 @@ function ReminderFields({
           <Label className="text-sm text-muted-foreground">Send</Label>
           <NativeSelect
             value={value.timeBeforeStart}
-            onChange={event =>
+            onChange={(event) =>
               onChange({
                 ...value,
                 timeBeforeStart: event.target.value,
               })
             }
           >
-            {hasCustomTime ? (
-              <option value={value.timeBeforeStart}>
-                Custom ({value.timeBeforeStart})
-              </option>
-            ) : null}
-            {reminderOptions.map(option => (
+            {hasCustomTime ? <option value={value.timeBeforeStart}>Custom ({value.timeBeforeStart})</option> : null}
+            {reminderOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.name}
               </option>
@@ -220,13 +200,7 @@ function ReminderFields({
 
         {onClear ? (
           <div className="flex items-center sm:justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={onClear}
-              aria-label="Remove reminder"
-            >
+            <Button type="button" variant="ghost" size="icon-sm" onClick={onClear} aria-label="Remove reminder">
               <X className="size-4" />
             </Button>
           </div>

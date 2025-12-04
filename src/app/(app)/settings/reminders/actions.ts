@@ -2,14 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 
-import {
-  clientReminderTypeValues,
-  serviceProviderReminderTypeValues,
-} from '@/lib/reminders'
-import {
-  type ReminderSettingsInput,
-  updateReminderSettings,
-} from '@/server/reminders'
+import { clientReminderTypeValues, serviceProviderReminderTypeValues } from '@/lib/reminders'
+import { type ReminderSettingsInput, updateReminderSettings } from '@/server/reminders'
 import { readSessionFromCookies } from '../../../session.server'
 
 export type ActionResult = { status: 'success' | 'error'; message: string }
@@ -21,10 +15,7 @@ const authError: ActionResult = {
 
 const isoDurationPrefix = /^P/i
 
-const parseReminder = <
-  TType extends string,
-  TResult extends { type: TType; timeBeforeStart: string } | null
->(
+const parseReminder = <TType extends string, TResult extends { type: TType; timeBeforeStart: string } | null>(
   formData: FormData,
   prefix: string,
   allowedTypes: readonly TType[]
@@ -54,34 +45,16 @@ const parseReminder = <
   return { type: type as TType, timeBeforeStart } as TResult
 }
 
-export async function updateRemindersAction(
-  formData: FormData
-): Promise<ActionResult> {
+export async function updateRemindersAction(formData: FormData): Promise<ActionResult> {
   const session = await readSessionFromCookies()
   if (!session) return authError
 
   try {
     const payload: ReminderSettingsInput = {
-      serviceProviderReminder1: parseReminder(
-        formData,
-        'serviceProviderReminder1',
-        serviceProviderReminderTypeValues
-      ),
-      serviceProviderReminder2: parseReminder(
-        formData,
-        'serviceProviderReminder2',
-        serviceProviderReminderTypeValues
-      ),
-      clientReminder1: parseReminder(
-        formData,
-        'clientReminder1',
-        clientReminderTypeValues
-      ),
-      clientReminder2: parseReminder(
-        formData,
-        'clientReminder2',
-        clientReminderTypeValues
-      ),
+      serviceProviderReminder1: parseReminder(formData, 'serviceProviderReminder1', serviceProviderReminderTypeValues),
+      serviceProviderReminder2: parseReminder(formData, 'serviceProviderReminder2', serviceProviderReminderTypeValues),
+      clientReminder1: parseReminder(formData, 'clientReminder1', clientReminderTypeValues),
+      clientReminder2: parseReminder(formData, 'clientReminder2', clientReminderTypeValues),
     }
 
     await updateReminderSettings(session.trainerId, payload)
@@ -93,8 +66,7 @@ export async function updateRemindersAction(
       message: 'Reminder defaults updated.',
     }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unable to save reminders right now.'
+    const message = error instanceof Error ? error.message : 'Unable to save reminders right now.'
     return {
       status: 'error',
       message,

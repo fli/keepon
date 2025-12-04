@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ZodError } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 import { paramsSchema } from '../_shared'
 import { listTrainerNotifications } from '@/server/notifications'
 
@@ -13,7 +10,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -28,8 +25,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const { trainerId } = paramsResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching notifications',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching notifications',
   })
 
   if (!authorization.ok) {
@@ -49,10 +45,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   }
 
   try {
-    const notifications = await listTrainerNotifications(
-      authorization.trainerId,
-      authorization.userId
-    )
+    const notifications = await listTrainerNotifications(authorization.trainerId, authorization.userId)
 
     return NextResponse.json(notifications)
   } catch (error) {

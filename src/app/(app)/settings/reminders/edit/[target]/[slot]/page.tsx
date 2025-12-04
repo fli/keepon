@@ -10,17 +10,11 @@ import { updateRemindersAction } from '../../../actions'
 
 type TargetParam = 'service-provider' | 'client'
 
-const targetParamToKey = (param: TargetParam) =>
-  param === 'service-provider' ? 'serviceProvider' : 'client'
+const targetParamToKey = (param: TargetParam) => (param === 'service-provider' ? 'serviceProvider' : 'client')
 
-const slotParamToNumber = (param: string): 1 | 2 | null =>
-  param === '1' ? 1 : param === '2' ? 2 : null
+const slotParamToNumber = (param: string): 1 | 2 | null => (param === '1' ? 1 : param === '2' ? 2 : null)
 
-export default function EditReminderPage({
-  params,
-}: {
-  params: Promise<{ target: TargetParam; slot: string }>
-}) {
+export default function EditReminderPage({ params }: { params: Promise<{ target: TargetParam; slot: string }> }) {
   return (
     <Suspense
       fallback={
@@ -36,11 +30,7 @@ export default function EditReminderPage({
   )
 }
 
-async function EditReminderContent({
-  params,
-}: {
-  params: Promise<{ target: TargetParam; slot: string }>
-}) {
+async function EditReminderContent({ params }: { params: Promise<{ target: TargetParam; slot: string }> }) {
   const resolvedParams = await params
 
   const session = await readSessionFromCookies()
@@ -61,10 +51,7 @@ async function EditReminderContent({
   try {
     settings = await getReminderSettings(session.trainerId)
   } catch (cause) {
-    error =
-      cause instanceof Error
-        ? cause.message
-        : 'Unable to load reminder settings right now.'
+    error = cause instanceof Error ? cause.message : 'Unable to load reminder settings right now.'
   }
 
   if (error) {

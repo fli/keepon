@@ -1,11 +1,6 @@
 import { z } from 'zod'
 
-const moneyString = z
-  .string()
-  .regex(
-    /^-?\d+(?:\.\d{2})$/,
-    'Money values must be formatted with two decimal places'
-  )
+const moneyString = z.string().regex(/^-?\d+(?:\.\d{2})$/, 'Money values must be formatted with two decimal places')
 
 const isoDateTimeString = z.string().datetime({ offset: true })
 
@@ -85,10 +80,7 @@ export type SalePaymentRow = {
   subscriptionCreatedAt: Date | string | null
 }
 
-const ensureDate = (
-  value: Date | string | null | undefined,
-  label: string
-): Date => {
+const ensureDate = (value: Date | string | null | undefined, label: string): Date => {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
       throw new Error(`Invalid ${label} value in sale payment record`)
@@ -111,15 +103,9 @@ const ensureDate = (
   throw new Error(`Unsupported ${label} value type in sale payment record`)
 }
 
-const toIsoDateTime = (
-  value: Date | string | null | undefined,
-  label: string
-) => ensureDate(value, label).toISOString()
+const toIsoDateTime = (value: Date | string | null | undefined, label: string) => ensureDate(value, label).toISOString()
 
-const formatMoney = (
-  value: string | number | null | undefined,
-  label: string
-): string => {
+const formatMoney = (value: string | number | null | undefined, label: string): string => {
   if (value === null || value === undefined) {
     throw new Error(`Missing ${label} value in sale payment record`)
   }
@@ -153,8 +139,7 @@ const parseInteger = (
     throw new Error(`Missing ${label} value in sale payment record`)
   }
 
-  const numeric =
-    typeof value === 'number' ? value : Number.parseFloat(String(value))
+  const numeric = typeof value === 'number' ? value : Number.parseFloat(String(value))
 
   if (!Number.isFinite(numeric)) {
     throw new Error(`Invalid ${label} value in sale payment record`)
@@ -166,18 +151,13 @@ const parseInteger = (
   }
 
   if (options.minimum !== undefined && integer < options.minimum) {
-    throw new Error(
-      `${label} must be at least ${options.minimum} but was ${integer}`
-    )
+    throw new Error(`${label} must be at least ${options.minimum} but was ${integer}`)
   }
 
   return integer
 }
 
-const parseStripeCreatedTimestamp = (
-  value: unknown,
-  label: string
-): Date | null => {
+const parseStripeCreatedTimestamp = (value: unknown, label: string): Date | null => {
   if (!value || typeof value !== 'object') {
     return null
   }
@@ -220,7 +200,7 @@ const determineType = (row: SalePaymentRow): SalePaymentType => {
     { type: 'subscription', value: row.isSubscription === true },
   ]
 
-  const active = flags.filter(flag => flag.value)
+  const active = flags.filter((flag) => flag.value)
 
   if (active.length !== 1) {
     throw new Error('Sale payment row has unsupported type flags')
@@ -245,50 +225,29 @@ const determineUpdatedAt = (row: SalePaymentRow): string => {
   ]
 
   const dates = candidates
-    .filter(candidate => candidate.value !== null && candidate.value !== undefined)
-    .map(candidate => ensureDate(candidate.value, candidate.label))
+    .filter((candidate) => candidate.value !== null && candidate.value !== undefined)
+    .map((candidate) => ensureDate(candidate.value, candidate.label))
 
   if (dates.length === 0) {
     throw new Error('Sale payment row is missing updated timestamps')
   }
 
-  const latest = dates.reduce((max, current) =>
-    current.getTime() > max.getTime() ? current : max
-  )
+  const latest = dates.reduce((max, current) => (current.getTime() > max.getTime() ? current : max))
 
   return latest.toISOString()
 }
 
-const determineTransactedAt = (
-  row: SalePaymentRow,
-  type: SalePaymentType,
-  createdAt: Date
-): string => {
+const determineTransactedAt = (row: SalePaymentRow, type: SalePaymentType, createdAt: Date): string => {
   switch (type) {
     case 'manual':
-      return toIsoDateTime(
-        row.manualTransactionTime,
-        'manual transaction time'
-      )
+      return toIsoDateTime(row.manualTransactionTime, 'manual transaction time')
     case 'creditPack':
-      return toIsoDateTime(
-        row.creditPackTransactionTime,
-        'credit pack transaction time'
-      )
+      return toIsoDateTime(row.creditPackTransactionTime, 'credit pack transaction time')
     case 'subscription':
-      return toIsoDateTime(
-        row.subscriptionCreatedAt,
-        'subscription transaction time'
-      )
+      return toIsoDateTime(row.subscriptionCreatedAt, 'subscription transaction time')
     case 'stripe': {
-      const fromIntent = parseStripeCreatedTimestamp(
-        row.stripePaymentIntentObject,
-        'stripe payment intent'
-      )
-      const fromCharge = parseStripeCreatedTimestamp(
-        row.stripeChargeObject,
-        'stripe charge'
-      )
+      const fromIntent = parseStripeCreatedTimestamp(row.stripePaymentIntentObject, 'stripe payment intent')
+      const fromCharge = parseStripeCreatedTimestamp(row.stripeChargeObject, 'stripe charge')
       const timestamp = fromIntent ?? fromCharge ?? createdAt
       return timestamp.toISOString()
     }
@@ -306,9 +265,7 @@ export const adaptSalePaymentRow = (row: SalePaymentRow): SalePayment => {
   const createdAt = ensureDate(row.createdAt, 'createdAt')
   const amount = formatMoney(row.amount, 'amount')
   const amountRefunded =
-    row.refundedTime !== null && row.refundedTime !== undefined
-      ? formatMoney(row.amount, 'amount refunded')
-      : '0.00'
+    row.refundedTime !== null && row.refundedTime !== undefined ? formatMoney(row.amount, 'amount refunded') : '0.00'
 
   const base = {
     id: row.id,
@@ -344,10 +301,7 @@ export const adaptSalePaymentRow = (row: SalePaymentRow): SalePayment => {
     return {
       ...base,
       type,
-      transactionFee: formatMoney(
-        row.stripeFee,
-        'stripe transaction fee'
-      ),
+      transactionFee: formatMoney(row.stripeFee, 'stripe transaction fee'),
     }
   }
 

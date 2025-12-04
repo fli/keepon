@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateClientRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateClientRequest, buildErrorResponse } from '../../_lib/accessToken'
 import {
   parseAmount,
   parseNumberValue,
@@ -26,16 +23,12 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const parsedParams = paramsSchema.safeParse(await context.params)
 
   if (!parsedParams.success) {
-    const detail = parsedParams.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = parsedParams.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid payment plan identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected payment plan schema.',
+        detail: detail || 'Request parameters did not match the expected payment plan schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -45,8 +38,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const { paymentPlanId } = parsedParams.data
 
   const authorization = await authenticateClientRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching payment plan',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching payment plan',
   })
 
   if (!authorization.ok) {
@@ -57,16 +49,8 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     const row = (await db
       .selectFrom('payment_plan')
       .innerJoin('trainer', 'trainer.id', 'payment_plan.trainer_id')
-      .innerJoin(
-        'supported_country_currency',
-        'supported_country_currency.country_id',
-        'trainer.country_id'
-      )
-      .innerJoin(
-        'currency',
-        'currency.id',
-        'supported_country_currency.currency_id'
-      )
+      .innerJoin('supported_country_currency', 'supported_country_currency.country_id', 'trainer.country_id')
+      .innerJoin('currency', 'currency.id', 'supported_country_currency.currency_id')
       .select(({ ref }) => [
         ref('payment_plan.id').as('id'),
         ref('payment_plan.status').as('status'),
@@ -75,9 +59,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         ref('payment_plan.start').as('startAt'),
         ref('payment_plan.end_').as('requestedEndAt'),
         ref('payment_plan.accepted_end').as('endAt'),
-        ref('payment_plan.frequency_weekly_interval').as(
-          'weeklyRecurrenceInterval'
-        ),
+        ref('payment_plan.frequency_weekly_interval').as('weeklyRecurrenceInterval'),
         ref('payment_plan.name').as('name'),
         ref('payment_plan.amount').as('requestedAmount'),
         ref('payment_plan.accepted_amount').as('amount'),
@@ -109,15 +91,9 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       startAt: toIsoString(row.startAt),
       requestedEndAt: toIsoString(row.requestedEndAt),
       endAt: toOptionalIsoString(row.endAt),
-      weeklyRecurrenceInterval: parseNumberValue(
-        row.weeklyRecurrenceInterval,
-        'weekly recurrence interval'
-      ),
+      weeklyRecurrenceInterval: parseNumberValue(row.weeklyRecurrenceInterval, 'weekly recurrence interval'),
       name: row.name,
-      requestedAmount: parseRequiredAmount(
-        row.requestedAmount,
-        'requested amount'
-      ),
+      requestedAmount: parseRequiredAmount(row.requestedAmount, 'requested amount'),
       amount: parseAmount(row.amount, 'accepted amount'),
       requestSentAt: toOptionalIsoString(row.requestSentAt),
       currency: row.currency,
@@ -130,8 +106,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse payment plan data from database',
-          detail:
-            'Payment plan data did not match the expected response schema.',
+          detail: 'Payment plan data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

@@ -1,19 +1,12 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { ZodError } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
-import {
-  parseNotificationRows,
-  RawNotificationRow,
-} from '../trainers/[trainerId]/notifications/_shared'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { parseNotificationRows, RawNotificationRow } from '../trainers/[trainerId]/notifications/_shared'
 
 export async function GET(request: Request) {
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching notifications',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching notifications',
   })
 
   if (!authorization.ok) {
@@ -31,12 +24,8 @@ export async function GET(request: Request) {
         ref('vw_legacy_app_notification.viewed').as('viewed'),
         ref('vw_legacy_app_notification.model_name').as('modelName'),
         ref('vw_legacy_app_notification.model_id').as('modelId'),
-        ref('vw_legacy_app_notification.expiration_interval').as(
-          'expirationInterval'
-        ),
-        ref('vw_legacy_app_notification.notification_type').as(
-          'notificationType'
-        ),
+        ref('vw_legacy_app_notification.expiration_interval').as('expirationInterval'),
+        ref('vw_legacy_app_notification.notification_type').as('notificationType'),
         ref('vw_legacy_app_notification.client_id').as('clientId'),
         ref('vw_legacy_app_notification.message_type').as('messageType'),
         ref('vw_legacy_app_notification.category').as('category'),
@@ -54,8 +43,7 @@ export async function GET(request: Request) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse notification data from database',
-          detail:
-            'Notification data did not match the expected response schema.',
+          detail: 'Notification data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

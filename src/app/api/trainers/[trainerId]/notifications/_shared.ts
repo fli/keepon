@@ -12,25 +12,13 @@ export const notificationSchema = z.object({
   alert: z.string(),
   created: isoDateTimeString.optional(),
   viewed: z.boolean().optional(),
-  modelName: z
-    .enum(['plan', 'payment', 'sessionPack', 'client'])
-    .nullable()
-    .optional(),
+  modelName: z.enum(['plan', 'payment', 'sessionPack', 'client']).nullable().optional(),
   modelId: z.string().nullable().optional(),
   expirationInterval: z.number().nullable().optional(),
-  notificationType: z
-    .enum(['general', 'transaction', 'reminder'])
-    .nullable()
-    .optional(),
+  notificationType: z.enum(['general', 'transaction', 'reminder']).nullable().optional(),
   clientId: z.string().nullable().optional(),
-  messageType: z
-    .enum(['failure', 'success', 'default'])
-    .nullable()
-    .optional(),
-  category: z
-    .enum(['general', 'transaction', 'reminder'])
-    .nullable()
-    .optional(),
+  messageType: z.enum(['failure', 'success', 'default']).nullable().optional(),
+  category: z.enum(['general', 'transaction', 'reminder']).nullable().optional(),
 })
 
 export const notificationListSchema = z.array(notificationSchema)
@@ -52,9 +40,7 @@ export type RawNotificationRow = {
   category: string | null
 }
 
-const createEnumNormalizer = <TValues extends readonly string[]>(
-  allowedValues: TValues
-) => {
+const createEnumNormalizer = <TValues extends readonly string[]>(allowedValues: TValues) => {
   const allowedSet = new Set<string>(allowedValues)
   return (value: string | null): TValues[number] | null => {
     if (!value) {
@@ -68,27 +54,16 @@ const createEnumNormalizer = <TValues extends readonly string[]>(
   }
 }
 
-const normalizeModelName = createEnumNormalizer(
-  ['plan', 'payment', 'sessionPack', 'client'] as const
-)
-const normalizeNotificationType = createEnumNormalizer(
-  ['general', 'transaction', 'reminder'] as const
-)
-const normalizeMessageType = createEnumNormalizer(
-  ['failure', 'success', 'default'] as const
-)
+const normalizeModelName = createEnumNormalizer(['plan', 'payment', 'sessionPack', 'client'] as const)
+const normalizeNotificationType = createEnumNormalizer(['general', 'transaction', 'reminder'] as const)
+const normalizeMessageType = createEnumNormalizer(['failure', 'success', 'default'] as const)
 
 const toIsoDateTime = (value: Date | string | null): string | undefined => {
   if (value === null) {
     return undefined
   }
 
-  const date =
-    value instanceof Date
-      ? value
-      : typeof value === 'string'
-        ? new Date(value)
-        : null
+  const date = value instanceof Date ? value : typeof value === 'string' ? new Date(value) : null
 
   if (!date || Number.isNaN(date.getTime())) {
     throw new Error('Invalid timestamp value in notification row')
@@ -97,9 +72,7 @@ const toIsoDateTime = (value: Date | string | null): string | undefined => {
   return date.toISOString()
 }
 
-const normalizeExpirationInterval = (
-  value: number | string | null
-): number | null => {
+const normalizeExpirationInterval = (value: number | string | null): number | null => {
   if (value === null) {
     return null
   }
@@ -121,9 +94,7 @@ const normalizeExpirationInterval = (
   return numeric
 }
 
-export const adaptRowToNotification = (
-  row: RawNotificationRow
-): z.input<typeof notificationSchema> => {
+export const adaptRowToNotification = (row: RawNotificationRow): z.input<typeof notificationSchema> => {
   if (!row.id || !row.userId || !row.alert) {
     throw new Error('Notification row missing required fields')
   }
@@ -148,4 +119,4 @@ export const adaptRowToNotification = (
 }
 
 export const parseNotificationRows = (rows: RawNotificationRow[]) =>
-  notificationListSchema.parse(rows.map(row => adaptRowToNotification(row)))
+  notificationListSchema.parse(rows.map((row) => adaptRowToNotification(row)))

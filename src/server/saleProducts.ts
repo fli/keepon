@@ -1,15 +1,11 @@
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  adaptSaleProductRow,
-  fetchSaleProducts,
-  saleProductSchema,
-} from '../app/api/saleProducts/shared'
+import { adaptSaleProductRow, fetchSaleProducts, saleProductSchema } from '../app/api/saleProducts/shared'
 
 const createSaleProductSchema = z.object({
   saleId: z.string().uuid(),
   productId: z.string().optional(),
-  price: z.union([z.string(), z.number()]).transform(v => v.toString()),
+  price: z.union([z.string(), z.number()]).transform((v) => v.toString()),
   currency: z.string().min(1),
   name: z.string().min(1),
   type: z.enum(['creditPack', 'item', 'service']),
@@ -27,7 +23,7 @@ export async function createSaleProductForTrainer(
 ): Promise<z.infer<typeof saleProductSchema>> {
   const parsed = createSaleProductSchema.parse(payload)
 
-  const saleProductId = await db.transaction().execute(async trx => {
+  const saleProductId = await db.transaction().execute(async (trx) => {
     const sale = await trx
       .selectFrom('sale')
       .select(['id', 'client_id'])

@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z, ZodError } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../_lib/constants'
-import {
-  adaptClientSessionRow,
-  nullableNumber,
-  RawClientSessionRow,
-} from '../../_lib/clientSessionsSchema'
+import { adaptClientSessionRow, nullableNumber, RawClientSessionRow } from '../../_lib/clientSessionsSchema'
 
 const requestSchema = z.object({
   clientId: z
@@ -25,27 +18,25 @@ const requestSchema = z.object({
     .uuid({ message: 'sessionId must be a valid UUID' }),
 })
 
-const nullableCount = z
-  .union([z.number(), z.string(), z.null()])
-  .transform(value => {
-    if (value === null || value === undefined) return null
-    if (typeof value === 'number') {
-      if (!Number.isFinite(value)) {
-        throw new Error('Invalid numeric value')
-      }
-      return value
-    }
-
-    const trimmed = value.trim()
-    if (trimmed.length === 0) return null
-
-    const parsed = Number(trimmed)
-    if (!Number.isFinite(parsed)) {
+const nullableCount = z.union([z.number(), z.string(), z.null()]).transform((value) => {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
       throw new Error('Invalid numeric value')
     }
+    return value
+  }
 
-    return parsed
-  })
+  const trimmed = value.trim()
+  if (trimmed.length === 0) return null
+
+  const parsed = Number(trimmed)
+  if (!Number.isFinite(parsed)) {
+    throw new Error('Invalid numeric value')
+  }
+
+  return parsed
+})
 
 const detailsSchema = z.object({
   sessionName: z.string().nullable(),
@@ -124,9 +115,7 @@ const buildInvitationEmail = (options: {
       ? `<p style="margin:16px 0;color:#4b5563;font-size:15px;line-height:1.5;">There's a max of ${options.maximumAttendance.toString()} clients that can attend this appointment, please reply so you don't miss out.</p>`
       : ''
 
-  const eventTitle = options.eventName?.trim().length
-    ? escapeHtml(options.eventName.trim())
-    : 'an appointment'
+  const eventTitle = options.eventName?.trim().length ? escapeHtml(options.eventName.trim()) : 'an appointment'
 
   return `
 <!doctype html>
@@ -184,11 +173,7 @@ const buildInvitationEmail = (options: {
 `
 }
 
-const formatEventPrice = (
-  price: number | null,
-  locale: string,
-  currency?: string | null
-) => {
+const formatEventPrice = (price: number | null, locale: string, currency?: string | null) => {
   if (price === null) return null
   if (price === 0) return 'Free'
 
@@ -218,9 +203,7 @@ export async function POST(request: NextRequest) {
     const rawBody = (await request.json()) as unknown
     const bodyResult = requestSchema.safeParse(rawBody)
     if (!bodyResult.success) {
-      const detail = bodyResult.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
@@ -248,8 +231,7 @@ export async function POST(request: NextRequest) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while inviting client session',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while inviting client session',
   })
 
   if (!authorization.ok) {
@@ -257,22 +239,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const rawRow = await db.transaction().execute(async trx => {
+    const rawRow = await db.transaction().execute(async (trx) => {
       const detailsRow = await trx
         .selectFrom('session as s')
         .innerJoin('session_series as ss', 'ss.id', 's.session_series_id')
         .innerJoin('trainer', 'trainer.id', 's.trainer_id')
         .innerJoin('country', 'country.id', 'trainer.country_id')
-        .innerJoin('client', join =>
-          join
-            .onRef('client.trainer_id', '=', 'trainer.id')
-            .on('client.id', '=', parsedBody.clientId)
+        .innerJoin('client', (join) =>
+          join.onRef('client.trainer_id', '=', 'trainer.id').on('client.id', '=', parsedBody.clientId)
         )
-        .leftJoin(
-          'supported_country_currency as scc',
-          'scc.country_id',
-          'trainer.country_id'
-        )
+        .leftJoin('supported_country_currency as scc', 'scc.country_id', 'trainer.country_id')
         .leftJoin('currency', 'currency.id', 'scc.currency_id')
         .select(({ ref }) => [
           ref('ss.name').as('sessionName'),
@@ -285,9 +261,7 @@ export async function POST(request: NextRequest) {
           ref('client.email').as('email'),
           ref('client.first_name').as('firstName'),
           ref('client.last_name').as('lastName'),
-          sql<string>`COALESCE(trainer.online_bookings_contact_email, trainer.email)`.as(
-            'serviceProviderEmail'
-          ),
+          sql<string>`COALESCE(trainer.online_bookings_contact_email, trainer.email)`.as('serviceProviderEmail'),
           sql<string>`COALESCE(trainer.business_name, trainer.first_name || COALESCE(' ' || trainer.last_name, ''))`.as(
             'serviceProviderBusinessName'
           ),
@@ -326,7 +300,7 @@ export async function POST(request: NextRequest) {
           state: 'invited',
           invite_time: sql<Date>`NOW()`,
         })
-        .onConflict(oc =>
+        .onConflict((oc) =>
           oc.columns(['session_id', 'client_id']).doUpdateSet({
             state: 'invited',
             invite_time: sql<Date>`NOW()`,
@@ -349,23 +323,12 @@ export async function POST(request: NextRequest) {
         timeZone: details.timezone,
       }).formatRange(details.start, details.end)
 
-      const eventPrice = formatEventPrice(
-        details.price,
-        details.locale,
-        details.currency
-      )
+      const eventPrice = formatEventPrice(details.price, details.locale, details.currency)
 
-      const acceptLink = new URL(
-        `/api/sessionInvitationLinks/${clientSessionId}?action=accept`,
-        baseUrl
-      )
-      const declineLink = new URL(
-        `/api/sessionInvitationLinks/${clientSessionId}?action=decline`,
-        baseUrl
-      )
+      const acceptLink = new URL(`/api/sessionInvitationLinks/${clientSessionId}?action=accept`, baseUrl)
+      const declineLink = new URL(`/api/sessionInvitationLinks/${clientSessionId}?action=decline`, baseUrl)
 
-      const senderName =
-        details.serviceProviderBusinessName.trim() || `${APP_NAME} Team`
+      const senderName = details.serviceProviderBusinessName.trim() || `${APP_NAME} Team`
 
       const html = buildInvitationEmail({
         businessName: details.serviceProviderBusinessName,
@@ -439,8 +402,7 @@ export async function POST(request: NextRequest) {
         buildErrorResponse({
           status: 404,
           title: 'Client or session not found',
-          detail:
-            'We could not find the specified client or session for the authenticated trainer.',
+          detail: 'We could not find the specified client or session for the authenticated trainer.',
           type: '/client-or-session-not-found',
         }),
         { status: 404 }
@@ -464,8 +426,7 @@ export async function POST(request: NextRequest) {
         buildErrorResponse({
           status: 409,
           title: 'Appointment has already started',
-          detail:
-            'This appointment has already started and invitations can no longer be sent.',
+          detail: 'This appointment has already started and invitations can no longer be sent.',
           type: '/appointment-has-already-started',
         }),
         { status: 409 }

@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  buildErrorResponse,
-  extractAccessToken,
-} from '../../_lib/accessToken'
+import { buildErrorResponse, extractAccessToken } from '../../_lib/accessToken'
 
 const FIFTEEN_MINUTES_IN_MS = 15 * 60 * 1000
 
 const paramsSchema = z.object({
-  userId: z
-    .string()
-    .trim()
-    .min(1, 'User id is required')
-    .uuid({ message: 'User id must be a valid UUID' }),
+  userId: z.string().trim().min(1, 'User id is required').uuid({ message: 'User id must be a valid UUID' }),
 })
 
 const responseSchema = z.object({
@@ -26,17 +19,13 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid user identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected user identifier schema.',
+        detail: detail || 'Request parameters did not match the expected user identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -96,8 +85,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse member data from database',
-          detail:
-            'Member data did not match the expected response schema.',
+          detail: 'Member data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

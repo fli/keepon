@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server'
 import { headers as nextHeaders } from 'next/headers'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 
-const baseUrl =
-  'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+const baseUrl = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
 
 const placeAutocompleteMatchedSubstringSchema = z.object({
   length: z.number(),
@@ -21,13 +17,9 @@ const placeAutocompletePredictionSchema = z
     structured_formatting: z
       .object({
         main_text: z.string(),
-        main_text_matched_substrings: z.array(
-          placeAutocompleteMatchedSubstringSchema
-        ),
+        main_text_matched_substrings: z.array(placeAutocompleteMatchedSubstringSchema),
         secondary_text: z.string(),
-        secondary_text_matched_substrings: z
-          .array(placeAutocompleteMatchedSubstringSchema)
-          .optional(),
+        secondary_text_matched_substrings: z.array(placeAutocompleteMatchedSubstringSchema).optional(),
       })
       .strict(),
     terms: z.array(
@@ -46,14 +38,7 @@ const placeAutocompletePredictionSchema = z
 const placesAutocompleteResponseSchema = z
   .object({
     predictions: z.array(placeAutocompletePredictionSchema),
-    status: z.enum([
-      'OK',
-      'ZERO_RESULTS',
-      'INVALID_REQUEST',
-      'OVER_QUERY_LIMIT',
-      'REQUEST_DENIED',
-      'UNKNOWN_ERROR',
-    ]),
+    status: z.enum(['OK', 'ZERO_RESULTS', 'INVALID_REQUEST', 'OVER_QUERY_LIMIT', 'REQUEST_DENIED', 'UNKNOWN_ERROR']),
   })
   .extend({
     error_message: z.string().optional(),
@@ -81,16 +66,14 @@ export async function GET(request: Request) {
   }
 
   const rawApiKey = process.env.GOOGLE_API_KEY
-  const googleApiKey =
-    typeof rawApiKey === 'string' ? rawApiKey.trim() : undefined
+  const googleApiKey = typeof rawApiKey === 'string' ? rawApiKey.trim() : undefined
 
   if (!googleApiKey) {
     return NextResponse.json(
       buildErrorResponse({
         status: 500,
         title: 'Google API key not configured',
-        detail:
-          'The GOOGLE_API_KEY environment variable is missing or empty.',
+        detail: 'The GOOGLE_API_KEY environment variable is missing or empty.',
         type: '/missing-configuration',
       }),
       { status: 500 }
@@ -107,9 +90,7 @@ export async function GET(request: Request) {
     googleUrl.searchParams.set('key', googleApiKey)
 
     const headers = new Headers()
-    const acceptLanguage = sanitizeHeaderValue(
-      (await nextHeaders()).get('accept-language')
-    )
+    const acceptLanguage = sanitizeHeaderValue((await nextHeaders()).get('accept-language'))
     if (acceptLanguage) {
       headers.set('Accept-Language', acceptLanguage)
     }
@@ -134,21 +115,16 @@ export async function GET(request: Request) {
     }
 
     const responseJson: unknown = await response.json()
-    const parseResult =
-      placesAutocompleteResponseSchema.safeParse(responseJson)
+    const parseResult = placesAutocompleteResponseSchema.safeParse(responseJson)
 
     if (!parseResult.success) {
-      console.error(
-        'Failed to parse Google Places autocomplete response',
-        parseResult.error
-      )
+      console.error('Failed to parse Google Places autocomplete response', parseResult.error)
 
       return NextResponse.json(
         buildErrorResponse({
           status: 502,
           title: 'Invalid place suggestions response',
-          detail:
-            'The Google Places API response did not match the expected schema.',
+          detail: 'The Google Places API response did not match the expected schema.',
           type: '/invalid-response',
         }),
         { status: 502 }

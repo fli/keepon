@@ -1,12 +1,6 @@
 import { z } from 'zod'
 
-export const paymentPlanStatusSchema = z.enum([
-  'active',
-  'cancelled',
-  'ended',
-  'paused',
-  'pending',
-])
+export const paymentPlanStatusSchema = z.enum(['active', 'cancelled', 'ended', 'paused', 'pending'])
 
 export type PaymentPlanStatus = z.infer<typeof paymentPlanStatusSchema>
 
@@ -65,75 +59,52 @@ export const toIsoString = (value: Date | string) => {
   return date.toISOString()
 }
 
-export const toOptionalIsoString = (
-  value: Date | string | null | undefined
-) => {
+export const toOptionalIsoString = (value: Date | string | null | undefined) => {
   if (value === null || value === undefined) {
     return null
   }
   return toIsoString(value)
 }
 
-export const parseAmount = (
-  value: string | number | null,
-  label: string
-): string | null => {
+export const parseAmount = (value: string | number | null, label: string): string | null => {
   if (value === null || value === undefined) {
     return null
   }
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(
-        `Invalid ${label} value encountered in payment plan record`
-      )
+      throw new Error(`Invalid ${label} value encountered in payment plan record`)
     }
     return value.toFixed(2)
   }
   const trimmed = value.trim()
   if (trimmed.length === 0) {
-    throw new Error(
-      `Empty ${label} value encountered in payment plan record`
-    )
+    throw new Error(`Empty ${label} value encountered in payment plan record`)
   }
   return trimmed
 }
 
-export const parseRequiredAmount = (
-  value: string | number,
-  label: string
-): string => {
+export const parseRequiredAmount = (value: string | number, label: string): string => {
   const result = parseAmount(value, label)
   if (result === null) {
-    throw new Error(
-      `Missing ${label} value encountered in payment plan record`
-    )
+    throw new Error(`Missing ${label} value encountered in payment plan record`)
   }
   return result
 }
 
-export const parseNumberValue = (
-  value: number | string,
-  label: string
-): number => {
+export const parseNumberValue = (value: number | string, label: string): number => {
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(
-        `Invalid ${label} value encountered in payment plan record`
-      )
+      throw new Error(`Invalid ${label} value encountered in payment plan record`)
     }
     return value
   }
   const trimmed = value.trim()
   if (trimmed.length === 0) {
-    throw new Error(
-      `Empty ${label} value encountered in payment plan record`
-    )
+    throw new Error(`Empty ${label} value encountered in payment plan record`)
   }
   const numeric = Number(trimmed)
   if (Number.isNaN(numeric)) {
-    throw new Error(
-      `Invalid ${label} value encountered in payment plan record`
-    )
+    throw new Error(`Invalid ${label} value encountered in payment plan record`)
   }
   return numeric
 }

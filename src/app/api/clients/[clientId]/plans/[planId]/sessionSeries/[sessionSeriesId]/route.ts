@@ -1,32 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import {
-  db,
-  sql,
-  type Selectable,
-  type VwLegacyPayment,
-} from '@/lib/db'
+import { db, sql, type Selectable, type VwLegacyPayment } from '@/lib/db'
 import { z, ZodError } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../../../../_lib/accessToken'
-import {
-  normalizePlanRow,
-  type RawPlanRow,
-} from '../../../../../../plans/shared'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../../../../_lib/accessToken'
+import { normalizePlanRow, type RawPlanRow } from '../../../../../../plans/shared'
 import { paymentSchema } from '../../../../../../_lib/clientSessionsSchema'
 
 const paramsSchema = z.object({
-  clientId: z
-    .string()
-    .trim()
-    .min(1, 'Client id is required.')
-    .uuid({ message: 'Client id must be a valid UUID.' }),
-  planId: z
-    .string()
-    .trim()
-    .min(1, 'Plan id is required.')
-    .uuid({ message: 'Plan id must be a valid UUID.' }),
+  clientId: z.string().trim().min(1, 'Client id is required.').uuid({ message: 'Client id must be a valid UUID.' }),
+  planId: z.string().trim().min(1, 'Plan id is required.').uuid({ message: 'Plan id must be a valid UUID.' }),
   sessionSeriesId: z
     .string()
     .trim()
@@ -146,22 +127,16 @@ const adaptPaymentRow = (row: RawPaymentRow) => {
     throw new Error('Payment row is missing updatedAt')
   }
 
-  const paidAmount =
-    row.paidAmount === null || row.paidAmount === undefined ? 0 : row.paidAmount
+  const paidAmount = row.paidAmount === null || row.paidAmount === undefined ? 0 : row.paidAmount
 
   return paymentSchema.parse({
     trainerId: row.trainerId,
     id: row.id,
     paymentType: row.paymentType,
-    contributionAmount:
-      row.contributionAmount === null ? null : row.contributionAmount,
+    contributionAmount: row.contributionAmount === null ? null : row.contributionAmount,
     paidAmount,
-    paymentMethod:
-      row.paymentMethod === null ? null : String(row.paymentMethod),
-    paidDate:
-      row.paidDate === null || row.paidDate === undefined
-        ? null
-        : (row.paidDate as Date | string),
+    paymentMethod: row.paymentMethod === null ? null : String(row.paymentMethod),
+    paidDate: row.paidDate === null || row.paidDate === undefined ? null : (row.paidDate as Date | string),
     status: row.status,
     stripeCharge: row.stripeCharge ?? null,
     stripeRefund: row.stripeRefund ?? null,
@@ -190,10 +165,7 @@ const normalizeDeletedCount = (value: unknown) => {
   return 0
 }
 
-const toDateOrThrow = (
-  value: Date | string | number | null | undefined,
-  label: string
-) => {
+const toDateOrThrow = (value: Date | string | number | null | undefined, label: string) => {
   if (value === 'infinity' || value === Infinity) {
     return MAX_TIME
   }
@@ -234,10 +206,7 @@ const toDateOrThrow = (
   throw new Error(`${label} is invalid`)
 }
 
-const normalizeNumericString = (
-  value: string | number | null | undefined,
-  label: string
-) => {
+const normalizeNumericString = (value: string | number | null | undefined, label: string) => {
   if (value === null || value === undefined) {
     throw new Error(`${label} is missing`)
   }
@@ -264,31 +233,21 @@ const normalizeNumericString = (
   throw new Error(`${label} is invalid`)
 }
 
-const addWeeks = (date: Date, weeks: number) =>
-  new Date(date.getTime() + weeks * MS_PER_WEEK)
+const addWeeks = (date: Date, weeks: number) => new Date(date.getTime() + weeks * MS_PER_WEEK)
 
-const normalizeSessionDetail = (
-  row: SessionDetailRow,
-  index: number
-): NormalizedSessionDetail => {
+const normalizeSessionDetail = (row: SessionDetailRow, index: number): NormalizedSessionDetail => {
   if (!row.client_session_id) {
     throw new ClientNotPartOfAppointmentsError()
   }
 
   return {
     clientSessionId: row.client_session_id,
-    sessionStart: toDateOrThrow(
-      row.session_start,
-      `session start at index ${index}`
-    ),
+    sessionStart: toDateOrThrow(row.session_start, `session start at index ${index}`),
     paid: Boolean(row.paid),
     saleId: row.sale_id ?? null,
     duration: row.duration ?? null,
     location: row.location ?? null,
-    price: normalizeNumericString(
-      row.price,
-      `session price at index ${index}`
-    ),
+    price: normalizeNumericString(row.price, `session price at index ${index}`),
   }
 }
 
@@ -296,17 +255,13 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Request parameters did not match the expected schema.',
+        detail: detail || 'Request parameters did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -314,8 +269,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while attaching subscription session series',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while attaching subscription session series',
   })
 
   if (!authorization.ok) {
@@ -325,7 +279,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const { clientId, planId, sessionSeriesId } = paramsResult.data
 
   try {
-    const result = await db.transaction().execute(async trx => {
+    const result = await db.transaction().execute(async (trx) => {
       const sessionDetailsResult = await sql<SessionDetailRow>`
         SELECT
           client_session.id AS client_session_id,
@@ -346,9 +300,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
          AND client_session.client_id = ${clientId}
       `.execute(trx)
 
-      const sessionDetails = sessionDetailsResult.rows.map((row, index) =>
-        normalizeSessionDetail(row, index)
-      )
+      const sessionDetails = sessionDetailsResult.rows.map((row, index) => normalizeSessionDetail(row, index))
 
       if (sessionDetails.length === 0) {
         throw new AppointmentSeriesNotFoundError()
@@ -358,9 +310,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         .selectFrom('payment_plan as plan')
         .select(({ ref }) => [
           ref('plan.end_').as('end'),
-          ref('plan.frequency_weekly_interval').as(
-            'frequencyWeeklyInterval'
-          ),
+          ref('plan.frequency_weekly_interval').as('frequencyWeeklyInterval'),
         ])
         .where('plan.id', '=', planId)
         .where('plan.client_id', '=', clientId)
@@ -378,12 +328,9 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       }
 
       if (planEnd.getTime() !== MAX_TIME.getTime()) {
-        const maxAllowedDate = addWeeks(
-          planEnd,
-          planDetails.frequencyWeeklyInterval ?? 0
-        )
-        const hasOutOfRangeSessions = sessionDetails.some(detail =>
-          detail.sessionStart.getTime() > maxAllowedDate.getTime()
+        const maxAllowedDate = addWeeks(planEnd, planDetails.frequencyWeeklyInterval ?? 0)
+        const hasOutOfRangeSessions = sessionDetails.some(
+          (detail) => detail.sessionStart.getTime() > maxAllowedDate.getTime()
         )
 
         if (hasOutOfRangeSessions) {
@@ -391,7 +338,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         }
       }
 
-      const unpaidSessions = sessionDetails.filter(detail => !detail.paid)
+      const unpaidSessions = sessionDetails.filter((detail) => !detail.paid)
       const paymentIds: string[] = []
 
       for (const session of unpaidSessions) {
@@ -524,12 +471,10 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         .execute()) as RawPaymentRow[]
 
       if (paymentRows.length !== paymentIds.length) {
-        throw new PaymentDataMismatchError(
-          `Expected ${paymentIds.length} payments, received ${paymentRows.length}`
-        )
+        throw new PaymentDataMismatchError(`Expected ${paymentIds.length} payments, received ${paymentRows.length}`)
       }
 
-      const payments = paymentRows.map(row => adaptPaymentRow(row))
+      const payments = paymentRows.map((row) => adaptPaymentRow(row))
 
       return { plan, payments }
     })
@@ -541,8 +486,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Appointment series not found',
-          detail:
-            'We could not find the requested session series for this client and trainer.',
+          detail: 'We could not find the requested session series for this client and trainer.',
           type: '/resource-not-found',
         }),
         { status: 404 }
@@ -554,8 +498,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client not part of appointment series',
-          detail:
-            'The specified client is not assigned to the requested session series.',
+          detail: 'The specified client is not assigned to the requested session series.',
           type: '/resource-not-found',
         }),
         { status: 404 }
@@ -567,8 +510,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Subscription not found',
-          detail:
-            'We could not find a subscription with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a subscription with the specified identifier for the authenticated trainer.',
           type: '/resource-not-found',
         }),
         { status: 404 }
@@ -592,8 +534,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 409,
           title: 'Appointments are past the subscription end date',
-          detail:
-            'One or more appointments occur after the subscription end date, so they cannot be attached.',
+          detail: 'One or more appointments occur after the subscription end date, so they cannot be attached.',
           type: '/appointments-past-subscription-end',
         }),
         { status: 409 }
@@ -601,23 +542,19 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     }
 
     if (error instanceof PaymentDataMismatchError) {
-      console.error(
-        'Payment data mismatch while attaching subscription session series',
-        {
-          trainerId: authorization.trainerId,
-          clientId,
-          planId,
-          sessionSeriesId,
-          error: error.message,
-        }
-      )
+      console.error('Payment data mismatch while attaching subscription session series', {
+        trainerId: authorization.trainerId,
+        clientId,
+        planId,
+        sessionSeriesId,
+        error: error.message,
+      })
 
       return NextResponse.json(
         buildErrorResponse({
           status: 500,
           title: 'Failed to retrieve subscription payments',
-          detail:
-            'Updated client sessions did not match the expected payment records.',
+          detail: 'Updated client sessions did not match the expected payment records.',
           type: '/payment-data-mismatch',
         }),
         { status: 500 }
@@ -629,24 +566,20 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse subscription data from database',
-          detail:
-            'Subscription or payment data did not match the expected response schema.',
+          detail: 'Subscription or payment data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
       )
     }
 
-    console.error(
-      'Failed to attach session series to subscription',
-      {
-        trainerId: authorization.trainerId,
-        clientId,
-        planId,
-        sessionSeriesId,
-        error,
-      }
-    )
+    console.error('Failed to attach session series to subscription', {
+      trainerId: authorization.trainerId,
+      clientId,
+      planId,
+      sessionSeriesId,
+      error,
+    })
 
     return NextResponse.json(
       buildErrorResponse({
@@ -663,17 +596,13 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Request parameters did not match the expected schema.',
+        detail: detail || 'Request parameters did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -681,8 +610,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while removing subscription session series',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while removing subscription session series',
   })
 
   if (!authorization.ok) {
@@ -692,7 +620,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   const { clientId, planId, sessionSeriesId } = paramsResult.data
 
   try {
-    const result = await db.transaction().execute(async trx => {
+    const result = await db.transaction().execute(async (trx) => {
       const planExists = await trx
         .selectFrom('payment_plan as plan')
         .select('plan.id')
@@ -725,7 +653,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
 
       if (clientSessions.length > 0) {
         const paymentIds = clientSessions
-          .map(row => row.payment_id)
+          .map((row) => row.payment_id)
           .filter((value): value is string => typeof value === 'string')
 
         if (paymentIds.length > 0) {
@@ -738,9 +666,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
           const deletedCount = normalizeDeletedCount(deleteResult?.numDeletedRows)
 
           if (deletedCount !== paymentIds.length) {
-            throw new PaymentDeletionMismatchError(
-              `Deleted ${deletedCount} of ${paymentIds.length} payment records`
-            )
+            throw new PaymentDeletionMismatchError(`Deleted ${deletedCount} of ${paymentIds.length} payment records`)
           }
         }
       }
@@ -762,7 +688,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
       const clientSessionIds = Array.from(
         new Set(
           clientSessions
-            .map(row => row.client_session_id)
+            .map((row) => row.client_session_id)
             .filter((value): value is string => typeof value === 'string')
         )
       )
@@ -784,7 +710,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         )
       }
 
-      const payments = paymentRows.map(row => adaptPaymentRow(row))
+      const payments = paymentRows.map((row) => adaptPaymentRow(row))
 
       return { plan, payments }
     })
@@ -796,8 +722,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Subscription not found',
-          detail:
-            'We could not find a subscription with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a subscription with the specified identifier for the authenticated trainer.',
           type: '/resource-not-found',
         }),
         { status: 404 }
@@ -805,23 +730,19 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
     }
 
     if (error instanceof PaymentDeletionMismatchError) {
-      console.error(
-        'Payment deletion mismatch while removing subscription session series',
-        {
-          trainerId: authorization.trainerId,
-          clientId,
-          planId,
-          sessionSeriesId,
-          error: error.message,
-        }
-      )
+      console.error('Payment deletion mismatch while removing subscription session series', {
+        trainerId: authorization.trainerId,
+        clientId,
+        planId,
+        sessionSeriesId,
+        error: error.message,
+      })
 
       return NextResponse.json(
         buildErrorResponse({
           status: 500,
           title: 'Failed to remove subscription payments',
-          detail:
-            'Deleted payment count did not match the expected number of subscription payments.',
+          detail: 'Deleted payment count did not match the expected number of subscription payments.',
           type: '/payment-deletion-mismatch',
         }),
         { status: 500 }
@@ -829,23 +750,19 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
     }
 
     if (error instanceof PaymentDataMismatchError) {
-      console.error(
-        'Payment data mismatch while fetching subscription payments after deletion',
-        {
-          trainerId: authorization.trainerId,
-          clientId,
-          planId,
-          sessionSeriesId,
-          error: error.message,
-        }
-      )
+      console.error('Payment data mismatch while fetching subscription payments after deletion', {
+        trainerId: authorization.trainerId,
+        clientId,
+        planId,
+        sessionSeriesId,
+        error: error.message,
+      })
 
       return NextResponse.json(
         buildErrorResponse({
           status: 500,
           title: 'Failed to retrieve subscription payments',
-          detail:
-            'Updated client sessions did not match the expected payment records.',
+          detail: 'Updated client sessions did not match the expected payment records.',
           type: '/payment-data-mismatch',
         }),
         { status: 500 }
@@ -857,24 +774,20 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse subscription data from database',
-          detail:
-            'Subscription or payment data did not match the expected response schema.',
+          detail: 'Subscription or payment data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
       )
     }
 
-    console.error(
-      'Failed to remove session series from subscription',
-      {
-        trainerId: authorization.trainerId,
-        clientId,
-        planId,
-        sessionSeriesId,
-        error,
-      }
-    )
+    console.error('Failed to remove session series from subscription', {
+      trainerId: authorization.trainerId,
+      clientId,
+      planId,
+      sessionSeriesId,
+      error,
+    })
 
     return NextResponse.json(
       buildErrorResponse({

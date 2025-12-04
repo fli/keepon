@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 
 const paramsSchema = z.object({
   saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }),
@@ -16,7 +13,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -29,8 +26,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   const auth = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while requesting payment',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while requesting payment',
   })
 
   if (!auth.ok) {

@@ -1,21 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
-import {
-  adaptFinanceItemRow,
-  financeItemSchema,
-  type FinanceItemRow,
-} from '../shared'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { adaptFinanceItemRow, financeItemSchema, type FinanceItemRow } from '../shared'
 
 const paramsSchema = z.object({
-  financeItemId: z
-    .string()
-    .trim()
-    .min(1, 'Finance item id is required'),
+  financeItemId: z.string().trim().min(1, 'Finance item id is required'),
 })
 
 const deleteResponseSchema = z.object({
@@ -24,18 +14,14 @@ const deleteResponseSchema = z.object({
 
 const requestBodySchema = z
   .object({
-    name: z
-      .string({ message: 'name must be a string.' })
-      .trim()
-      .min(1, 'name must not be empty.')
-      .optional(),
+    name: z.string({ message: 'name must be a string.' }).trim().min(1, 'name must not be empty.').optional(),
     amount: z
       .number({ message: 'amount must be a number.' })
       .refine(Number.isFinite, { message: 'amount must be a finite number.' })
       .optional(),
     startDate: z
       .union([z.string(), z.date()])
-      .transform(value => {
+      .transform((value) => {
         const date = value instanceof Date ? value : new Date(value)
         if (Number.isNaN(date.getTime())) {
           throw new Error('startDate must be a valid date-time value.')
@@ -60,17 +46,13 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Finance item identifier parameter did not match the expected schema.',
+        detail: detail || 'Finance item identifier parameter did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -80,8 +62,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const { financeItemId } = paramsResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching finance item',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching finance item',
   })
 
   if (!authorization.ok) {
@@ -113,8 +94,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Finance item not found',
-          detail:
-            'We could not find a finance item with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a finance item with the specified identifier for the authenticated trainer.',
           type: '/finance-item-not-found',
         }),
         { status: 404 }
@@ -130,20 +110,14 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse finance item data from database',
-          detail:
-            'Finance item data did not match the expected response schema.',
+          detail: 'Finance item data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
       )
     }
 
-    console.error(
-      'Failed to fetch finance item',
-      authorization.trainerId,
-      financeItemId,
-      error
-    )
+    console.error('Failed to fetch finance item', authorization.trainerId, financeItemId, error)
 
     return NextResponse.json(
       buildErrorResponse({
@@ -160,17 +134,13 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Finance item identifier parameter did not match the expected schema.',
+        detail: detail || 'Finance item identifier parameter did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -198,9 +168,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     const bodyResult = requestBodySchema.safeParse(rawBody)
 
     if (!bodyResult.success) {
-      const detail = bodyResult.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
@@ -231,13 +199,10 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     )
   }
 
-  const hasUpdates = Object.values(parsedBody).some(
-    value => value !== undefined
-  )
+  const hasUpdates = Object.values(parsedBody).some((value) => value !== undefined)
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating finance item',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating finance item',
   })
 
   if (!authorization.ok) {
@@ -272,9 +237,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         throw new FinanceItemNotFoundError()
       }
 
-      const financeItem = financeItemSchema.parse(
-        adaptFinanceItemRow(financeItemRow)
-      )
+      const financeItem = financeItemSchema.parse(adaptFinanceItemRow(financeItemRow))
 
       return NextResponse.json(financeItem)
     } catch (error) {
@@ -283,8 +246,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           buildErrorResponse({
             status: 404,
             title: 'Finance item not found',
-            detail:
-              'We could not find a finance item with the specified identifier for the authenticated trainer.',
+            detail: 'We could not find a finance item with the specified identifier for the authenticated trainer.',
             type: '/finance-item-not-found',
           }),
           { status: 404 }
@@ -296,8 +258,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           buildErrorResponse({
             status: 500,
             title: 'Failed to parse finance item data from database',
-            detail:
-              'Finance item data did not match the expected response schema.',
+            detail: 'Finance item data did not match the expected response schema.',
             type: '/invalid-response',
           }),
           { status: 500 }
@@ -331,8 +292,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
     if (parsedBody.name !== undefined) updates.name = parsedBody.name
     if (parsedBody.amount !== undefined) updates.amount = parsedBody.amount
-    if (parsedBody.startDate !== undefined)
-      updates.start_date = parsedBody.startDate
+    if (parsedBody.startDate !== undefined) updates.start_date = parsedBody.startDate
     if (parsedBody.imageUrl !== undefined) updates.image_url = parsedBody.imageUrl
 
     const updated = await db
@@ -353,9 +313,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       throw new FinanceItemNotFoundError()
     }
 
-    const financeItem = financeItemSchema.parse(
-      adaptFinanceItemRow(financeItemRow)
-    )
+    const financeItem = financeItemSchema.parse(adaptFinanceItemRow(financeItemRow))
 
     return NextResponse.json(financeItem)
   } catch (error) {
@@ -364,8 +322,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Finance item not found',
-          detail:
-            'We could not find a finance item with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a finance item with the specified identifier for the authenticated trainer.',
           type: '/finance-item-not-found',
         }),
         { status: 404 }
@@ -377,8 +334,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to validate finance item update response',
-          detail:
-            'Finance item update response did not match the expected schema.',
+          detail: 'Finance item update response did not match the expected schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
@@ -406,17 +362,13 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Finance item identifier parameter did not match the expected schema.',
+        detail: detail || 'Finance item identifier parameter did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -438,8 +390,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while deleting finance item',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while deleting finance item',
   })
 
   if (!authorization.ok) {
@@ -459,8 +410,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Finance item not found',
-          detail:
-            'We could not find a finance item with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a finance item with the specified identifier for the authenticated trainer.',
           type: '/finance-item-not-found',
         }),
         { status: 404 }
@@ -476,8 +426,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to validate finance item deletion response',
-          detail:
-            'Finance item deletion response did not match the expected schema.',
+          detail: 'Finance item deletion response did not match the expected schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

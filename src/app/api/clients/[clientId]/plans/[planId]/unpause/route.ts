@@ -1,26 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../../../_lib/accessToken'
-import {
-  normalizePlanRow,
-  type RawPlanRow,
-} from '../../../../../plans/shared'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../../../_lib/accessToken'
+import { normalizePlanRow, type RawPlanRow } from '../../../../../plans/shared'
 
 const paramsSchema = z.object({
-  clientId: z
-    .string()
-    .trim()
-    .min(1, 'Client id is required')
-    .uuid({ message: 'Client id must be a valid UUID.' }),
-  planId: z
-    .string()
-    .trim()
-    .min(1, 'Plan id is required')
-    .uuid({ message: 'Plan id must be a valid UUID.' }),
+  clientId: z.string().trim().min(1, 'Client id is required').uuid({ message: 'Client id must be a valid UUID.' }),
+  planId: z.string().trim().min(1, 'Plan id is required').uuid({ message: 'Plan id must be a valid UUID.' }),
 })
 
 type HandlerContext = RouteContext<'/api/clients/[clientId]/plans/[planId]/unpause'>
@@ -43,17 +29,13 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Request parameters did not match the expected schema.',
+        detail: detail || 'Request parameters did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -61,8 +43,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while unpausing subscription',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while unpausing subscription',
   })
 
   if (!authorization.ok) {
@@ -72,7 +53,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const { clientId, planId } = paramsResult.data
 
   try {
-    const plan = await db.transaction().execute(async trx => {
+    const plan = await db.transaction().execute(async (trx) => {
       const planDetails = await trx
         .selectFrom('payment_plan as plan')
         .select(({ ref }) => [ref('plan.status').as('status')])
@@ -135,8 +116,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Subscription not found',
-          detail:
-            'We could not find a subscription with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a subscription with the specified identifier for the authenticated trainer.',
           type: '/resource-not-found',
         }),
         { status: 404 }
@@ -167,13 +147,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       )
     }
 
-    console.error(
-      'Failed to unpause subscription',
-      authorization.trainerId,
-      clientId,
-      planId,
-      error
-    )
+    console.error('Failed to unpause subscription', authorization.trainerId, clientId, planId, error)
 
     return NextResponse.json(
       buildErrorResponse({

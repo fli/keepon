@@ -35,7 +35,7 @@ export async function createSaleForTrainer(
 ): Promise<z.infer<typeof saleIdSchema>> {
   const parsed = createSaleSchema.parse(payload)
 
-  const created = await db.transaction().execute(async trx => {
+  const created = await db.transaction().execute(async (trx) => {
     const sale = await trx
       .insertInto('sale')
       .values({
@@ -43,8 +43,7 @@ export async function createSaleForTrainer(
         client_id: parsed.clientId,
         note: parsed.note ?? '',
         due_time: parseDueAfter(parsed.dueAfter),
-        payment_request_pass_on_transaction_fee:
-          parsed.paymentRequestPassOnTransactionFee ?? false,
+        payment_request_pass_on_transaction_fee: parsed.paymentRequestPassOnTransactionFee ?? false,
       })
       .returning('id')
       .executeTakeFirst()
@@ -53,10 +52,7 @@ export async function createSaleForTrainer(
       throw new Error('Failed to create sale')
     }
 
-    await trx
-      .insertInto('sale_payment_status')
-      .values({ sale_id: sale.id, payment_status: 'none' })
-      .execute()
+    await trx.insertInto('sale_payment_status').values({ sale_id: sale.id, payment_status: 'none' }).execute()
 
     if (parsed.clientSessionId) {
       const updated = await trx

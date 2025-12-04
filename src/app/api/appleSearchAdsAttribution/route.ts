@@ -7,7 +7,7 @@ const isoDateTimeString = z
   .string()
   .trim()
   .refine(
-    value => {
+    (value) => {
       if (value.length === 0) {
         return false
       }
@@ -21,15 +21,10 @@ const isoDateTimeString = z
 
 const optionalNullableString = z.union([z.string().trim(), z.null()]).optional()
 
-const optionalNullableIsoDateTime = z
-  .union([isoDateTimeString, z.null()])
-  .optional()
+const optionalNullableIsoDateTime = z.union([isoDateTimeString, z.null()]).optional()
 
 const requestSchema = z.object({
-  anonymousId: z
-    .string({ message: 'anonymousId is required' })
-    .trim()
-    .min(1, 'anonymousId must not be empty'),
+  anonymousId: z.string({ message: 'anonymousId is required' }).trim().min(1, 'anonymousId must not be empty'),
   attribution: z.boolean().nullable().optional(),
   orgName: optionalNullableString,
   orgId: optionalNullableString,
@@ -81,11 +76,9 @@ const createInternalErrorResponse = () =>
     { status: 500 }
   )
 
-const toNullableString = (value: string | null | undefined) =>
-  value ?? null
+const toNullableString = (value: string | null | undefined) => value ?? null
 
-const toNullableIsoDateString = (value: string | null | undefined) =>
-  value ?? null
+const toNullableIsoDateString = (value: string | null | undefined) => value ?? null
 
 type RequestBody = z.infer<typeof requestSchema>
 
@@ -97,19 +90,14 @@ export async function POST(request: Request) {
     const validation = requestSchema.safeParse(rawBody)
 
     if (!validation.success) {
-      const detail = validation.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
       return createInvalidBodyResponse(detail || undefined)
     }
 
     parsedBody = validation.data
   } catch (error) {
-    console.error(
-      'Failed to parse Apple Search Ads attribution payload as JSON',
-      error
-    )
+    console.error('Failed to parse Apple Search Ads attribution payload as JSON', error)
     return createInvalidJsonResponse()
   }
 
@@ -136,7 +124,7 @@ export async function POST(request: Request) {
         creativeset_id: toNullableString(parsedBody.creativesetId),
         creativeset_name: toNullableString(parsedBody.creativesetName),
       })
-      .onConflict(oc => oc.doNothing())
+      .onConflict((oc) => oc.doNothing())
       .execute()
   } catch (error) {
     console.error('Failed to record Apple Search Ads attribution', {

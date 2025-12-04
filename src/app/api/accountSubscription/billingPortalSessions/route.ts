@@ -2,18 +2,11 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import Stripe from 'stripe'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { getStripeClient } from '../../_lib/stripeClient'
 
 const requestBodySchema = z.object({
-  returnUrl: z
-    .string()
-    .trim()
-    .min(1, 'returnUrl is required')
-    .url('returnUrl must be a valid URL'),
+  returnUrl: z.string().trim().min(1, 'returnUrl is required').url('returnUrl must be a valid URL'),
 })
 
 const trainerStripeCustomerSchema = z.object({
@@ -47,7 +40,7 @@ export async function POST(request: Request) {
     const result = requestBodySchema.safeParse(rawBody)
 
     if (!result.success) {
-      const detail = result.error.issues.map(issue => issue.message).join('; ')
+      const detail = result.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
@@ -76,8 +69,7 @@ export async function POST(request: Request) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while creating Stripe billing portal session',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while creating Stripe billing portal session',
   })
 
   if (!authorization.ok) {
@@ -112,9 +104,7 @@ export async function POST(request: Request) {
   try {
     const row = await db
       .selectFrom('trainer')
-      .select(({ ref }) => [
-        ref('trainer.stripe_customer_id').as('stripeCustomerId'),
-      ])
+      .select(({ ref }) => [ref('trainer.stripe_customer_id').as('stripeCustomerId')])
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()
 
@@ -123,8 +113,7 @@ export async function POST(request: Request) {
         buildErrorResponse({
           status: 404,
           title: 'Trainer not found',
-          detail:
-            'No trainer record was found for the authenticated access token.',
+          detail: 'No trainer record was found for the authenticated access token.',
           type: '/trainer-not-found',
         }),
         { status: 404 }
@@ -133,9 +122,7 @@ export async function POST(request: Request) {
 
     const parsedRow = trainerStripeCustomerSchema.safeParse(row)
     if (!parsedRow.success) {
-      const detail = parsedRow.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = parsedRow.error.issues.map((issue) => issue.message).join('; ')
 
       console.error('Failed to parse trainer Stripe customer data', {
         trainerId: authorization.trainerId,
@@ -146,8 +133,7 @@ export async function POST(request: Request) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse trainer data',
-          detail:
-            detail || 'Trainer data did not match the expected schema.',
+          detail: detail || 'Trainer data did not match the expected schema.',
           type: '/invalid-database-response',
         }),
         { status: 500 }
@@ -171,8 +157,7 @@ export async function POST(request: Request) {
         buildErrorResponse({
           status: 500,
           title: 'Stripe configuration missing',
-          detail:
-            'STRIPE_SECRET_KEY is not configured, so Stripe billing portal sessions cannot be created.',
+          detail: 'STRIPE_SECRET_KEY is not configured, so Stripe billing portal sessions cannot be created.',
           type: '/missing-stripe-configuration',
         }),
         { status: 500 }
@@ -190,25 +175,18 @@ export async function POST(request: Request) {
       })
 
       if (!parsedSession.success) {
-        const detail = parsedSession.error.issues
-          .map(issue => issue.message)
-          .join('; ')
+        const detail = parsedSession.error.issues.map((issue) => issue.message).join('; ')
 
-        console.error(
-          'Stripe billing portal session response did not match schema',
-          {
-            trainerId: authorization.trainerId,
-            detail,
-          }
-        )
+        console.error('Stripe billing portal session response did not match schema', {
+          trainerId: authorization.trainerId,
+          detail,
+        })
 
         return NextResponse.json(
           buildErrorResponse({
             status: 500,
             title: 'Failed to validate Stripe billing portal session response',
-            detail:
-              detail ||
-              'Stripe billing portal session response did not match the expected schema.',
+            detail: detail || 'Stripe billing portal session response did not match the expected schema.',
             type: '/invalid-response',
           }),
           { status: 500 }

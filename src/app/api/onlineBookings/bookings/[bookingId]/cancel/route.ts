@@ -5,10 +5,7 @@ import { buildErrorResponse } from '../../../../_lib/accessToken'
 import { APP_EMAIL, APP_NAME, NO_REPLY_EMAIL } from '../../../../_lib/constants'
 
 const paramsSchema = z.object({
-  bookingId: z
-    .string()
-    .trim()
-    .min(1, 'Booking identifier must not be empty'),
+  bookingId: z.string().trim().min(1, 'Booking identifier must not be empty'),
 })
 
 const detailsSchema = z.object({
@@ -56,12 +53,11 @@ const escapeHtml = (value: string) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
 
-const isAppleRelayEmail = (email: string) =>
-  email.toLowerCase().endsWith('@privaterelay.appleid.com')
+const isAppleRelayEmail = (email: string) => email.toLowerCase().endsWith('@privaterelay.appleid.com')
 
 const joinNames = (...parts: Array<string | null | undefined>) =>
   parts
-    .map(part => part?.trim())
+    .map((part) => part?.trim())
     .filter(Boolean)
     .join(' ')
 
@@ -72,14 +68,8 @@ const buildClientEmailHtml = (options: {
   contactDetails: string | null
   brandColor: string
 }) => {
-  const accent =
-    options.brandColor && options.brandColor.trim().length > 0
-      ? options.brandColor
-      : '#111827'
-  const eventName =
-    options.appointmentName?.trim().length ?? 0
-      ? options.appointmentName!.trim()
-      : 'your appointment'
+  const accent = options.brandColor && options.brandColor.trim().length > 0 ? options.brandColor : '#111827'
+  const eventName = (options.appointmentName?.trim().length ?? 0) ? options.appointmentName!.trim() : 'your appointment'
   const contactLine = options.contactDetails
     ? `<tr><td style="font-size:15px;line-height:1.6;color:#374151;padding-top:14px;">If you have any questions please contact ${options.contactDetails}.</td></tr>`
     : ''
@@ -99,9 +89,7 @@ const buildClientEmailHtml = (options: {
             </tr>
             <tr>
               <td style="font-size:16px;line-height:1.6;color:#1f2937;padding-bottom:10px;">
-                We're no longer expecting you for ${escapeHtml(eventName)} on ${escapeHtml(
-                  options.formattedDate
-                )}.
+                We're no longer expecting you for ${escapeHtml(eventName)} on ${escapeHtml(options.formattedDate)}.
               </td>
             </tr>
             ${contactLine}
@@ -134,10 +122,7 @@ const buildTrainerEmailHtml = (options: {
   businessLogoUrl: string | null
   serviceProviderName: string
 }) => {
-  const accent =
-    options.brandColor && options.brandColor.trim().length > 0
-      ? options.brandColor
-      : '#111827'
+  const accent = options.brandColor && options.brandColor.trim().length > 0 ? options.brandColor : '#111827'
   const appointmentText =
     options.appointmentName && options.appointmentName.trim().length > 0
       ? ` for ${escapeHtml(options.appointmentName.trim())}`
@@ -194,9 +179,7 @@ const createInvalidParamsResponse = (detail?: string) =>
     buildErrorResponse({
       status: 400,
       title: 'Invalid booking identifier',
-      detail:
-        detail ||
-        'Request parameters did not match the expected booking identifier schema.',
+      detail: detail || 'Request parameters did not match the expected booking identifier schema.',
       type: '/invalid-parameter',
     }),
     { status: 400 }
@@ -237,16 +220,14 @@ export async function POST(_request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
     return createInvalidParamsResponse(detail)
   }
 
   const { bookingId } = paramsResult.data
 
   try {
-    await db.transaction().execute(async trx => {
+    await db.transaction().execute(async (trx) => {
       const detailsResult = await sql`
         SELECT
           client.email AS "clientEmail",
@@ -314,14 +295,10 @@ export async function POST(_request: NextRequest, context: HandlerContext) {
       })
 
       const formattedDate = formatter.format(details.startsAt)
-      const clientName = joinNames(
-        details.clientFirstName,
-        details.clientLastName
-      )
+      const clientName = joinNames(details.clientFirstName, details.clientLastName)
 
       const unreplyable = isAppleRelayEmail(details.serviceProviderEmail)
-      const contactable =
-        !unreplyable || !!details.serviceProviderContactNumber
+      const contactable = !unreplyable || !!details.serviceProviderContactNumber
 
       const contactDetails = contactable
         ? [
@@ -342,11 +319,7 @@ export async function POST(_request: NextRequest, context: HandlerContext) {
 
       const clientSubject =
         details.eventType === 'group_session'
-          ? `You've cancelled your booking${
-              details.appointmentName
-                ? ` for ${details.appointmentName}`
-                : ''
-            }`
+          ? `You've cancelled your booking${details.appointmentName ? ` for ${details.appointmentName}` : ''}`
           : `You've cancelled ${details.appointmentName ?? 'your appointment'}`
 
       const trainerSubject = `${clientName || 'A client'} has cancelled their booking`
@@ -458,11 +431,7 @@ export async function POST(_request: NextRequest, context: HandlerContext) {
     }
 
     if (error instanceof z.ZodError) {
-      console.error(
-        'Failed to parse booking cancellation data',
-        bookingId,
-        error
-      )
+      console.error('Failed to parse booking cancellation data', bookingId, error)
       return NextResponse.json(
         buildErrorResponse({
           status: 500,

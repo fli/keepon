@@ -1,18 +1,11 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { normalizePlanRow, type RawPlanRow } from './shared'
 
 const querySchema = z.object({
-  clientId: z
-    .string()
-    .trim()
-    .min(1, 'clientId must not be empty')
-    .optional(),
+  clientId: z.string().trim().min(1, 'clientId must not be empty').optional(),
 })
 
 export async function GET(request: Request) {
@@ -23,16 +16,12 @@ export async function GET(request: Request) {
 
   const parsedQuery = querySchema.safeParse(queryParams)
   if (!parsedQuery.success) {
-    const detail = parsedQuery.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = parsedQuery.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid query parameters',
-        detail:
-          detail ||
-          'Request query parameters did not match the expected schema.',
+        detail: detail || 'Request query parameters did not match the expected schema.',
         type: '/invalid-query',
       }),
       { status: 400 }
@@ -40,8 +29,7 @@ export async function GET(request: Request) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching plans',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching plans',
   })
 
   if (!authorization.ok) {
@@ -51,18 +39,13 @@ export async function GET(request: Request) {
   try {
     const { clientId } = parsedQuery.data
 
-    let query = db
-      .selectFrom('vw_legacy_plan as v')
-      .selectAll('v')
-      .where('v.trainerId', '=', authorization.trainerId)
+    let query = db.selectFrom('vw_legacy_plan as v').selectAll('v').where('v.trainerId', '=', authorization.trainerId)
 
     if (clientId) {
       query = query.where('v.clientId', '=', clientId)
     }
 
-    const rows = (await query
-      .orderBy('v.startDate', 'desc')
-      .execute()) as RawPlanRow[]
+    const rows = (await query.orderBy('v.startDate', 'desc').execute()) as RawPlanRow[]
 
     const plans = rows.map(normalizePlanRow)
 

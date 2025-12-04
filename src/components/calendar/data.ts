@@ -86,7 +86,13 @@ export const weekColumns: CalendarDay[] = [
     isToday: true,
     events: [
       { id: 1, name: 'Breakfast', time: '6:00 AM', datetime: '2022-01-12T06:00' },
-      { id: 2, name: 'Flight to Paris', time: '7:30 AM', datetime: '2022-01-12T07:30', location: 'JFK' },
+      {
+        id: 2,
+        name: 'Flight to Paris',
+        time: '7:30 AM',
+        datetime: '2022-01-12T07:30',
+        location: 'JFK',
+      },
     ],
   },
   { label: 'Thu', date: '2022-01-13', events: [] },
@@ -101,8 +107,20 @@ export const weekColumns: CalendarDay[] = [
 
 export const dayEvents: CalendarEvent[] = [
   { id: 1, name: 'Breakfast', time: '6:00 AM', datetime: '2022-01-22T06:00' },
-  { id: 2, name: 'Flight to Paris', time: '7:30 AM', datetime: '2022-01-22T07:30', location: 'JFK' },
-  { id: 3, name: 'Sightseeing', time: '11:00 AM', datetime: '2022-01-22T11:00', location: 'Eiffel Tower' },
+  {
+    id: 2,
+    name: 'Flight to Paris',
+    time: '7:30 AM',
+    datetime: '2022-01-22T07:30',
+    location: 'JFK',
+  },
+  {
+    id: 3,
+    name: 'Sightseeing',
+    time: '11:00 AM',
+    datetime: '2022-01-22T11:00',
+    location: 'Eiffel Tower',
+  },
 ]
 
 export const monthsGrid = [

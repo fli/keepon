@@ -23,18 +23,10 @@ export function LoginForm() {
 
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-          />
+          <Input id="password" name="password" type="password" required autoComplete="current-password" />
         </div>
 
-        {state.error ? (
-          <p className="text-sm text-destructive">{state.error}</p>
-        ) : null}
+        {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? 'Signing in…' : 'Sign in'}

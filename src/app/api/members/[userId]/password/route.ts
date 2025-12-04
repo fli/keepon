@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  buildErrorResponse,
-  extractAccessToken,
-} from '../../../_lib/accessToken'
+import { buildErrorResponse, extractAccessToken } from '../../../_lib/accessToken'
 
 const paramsSchema = z.object({
-  userId: z
-    .string()
-    .trim()
-    .min(1, 'User id is required')
-    .uuid({ message: 'User id must be a valid UUID' }),
+  userId: z.string().trim().min(1, 'User id is required').uuid({ message: 'User id must be a valid UUID' }),
 })
 
 const requestSchema = z.object({
@@ -43,17 +36,13 @@ type HandlerContext = RouteContext<'/api/members/[userId]/password'>
 export async function POST(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid user identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected user identifier schema.',
+        detail: detail || 'Request parameters did not match the expected user identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -65,9 +54,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     const rawBody = (await request.json()) as unknown
     const validation = requestSchema.safeParse(rawBody)
     if (!validation.success) {
-      const detail = validation.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
@@ -81,10 +68,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     }
     parsedBody = validation.data
   } catch (error) {
-    console.error(
-      'Failed to parse member password reset request body as JSON',
-      error
-    )
+    console.error('Failed to parse member password reset request body as JSON', error)
 
     return NextResponse.json(
       buildErrorResponse({
@@ -106,10 +90,8 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const { password } = parsedBody
 
   try {
-    const result = await db
-      .transaction()
-      .execute(async trx => {
-        const update = await sql<{ userId: string }>`
+    const result = await db.transaction().execute(async (trx) => {
+      const update = await sql<{ userId: string }>`
           UPDATE trainer
              SET password_hash = crypt(${password}, gen_salt('bf', 10))
             FROM access_token
@@ -122,19 +104,19 @@ export async function POST(request: NextRequest, context: HandlerContext) {
            RETURNING trainer.user_id AS "userId"
         `.execute(trx)
 
-        const row = update.rows[0]
-        if (!row) {
-          return { ok: false as const }
-        }
+      const row = update.rows[0]
+      if (!row) {
+        return { ok: false as const }
+      }
 
-        await sql`
+      await sql`
           DELETE FROM access_token
            WHERE user_id = ${userId}
              AND type IN ('api', 'password_reset')
         `.execute(trx)
 
-        return { ok: true as const }
-      })
+      return { ok: true as const }
+    })
 
     if (!result.ok) {
       return createTemporaryCodeInvalidResponse()

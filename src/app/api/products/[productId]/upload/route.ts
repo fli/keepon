@@ -4,14 +4,8 @@ import sharp, { type Sharp } from 'sharp'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { getProductById } from '@/server/products'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
-import {
-  PublicBucketNotConfiguredError,
-  uploadBufferToPublicBucket,
-} from '../../../_lib/storage'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
+import { PublicBucketNotConfiguredError, uploadBufferToPublicBucket } from '../../../_lib/storage'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 const allowedExtensions = new Set(['jpg', 'jpeg', 'png', 'gif'])
@@ -35,11 +29,7 @@ const uploadFields = [
 type HandlerContext = { params: Promise<{ productId: string }> }
 
 const paramsSchema = z.object({
-  productId: z
-    .string()
-    .trim()
-    .min(1, 'Product id is required')
-    .uuid({ message: 'Product id must be a valid UUID' }),
+  productId: z.string().trim().min(1, 'Product id is required').uuid({ message: 'Product id must be a valid UUID' }),
 })
 
 const createInvalidParamsResponse = (detail?: string) =>
@@ -47,9 +37,7 @@ const createInvalidParamsResponse = (detail?: string) =>
     buildErrorResponse({
       status: 400,
       title: 'Invalid path parameters',
-      detail:
-        detail ||
-        'Product identifier parameter did not match the expected schema.',
+      detail: detail || 'Product identifier parameter did not match the expected schema.',
       type: '/invalid-path-parameters',
     }),
     { status: 400 }
@@ -60,9 +48,7 @@ const createInvalidBodyResponse = (detail?: string) =>
     buildErrorResponse({
       status: 400,
       title: 'Invalid request body',
-      detail:
-        detail ??
-        'Request body must be multipart/form-data with image file fields.',
+      detail: detail ?? 'Request body must be multipart/form-data with image file fields.',
       type: '/invalid-body',
     }),
     { status: 400 }
@@ -95,8 +81,7 @@ const createNotFoundResponse = () =>
     buildErrorResponse({
       status: 404,
       title: 'Product not found',
-      detail:
-        'We could not find a product with the specified identifier for the authenticated trainer.',
+      detail: 'We could not find a product with the specified identifier for the authenticated trainer.',
       type: '/product-not-found',
     }),
     { status: 404 }
@@ -168,9 +153,7 @@ export async function POST(request: Request, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return createInvalidParamsResponse(detail || undefined)
   }
@@ -178,8 +161,7 @@ export async function POST(request: Request, context: HandlerContext) {
   const { productId } = paramsResult.data
 
   const auth = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while uploading product images',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while uploading product images',
   })
 
   if (!auth.ok) {
@@ -218,13 +200,7 @@ export async function POST(request: Request, context: HandlerContext) {
       try {
         buffer = Buffer.from(await file.arrayBuffer())
       } catch (error) {
-        console.error(
-          'Failed to read product upload buffer',
-          auth.trainerId,
-          productId,
-          field.formKey,
-          error
-        )
+        console.error('Failed to read product upload buffer', auth.trainerId, productId, field.formKey, error)
         return createInvalidBodyResponse('Unable to read uploaded image.')
       }
 
@@ -234,8 +210,7 @@ export async function POST(request: Request, context: HandlerContext) {
         return createInvalidFileTypeResponse()
       }
 
-      const format: OutputFormat =
-        detected.ext.toLowerCase() === 'png' ? 'png' : 'jpg'
+      const format: OutputFormat = detected.ext.toLowerCase() === 'png' ? 'png' : 'jpg'
 
       const square = 'square' in field && field.square === true
 

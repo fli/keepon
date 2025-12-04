@@ -9,38 +9,21 @@ import { cn } from '@/lib/utils'
 
 type Renderable = UseRenderRenderProp<Record<string, unknown>>
 
-interface BaseRenderProps<T extends HTMLElement>
-  extends React.HTMLAttributes<T> {
+interface BaseRenderProps<T extends HTMLElement> extends React.HTMLAttributes<T> {
   render?: Renderable
 }
 
-const Pagination = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLElement>) => (
-  <nav
-    aria-label="Pagination"
-    className={cn('flex w-full items-center justify-between gap-4', className)}
-    {...props}
-  />
+const Pagination = ({ className, ...props }: React.HTMLAttributes<HTMLElement>) => (
+  <nav aria-label="Pagination" className={cn('flex w-full items-center justify-between gap-4', className)} {...props} />
 )
 Pagination.displayName = 'Pagination'
 
-const PaginationContent = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLUListElement>) => (
-  <ul
-    className={cn('flex items-center gap-1 text-sm font-medium', className)}
-    {...props}
-  />
+const PaginationContent = ({ className, ...props }: React.HTMLAttributes<HTMLUListElement>) => (
+  <ul className={cn('flex items-center gap-1 text-sm font-medium', className)} {...props} />
 )
 PaginationContent.displayName = 'PaginationContent'
 
-const PaginationItem = ({
-  className,
-  ...props
-}: React.LiHTMLAttributes<HTMLLIElement>) => (
+const PaginationItem = ({ className, ...props }: React.LiHTMLAttributes<HTMLLIElement>) => (
   <li className={cn('list-none', className)} {...props} />
 )
 PaginationItem.displayName = 'PaginationItem'
@@ -53,14 +36,13 @@ type PaginationLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> &
 function PaginationLink({
   className,
   isActive,
-  render = <a /> as React.ReactElement<Record<string, unknown>>,
+  render = (<a />) as React.ReactElement<Record<string, unknown>>,
   ...props
 }: PaginationLinkProps) {
   const defaultProps = {
     className: cn(
       'flex h-9 min-w-9 items-center justify-center rounded-md border px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
-      isActive &&
-        'border-primary/60 bg-primary text-primary-foreground shadow-xs hover:bg-primary',
+      isActive && 'border-primary/60 bg-primary text-primary-foreground shadow-xs hover:bg-primary',
       className
     ),
     'aria-current': isActive ? 'page' : undefined,
@@ -75,12 +57,11 @@ function PaginationLink({
 }
 PaginationLink.displayName = 'PaginationLink'
 
-type PaginationButtonProps = React.AnchorHTMLAttributes<HTMLAnchorElement> &
-  BaseRenderProps<HTMLAnchorElement>
+type PaginationButtonProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & BaseRenderProps<HTMLAnchorElement>
 
 function PaginationPrevious({
   className,
-  render = <a /> as React.ReactElement<Record<string, unknown>>,
+  render = (<a />) as React.ReactElement<Record<string, unknown>>,
   ...props
 }: PaginationButtonProps) {
   const element = useRender({
@@ -108,7 +89,7 @@ PaginationPrevious.displayName = 'PaginationPrevious'
 
 function PaginationNext({
   className,
-  render = <a /> as React.ReactElement<Record<string, unknown>>,
+  render = (<a />) as React.ReactElement<Record<string, unknown>>,
   ...props
 }: PaginationButtonProps) {
   const element = useRender({
@@ -134,16 +115,10 @@ function PaginationNext({
 }
 PaginationNext.displayName = 'PaginationNext'
 
-const PaginationEllipsis = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLSpanElement>) => (
+const PaginationEllipsis = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => (
   <span
     aria-hidden
-    className={cn(
-      'flex h-9 w-9 items-center justify-center text-muted-foreground',
-      className
-    )}
+    className={cn('flex h-9 w-9 items-center justify-center text-muted-foreground', className)}
     {...props}
   >
     <MoreHorizontal className="size-4" />

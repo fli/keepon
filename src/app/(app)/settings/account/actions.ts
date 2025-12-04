@@ -2,10 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 
-import {
-  changeTrainerPassword,
-  updateTrainerAccount,
-} from '@/server/account'
+import { changeTrainerPassword, updateTrainerAccount } from '@/server/account'
 import { readSessionFromCookies } from '../../../session.server'
 
 export type ActionResult = { status: 'success' | 'error'; message: string }

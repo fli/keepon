@@ -8,9 +8,7 @@ import { KeeponLogo } from '@/components/keepon-logo'
 import { supportedCountryCodes, supportedCountries } from '@/lib/supportedCountries'
 
 const DEFAULT_COUNTRY =
-  supportedCountries.find(country => country.code === 'US')?.code ??
-  supportedCountries[0]?.code ??
-  'US'
+  supportedCountries.find((country) => country.code === 'US')?.code ?? supportedCountries[0]?.code ?? 'US'
 
 const inferDefaultCountry = (reqHeaders: Headers) => {
   const ipCountry = reqHeaders.get('x-vercel-ip-country')?.trim().toUpperCase()

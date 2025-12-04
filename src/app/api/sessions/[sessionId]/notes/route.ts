@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { noteSchema } from '../../../_lib/clientSessionsSchema'
 
 const paramsSchema = z.object({
@@ -18,15 +15,13 @@ const paramsSchema = z.object({
 const requestBodySchema = z.object({
   content: z
     .union([
-      z
-        .string({ message: 'content must be a string or null.' })
-        .transform(value => {
-          const trimmed = value.trim()
-          return trimmed.length > 0 ? trimmed : null
-        }),
+      z.string({ message: 'content must be a string or null.' }).transform((value) => {
+        const trimmed = value.trim()
+        return trimmed.length > 0 ? trimmed : null
+      }),
       z.null({ message: 'content must be a string or null.' }),
     ])
-    .transform(value => {
+    .transform((value) => {
       if (typeof value === 'string') {
         const trimmed = value.trim()
         return trimmed.length > 0 ? trimmed : null
@@ -48,16 +43,13 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail || 'Session id parameter did not match the expected schema.',
+        detail: detail || 'Session id parameter did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -73,9 +65,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     const bodyResult = requestBodySchema.safeParse(rawBody)
 
     if (!bodyResult.success) {
-      const detail = bodyResult.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
@@ -104,8 +94,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating session notes',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating session notes',
   })
 
   if (!authorization.ok) {
@@ -113,7 +102,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   try {
-    const noteRecord = await db.transaction().execute(async trx => {
+    const noteRecord = await db.transaction().execute(async (trx) => {
       const updated = await trx
         .updateTable('session')
         .set({
@@ -149,8 +138,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Session not found',
-          detail:
-            'We could not find a session with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a session with the specified identifier for the authenticated trainer.',
           type: '/session-not-found',
         }),
         { status: 404 }

@@ -3,10 +3,7 @@ import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
 import type { CountryCode } from 'libphonenumber-js'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../_lib/constants'
 
 const paramsSchema = z.object({
@@ -155,8 +152,7 @@ const buildShareEmail = (options: {
   businessLogoUrl: string | null
 }) => {
   const safeProvider = options.serviceProviderName.trim() || APP_NAME
-  const safeAppointment =
-    options.appointmentName.trim() || 'Appointment'
+  const safeAppointment = options.appointmentName.trim() || 'Appointment'
   const logoBlock = options.businessLogoUrl
     ? `<tr><td style="padding-bottom:12px;text-align:center;"><img src="${escapeHtml(
         options.businessLogoUrl
@@ -205,14 +201,12 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Client session id parameter did not match the expected schema.',
+        detail: detail || 'Client session id parameter did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -238,9 +232,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
   const bodyResult = bodySchema.safeParse(body)
   if (!bodyResult.success) {
-    const detail = bodyResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -255,8 +247,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const { method } = bodyResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while sharing client session',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while sharing client session',
   })
 
   if (!authorization.ok) {
@@ -264,7 +255,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   try {
-    await db.transaction().execute(async trx => {
+    await db.transaction().execute(async (trx) => {
       const detailsRow = await trx
         .selectFrom('client_session as cs')
         .innerJoin('session as s', 's.id', 'cs.session_id')
@@ -275,15 +266,11 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         .leftJoin('sms_balance', 'sms_balance.trainer_id', 'trainer.id')
         .select(({ ref }) => [
           ref('cs.booking_id').as('bookingId'),
-          sql<string>`COALESCE(sms_balance.credit_balance, '0')`.as(
-            'smsCreditBalance'
-          ),
+          sql<string>`COALESCE(sms_balance.credit_balance, '0')`.as('smsCreditBalance'),
           sql<string>`COALESCE(trainer.online_bookings_business_name, trainer.business_name, trainer.first_name || COALESCE(' ' || trainer.last_name, ''))`.as(
             'serviceProviderName'
           ),
-          sql<string>`COALESCE(trainer.online_bookings_contact_email, trainer.email)`.as(
-            'serviceProviderEmail'
-          ),
+          sql<string>`COALESCE(trainer.online_bookings_contact_email, trainer.email)`.as('serviceProviderEmail'),
           ref('trainer.brand_color').as('brandColor'),
           ref('trainer.business_logo_url').as('businessLogoUrl'),
           ref('client.email').as('clientEmail'),
@@ -315,11 +302,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       if (wantsSms && !details.clientMobileNumber) {
         throw new ClientHasNoPhoneNumberError()
       }
-      if (
-        method === 'emailAndSms' &&
-        !details.clientEmail &&
-        !details.clientMobileNumber
-      ) {
+      if (method === 'emailAndSms' && !details.clientEmail && !details.clientMobileNumber) {
         throw new ClientHasNoContactInfoError()
       }
 
@@ -334,17 +317,12 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         }
       }
 
-      const formattedStart = formatStartLabel(
-        details.startsAt,
-        details.locale,
-        details.timezone
-      )
+      const formattedStart = formatStartLabel(details.startsAt, details.locale, details.timezone)
       const baseUrl = process.env.BASE_URL ?? 'http://localhost:3001'
       const bookingUrl = new URL(`/book/bookings/${details.bookingId}`, baseUrl)
 
       if (wantsEmail && details.clientEmail) {
-        const senderName =
-          details.serviceProviderName.trim() || `${APP_NAME} Team`
+        const senderName = details.serviceProviderName.trim() || `${APP_NAME} Team`
         const html = buildShareEmail({
           serviceProviderName: details.serviceProviderName,
           appointmentName: details.appointmentName,
@@ -371,10 +349,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       }
 
       if (wantsSms && details.clientMobileNumber) {
-        const toNumber = formatPhoneNumber(
-          details.clientMobileNumber,
-          details.country
-        )
+        const toNumber = formatPhoneNumber(details.clientMobileNumber, details.country)
         const smsBody = `${details.appointmentName} with ${details.serviceProviderName} on ${formattedStart}. More: ${bookingUrl.toString()}`
 
         await trx
@@ -402,8 +377,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client session not found',
-          detail:
-            'We could not find a client session with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client session with the specified identifier for the authenticated trainer.',
           type: '/client-session-not-found',
         }),
         { status: 404 }
@@ -439,8 +413,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 409,
           title: 'Client has no contact info',
-          detail:
-            'A client email or phone number is required to share this booking.',
+          detail: 'A client email or phone number is required to share this booking.',
           type: '/client-has-no-contact-info',
         }),
         { status: 409 }
@@ -464,8 +437,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 402,
           title: 'Out of text credits',
-          detail:
-            'Your account has insufficient text credits to send this message.',
+          detail: 'Your account has insufficient text credits to send this message.',
           type: '/out-of-text-credits',
         }),
         { status: 402 }
@@ -477,8 +449,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 409,
           title: 'Booking link unavailable',
-          detail:
-            'This booking does not have a public link to share at the moment.',
+          detail: 'This booking does not have a public link to share at the moment.',
           type: '/booking-link-unavailable',
         }),
         { status: 409 }
@@ -490,8 +461,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse client session data from database',
-          detail:
-            'Client session data did not match the expected response schema.',
+          detail: 'Client session data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

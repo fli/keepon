@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 
 const missionIdSchema = z.enum([
   'createInitialData',
@@ -54,8 +51,7 @@ const adaptRowToMission = (row: MissionRow): Mission => ({
 export async function GET(request: Request) {
   try {
     const authorization = await authenticateTrainerRequest(request, {
-      extensionFailureLogMessage:
-        'Failed to extend access token expiry while fetching missions',
+      extensionFailureLogMessage: 'Failed to extend access token expiry while fetching missions',
     })
     if (!authorization.ok) {
       return authorization.response
@@ -80,7 +76,7 @@ export async function GET(request: Request) {
       .orderBy('mission.display_order')
       .execute()
 
-    const missionRows: MissionRow[] = rows.map(row => ({
+    const missionRows: MissionRow[] = rows.map((row) => ({
       id: row.id,
       displayOrder: row.displayOrder,
       rewardId: row.rewardId,
@@ -91,9 +87,7 @@ export async function GET(request: Request) {
       rewardClaimedAt: row.rewardClaimedAt,
     }))
 
-    const missions = missionListSchema.parse(
-      missionRows.map(missionRow => adaptRowToMission(missionRow))
-    )
+    const missions = missionListSchema.parse(missionRows.map((missionRow) => adaptRowToMission(missionRow)))
 
     return NextResponse.json(missions)
   } catch (error) {

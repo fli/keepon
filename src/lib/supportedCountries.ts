@@ -13,7 +13,7 @@ const DISPLAY_NAME_OVERRIDES: Record<string, string> = {
   US: 'United States',
 }
 
-const countriesById = new Map(countries.map(country => [country.id, country]))
+const countriesById = new Map(countries.map((country) => [country.id, country]))
 
 const toFlagEmoji = (alpha2: string) => {
   if (alpha2.length !== 2) return alpha2
@@ -28,7 +28,7 @@ const toFlagEmoji = (alpha2: string) => {
 }
 
 export const supportedCountries: ReadonlyArray<SupportedCountry> = supportedCountryCurrency
-  .map(mapping => {
+  .map((mapping) => {
     const country = countriesById.get(mapping.countryId)
     if (!country) return null
 
@@ -44,4 +44,4 @@ export const supportedCountries: ReadonlyArray<SupportedCountry> = supportedCoun
   .filter((country): country is SupportedCountry => Boolean(country))
   .sort((a, b) => a.name.localeCompare(b.name))
 
-export const supportedCountryCodes = new Set(supportedCountries.map(country => country.code))
+export const supportedCountryCodes = new Set(supportedCountries.map((country) => country.code))

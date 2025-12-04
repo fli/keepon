@@ -38,10 +38,7 @@ async function RemindersSettingsContent() {
     settings = await getReminderSettings(session.trainerId)
   } catch (cause) {
     console.error('Failed to load reminder settings', cause)
-    error =
-      cause instanceof Error
-        ? cause.message
-        : 'Unable to load reminder settings right now.'
+    error = cause instanceof Error ? cause.message : 'Unable to load reminder settings right now.'
   }
 
   return (
@@ -61,10 +58,7 @@ async function RemindersSettingsContent() {
           <ReminderSection
             title="My default reminders"
             description="Sent to you before sessions you host."
-            reminders={[
-              settings.serviceProviderReminder1,
-              settings.serviceProviderReminder2,
-            ]}
+            reminders={[settings.serviceProviderReminder1, settings.serviceProviderReminder2]}
             targetSlug="service-provider"
           />
           <ReminderSection
@@ -79,20 +73,16 @@ async function RemindersSettingsContent() {
   )
 }
 
-type ReminderDisplay =
-  | {
-      label: string
-      time: string
-    }
-  | null
+type ReminderDisplay = {
+  label: string
+  time: string
+} | null
 
-const displayReminder = (
-  reminder: { type: string; timeBeforeStart: string } | null
-): ReminderDisplay => {
+const displayReminder = (reminder: { type: string; timeBeforeStart: string } | null): ReminderDisplay => {
   if (!reminder) return null
 
   const timeLabel =
-    reminderOptions.find(option => option.value === reminder.timeBeforeStart)?.name ??
+    reminderOptions.find((option) => option.value === reminder.timeBeforeStart)?.name ??
     `Custom (${reminder.timeBeforeStart})`
 
   const typeLabel = (() => {
@@ -131,11 +121,8 @@ function ReminderSection({
       display: displayReminder(reminder),
       slot: (index + 1) as 1 | 2,
     }))
-    .filter((item): item is { display: NonNullable<typeof item.display>; slot: 1 | 2 } =>
-      Boolean(item.display)
-    )
-  const nextSlot =
-    reminders[0] === null ? 1 : reminders[1] === null ? 2 : null
+    .filter((item): item is { display: NonNullable<typeof item.display>; slot: 1 | 2 } => Boolean(item.display))
+  const nextSlot = reminders[0] === null ? 1 : reminders[1] === null ? 2 : null
 
   return (
     <section className="space-y-3">
@@ -147,23 +134,19 @@ function ReminderSection({
         <p className="text-sm text-muted-foreground">No reminders set.</p>
       ) : (
         <ul className="divide-y divide-border/70 rounded-lg border border-border/70 bg-card/30">
-          {items.map(item => (
+          {items.map((item) => (
             <li
               key={`${item.display.label}-${item.display.time}-${item.slot}`}
               className="flex items-center justify-between gap-3 px-4 py-3"
             >
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-foreground">
-                  {item.display.label}
-                </span>
+                <span className="text-sm font-medium text-foreground">{item.display.label}</span>
                 <span className="text-sm text-muted-foreground">{item.display.time}</span>
               </div>
               <Button
                 size="sm"
                 variant="outline"
-                render={
-                  <Link href={`/settings/reminders/edit/${targetSlug}/${item.slot}`} />
-                }
+                render={<Link href={`/settings/reminders/edit/${targetSlug}/${item.slot}`} />}
               >
                 Edit
               </Button>
@@ -176,9 +159,7 @@ function ReminderSection({
         size="sm"
         variant="outline"
         disabled={!nextSlot}
-        render={
-          nextSlot ? <Link href={`/settings/reminders/add/${targetSlug}/${nextSlot}`} /> : undefined
-        }
+        render={nextSlot ? <Link href={`/settings/reminders/add/${targetSlug}/${nextSlot}`} /> : undefined}
       >
         Add reminder
       </Button>

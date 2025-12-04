@@ -3,13 +3,7 @@ import { Suspense } from 'react'
 
 import { WebTopNav } from '../../components/web-top-nav'
 
-export default function AppShellLayout({
-  children,
-  breadcrumbs,
-}: {
-  children: ReactNode
-  breadcrumbs: ReactNode
-}) {
+export default function AppShellLayout({ children, breadcrumbs }: { children: ReactNode; breadcrumbs: ReactNode }) {
   return (
     <>
       <Suspense fallback={null}>

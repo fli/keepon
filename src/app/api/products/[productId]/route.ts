@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { getProductById, moneyString } from '@/server/products'
 
 const paramsSchema = z.object({
-  productId: z
-    .string()
-    .trim()
-    .min(1, 'Product id is required')
-    .uuid({ message: 'Product id must be a valid UUID' }),
+  productId: z.string().trim().min(1, 'Product id is required').uuid({ message: 'Product id must be a valid UUID' }),
 })
 
 const deleteResponseSchema = z.object({
@@ -20,19 +13,14 @@ const deleteResponseSchema = z.object({
 })
 
 const nonNegativeMoneyString = moneyString.refine(
-  value => Number.parseFloat(value) >= 0,
+  (value) => Number.parseFloat(value) >= 0,
   'Price must be non-negative'
 )
 
 const priceSchema = z
   .union([z.string(), z.number()])
-  .transform(value => {
-    const raw =
-      typeof value === 'number'
-        ? value.toString()
-        : typeof value === 'string'
-          ? value.trim()
-          : value
+  .transform((value) => {
+    const raw = typeof value === 'number' ? value.toString() : typeof value === 'string' ? value.trim() : value
 
     if (typeof raw !== 'string') return raw
 
@@ -46,7 +34,7 @@ const priceSchema = z
 const nullableTrimmedToNull = z
   .union([z.string(), z.null()])
   .optional()
-  .transform(value => {
+  .transform((value) => {
     if (value === undefined) return undefined
     if (value === null) return null
     const trimmed = value.trim()
@@ -56,7 +44,7 @@ const nullableTrimmedToNull = z
 const descriptionSchema = z
   .union([z.string(), z.null()])
   .optional()
-  .transform(value => {
+  .transform((value) => {
     if (value === undefined) return undefined
     if (value === null) return ''
     return value.trim()
@@ -83,9 +71,7 @@ const patchRequestBodySchema = z
     bookableOnline: z.boolean().optional(),
     showPriceOnline: z.boolean().optional(),
     totalCredits: z.number().int().min(0).optional(),
-    bookingPaymentType: z
-      .enum(['hidePrice', 'noPrepayment', 'fullPrepayment'])
-      .optional(),
+    bookingPaymentType: z.enum(['hidePrice', 'noPrepayment', 'fullPrepayment']).optional(),
     bufferMinutesBefore: z.number().int().min(0).optional(),
     bufferMinutesAfter: z.number().int().min(0).optional(),
     timeSlotFrequencyMinutes: z.number().int().min(1).optional(),
@@ -98,13 +84,9 @@ const patchRequestBodySchema = z
     image5Url: z.union([z.string(), z.null()]).optional(),
     coverImageUrl: z.union([z.string(), z.null()]).optional(),
     iconUrl: z.union([z.string(), z.null()]).optional(),
-    requestClientAddressOnline: z
-      .union([z.literal('optional'), z.literal('required'), z.null()])
-      .optional(),
+    requestClientAddressOnline: z.union([z.literal('optional'), z.literal('required'), z.null()]).optional(),
     bookingQuestion: nullableTrimmedToNull,
-    bookingQuestionState: z
-      .union([z.literal('optional'), z.literal('required'), z.null()])
-      .optional(),
+    bookingQuestionState: z.union([z.literal('optional'), z.literal('required'), z.null()]).optional(),
   })
   .strict()
 
@@ -117,17 +99,13 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid product identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected product identifier schema.',
+        detail: detail || 'Request parameters did not match the expected product identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -135,8 +113,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching product',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching product',
   })
 
   if (!authorization.ok) {
@@ -153,8 +130,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Product not found',
-          detail:
-            'We could not find a product with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a product with the specified identifier for the authenticated trainer.',
           type: '/product-not-found',
         }),
         { status: 404 }
@@ -196,17 +172,13 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Product identifier parameter did not match the expected schema.',
+        detail: detail || 'Product identifier parameter did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -214,8 +186,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while deleting product',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while deleting product',
   })
 
   if (!authorization.ok) {
@@ -225,7 +196,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   const { productId } = paramsResult.data
 
   try {
-    const deleted = await db.transaction().execute(async trx => {
+    const deleted = await db.transaction().execute(async (trx) => {
       await trx
         .updateTable('sale_product')
         .set({ product_id: null })
@@ -248,8 +219,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Product not found',
-          detail:
-            'We could not find a product with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a product with the specified identifier for the authenticated trainer.',
           type: '/product-not-found',
         }),
         { status: 404 }
@@ -265,8 +235,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to validate product deletion response',
-          detail:
-            'Product deletion response did not match the expected schema.',
+          detail: 'Product deletion response did not match the expected schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
@@ -294,17 +263,13 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid product identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected product identifier schema.',
+        detail: detail || 'Request parameters did not match the expected product identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -314,15 +279,12 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
   let parsedBody: z.infer<typeof patchRequestBodySchema>
   try {
     const rawText = await request.text()
-    const rawBody: unknown =
-      rawText.trim().length === 0 ? {} : (JSON.parse(rawText) as unknown)
+    const rawBody: unknown = rawText.trim().length === 0 ? {} : (JSON.parse(rawText) as unknown)
 
     const bodyResult = patchRequestBodySchema.safeParse(rawBody)
 
     if (!bodyResult.success) {
-      const detail = bodyResult.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
@@ -350,8 +312,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating product',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating product',
   })
 
   if (!authorization.ok) {
@@ -359,7 +320,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
   }
 
   const { productId } = paramsResult.data
-  const hasUpdates = Object.values(parsedBody).some(value => value !== undefined)
+  const hasUpdates = Object.values(parsedBody).some((value) => value !== undefined)
 
   try {
     if (!hasUpdates) {
@@ -370,8 +331,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
           buildErrorResponse({
             status: 404,
             title: 'Product not found',
-            detail:
-              'We could not find a product with the specified identifier for the authenticated trainer.',
+            detail: 'We could not find a product with the specified identifier for the authenticated trainer.',
             type: '/product-not-found',
           }),
           { status: 404 }
@@ -381,7 +341,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
       return NextResponse.json(product)
     }
 
-    const transactionResult = await db.transaction().execute(async trx => {
+    const transactionResult = await db.transaction().execute(async (trx) => {
       const productRow = await trx
         .selectFrom('product as product')
         .leftJoin('service as service', 'service.id', 'product.id')
@@ -449,10 +409,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         ].filter((value): value is string => typeof value === 'string')
 
         if (providedGallery.length > 0) {
-          if (
-            typeof coverImageUrl === 'string' &&
-            coverImageUrl !== productRow.coverImageUrl
-          ) {
+          if (typeof coverImageUrl === 'string' && coverImageUrl !== productRow.coverImageUrl) {
             throw new MustUpdateImageUsingUploadError()
           }
 
@@ -471,14 +428,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
             ].filter((value): value is string => typeof value === 'string')
           )
 
-          for (const image of [
-            image0Url,
-            image1Url,
-            image2Url,
-            image3Url,
-            image4Url,
-            image5Url,
-          ]) {
+          for (const image of [image0Url, image1Url, image2Url, image3Url, image4Url, image5Url]) {
             if (typeof image === 'string' && !existingGallery.has(image)) {
               throw new UpdatedGalleryImageMustExistError()
             }
@@ -504,8 +454,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         }
 
         if (geo !== undefined) {
-          serviceUpdate.geo =
-            geo === null ? null : sql`point(${geo.lat}, ${geo.lng})`
+          serviceUpdate.geo = geo === null ? null : sql`point(${geo.lat}, ${geo.lng})`
         }
 
         if (bookableOnline !== undefined) {
@@ -514,11 +463,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
 
         const resolvedBookingPaymentType =
           bookingPaymentType ??
-          (showPriceOnline === undefined
-            ? undefined
-            : showPriceOnline
-              ? 'noPrepayment'
-              : 'hidePrice')
+          (showPriceOnline === undefined ? undefined : showPriceOnline ? 'noPrepayment' : 'hidePrice')
 
         if (resolvedBookingPaymentType !== undefined) {
           serviceUpdate.booking_payment_type = resolvedBookingPaymentType
@@ -569,8 +514,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         }
 
         if (requestClientAddressOnline !== undefined) {
-          serviceUpdate.request_client_address_online =
-            requestClientAddressOnline
+          serviceUpdate.request_client_address_online = requestClientAddressOnline
         }
 
         if (bookingQuestion !== undefined) {
@@ -635,8 +579,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Product not found',
-          detail:
-            'We could not find a product with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a product with the specified identifier for the authenticated trainer.',
           type: '/product-not-found',
         }),
         { status: 404 }
@@ -650,8 +593,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Product not found',
-          detail:
-            'We could not find a product with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a product with the specified identifier for the authenticated trainer.',
           type: '/product-not-found',
         }),
         { status: 404 }

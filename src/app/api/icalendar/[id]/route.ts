@@ -52,10 +52,7 @@ const getIcsFromDir = (dir: string): string[] => {
     const fullPath = path.join(dir, dirent.name)
     if (dirent.isDirectory()) {
       files.push(...getIcsFromDir(fullPath))
-    } else if (
-      dirent.isFile() &&
-      path.extname(dirent.name).toLowerCase() === '.ics'
-    ) {
+    } else if (dirent.isFile() && path.extname(dirent.name).toLowerCase() === '.ics') {
       files.push(fullPath)
     }
   }
@@ -82,9 +79,7 @@ const loadTimeZoneInfo = (): TimeZoneInfoMap => {
 
     for (const file of calFiles) {
       const data = fs.readFileSync(file, { encoding: 'utf8' })
-      const match = /(?:^|\n)(BEGIN:VTIMEZONE\n[\s\S]+?\nEND:VTIMEZONE)(?:$|\n)/.exec(
-        data
-      )
+      const match = /(?:^|\n)(BEGIN:VTIMEZONE\n[\s\S]+?\nEND:VTIMEZONE)(?:$|\n)/.exec(data)
       if (!match) {
         continue
       }
@@ -163,16 +158,13 @@ export async function GET(_request: Request, context: HandlerContext) {
   const parsedParams = paramsSchema.safeParse(await context.params)
 
   if (!parsedParams.success) {
-    const detail = parsedParams.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = parsedParams.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail || 'Request path parameters did not match the expected schema.',
+        detail: detail || 'Request path parameters did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -182,11 +174,7 @@ export async function GET(_request: Request, context: HandlerContext) {
   const { id } = parsedParams.data
 
   try {
-    const trainer = await db
-      .selectFrom('trainer')
-      .select('id')
-      .where('icalendar_url_slug', '=', id)
-      .executeTakeFirst()
+    const trainer = await db.selectFrom('trainer').select('id').where('icalendar_url_slug', '=', id).executeTakeFirst()
 
     if (!trainer) {
       return NextResponse.json(
@@ -242,12 +230,8 @@ export async function GET(_request: Request, context: HandlerContext) {
     const calendarRows = z.array(calendarRowSchema).parse(calendarRowsResult.rows)
 
     const timeZoneInfo = loadTimeZoneInfo()
-    const uniqueTimeZones = Array.from(
-      new Set(calendarRows.map(row => row.timezone))
-    )
-    const timeZoneBlocks = uniqueTimeZones
-      .map(tz => timeZoneInfo[tz])
-      .filter(Boolean)
+    const uniqueTimeZones = Array.from(new Set(calendarRows.map((row) => row.timezone)))
+    const timeZoneBlocks = uniqueTimeZones.map((tz) => timeZoneInfo[tz]).filter(Boolean)
 
     const eventBlocks = calendarRows.map(buildEventBlock)
 
@@ -255,9 +239,7 @@ export async function GET(_request: Request, context: HandlerContext) {
 VERSION:2.0
 PRODID:-//${resolveProdIdHost()}//Calendar
 CALSCALE:GREGORIAN
-X-WR-CALNAME:Keepon${
-      timeZoneBlocks.length === 0 ? '' : '\n' + timeZoneBlocks.join('\n').trim()
-    }${
+X-WR-CALNAME:Keepon${timeZoneBlocks.length === 0 ? '' : '\n' + timeZoneBlocks.join('\n').trim()}${
       eventBlocks.length === 0 ? '' : '\n' + eventBlocks.join('\n').trim()
     }
 END:VCALENDAR

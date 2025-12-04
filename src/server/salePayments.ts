@@ -4,7 +4,7 @@ import { salePaymentSchema } from '../app/api/_lib/salePayments'
 
 const createManualPaymentSchema = z.object({
   saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }),
-  amount: z.union([z.string(), z.number()]).transform(value => value.toString()),
+  amount: z.union([z.string(), z.number()]).transform((value) => value.toString()),
   currency: z.string().min(1),
   method: z.enum(['cash', 'electronic']),
   specificMethodName: z.string().nullable().optional(),
@@ -16,7 +16,7 @@ export async function createManualSalePaymentForTrainer(
 ): Promise<z.infer<typeof salePaymentSchema>> {
   const parsed = createManualPaymentSchema.parse(payload)
 
-  const paymentResult = await db.transaction().execute(async trx => {
+  const paymentResult = await db.transaction().execute(async (trx) => {
     const saleRow = await trx
       .selectFrom('sale')
       .select(['id', 'client_id'])

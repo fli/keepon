@@ -4,17 +4,9 @@ import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
 
 const requestSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, 'Email is required')
-    .email('Email must be a valid email address.'),
+  email: z.string().trim().min(1, 'Email is required').email('Email must be a valid email address.'),
   code: z.string().trim().min(1, 'Code is required'),
-  clientId: z
-    .string()
-    .trim()
-    .min(1, 'Client id is required')
-    .uuid('Client id must be a valid UUID'),
+  clientId: z.string().trim().min(1, 'Client id is required').uuid('Client id must be a valid UUID'),
 })
 
 const responseSchema = z.object({
@@ -38,16 +30,13 @@ export async function POST(request: Request) {
     const rawBody = (await request.json()) as unknown
     const validation = requestSchema.safeParse(rawBody)
     if (!validation.success) {
-      const detail = validation.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
           status: 400,
           title: 'Invalid request body',
-          detail:
-            detail || 'Request body did not match the expected schema.',
+          detail: detail || 'Request body did not match the expected schema.',
           type: '/invalid-body',
         }),
         { status: 400 }
@@ -94,10 +83,8 @@ export async function POST(request: Request) {
       return createTemporaryCodeInvalidResponse()
     }
 
-    const tokenRow = await db
-      .transaction()
-      .execute(async trx => {
-        await sql`
+    const tokenRow = await db.transaction().execute(async (trx) => {
+      await sql`
           UPDATE client_login_request
              SET expires_at = NOW()
            WHERE expires_at > NOW()
@@ -105,7 +92,7 @@ export async function POST(request: Request) {
              AND NOT authenticated
         `.execute(trx)
 
-        const inserted = await sql<{ id: string }>`
+      const inserted = await sql<{ id: string }>`
           INSERT INTO access_token (user_id, user_type, expires_at, type)
           SELECT client.user_id, 'client', NOW() + INTERVAL '7 days', 'client_dashboard'
             FROM client
@@ -114,15 +101,13 @@ export async function POST(request: Request) {
           RETURNING id
         `.execute(trx)
 
-        const row = inserted.rows[0]
-        if (!row) {
-          throw new Error(
-            'No access token created for client dashboard login request'
-          )
-        }
+      const row = inserted.rows[0]
+      if (!row) {
+        throw new Error('No access token created for client dashboard login request')
+      }
 
-        return row
-      })
+      return row
+    })
 
     const responseBody = responseSchema.parse({ id: tokenRow.id })
     return NextResponse.json(responseBody)
@@ -132,8 +117,7 @@ export async function POST(request: Request) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse client dashboard token data',
-          detail:
-            'Client dashboard token data did not match the expected response schema.',
+          detail: 'Client dashboard token data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
@@ -146,17 +130,12 @@ export async function POST(request: Request) {
       error,
     })
 
-    if (
-      error instanceof Error &&
-      error.message ===
-        'No access token created for client dashboard login request'
-    ) {
+    if (error instanceof Error && error.message === 'No access token created for client dashboard login request') {
       return NextResponse.json(
         buildErrorResponse({
           status: 400,
           title: 'Unable to create access token for client',
-          detail:
-            'Client identifier or email did not match an existing client record.',
+          detail: 'Client identifier or email did not match an existing client record.',
           type: '/client-not-found',
         }),
         { status: 400 }

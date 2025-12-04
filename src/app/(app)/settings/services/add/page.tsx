@@ -68,7 +68,7 @@ async function createService(formData: FormData) {
     throw new Error('Could not resolve your default currency')
   }
 
-  await db.transaction().execute(async trx => {
+  await db.transaction().execute(async (trx) => {
     const productRow = await trx
       .insertInto('product')
       .values({
@@ -167,13 +167,7 @@ async function AddServiceContent() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="durationMinutes">Duration (minutes)</Label>
-            <Input
-              id="durationMinutes"
-              name="durationMinutes"
-              inputMode="numeric"
-              placeholder="60"
-              required
-            />
+            <Input id="durationMinutes" name="durationMinutes" inputMode="numeric" placeholder="60" required />
           </div>
         </div>
 

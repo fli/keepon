@@ -1,16 +1,11 @@
 import { NextResponse } from 'next/server'
-import {
-  authenticateTrainerOrClientRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerOrClientRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { logout } from '@/server/auth'
 
 export async function POST(request: Request) {
   const authorization = await authenticateTrainerOrClientRequest(request, {
-    trainerExtensionFailureLogMessage:
-      'Failed to extend access token expiry while logging out trainer access token',
-    clientExtensionFailureLogMessage:
-      'Failed to extend access token expiry while logging out client access token',
+    trainerExtensionFailureLogMessage: 'Failed to extend access token expiry while logging out trainer access token',
+    clientExtensionFailureLogMessage: 'Failed to extend access token expiry while logging out client access token',
   })
 
   if (!authorization.ok) {

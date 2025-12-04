@@ -1,11 +1,6 @@
 import { z } from 'zod'
 
-export const rewardTypeSchema = z.enum([
-  '1DayTrial',
-  '2DayTrial',
-  '2TextCredits',
-  '3TextCredits',
-])
+export const rewardTypeSchema = z.enum(['1DayTrial', '2DayTrial', '2TextCredits', '3TextCredits'])
 
 export const rewardRowSchema = z.object({
   id: z.string(),

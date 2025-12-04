@@ -5,11 +5,7 @@ export const bookingPaymentTypes = ['fullPrepayment', 'hidePrice', 'noPrepayment
 export const bookingQuestionStates = ['optional', 'required'] as const
 
 export const clientAppointmentReminderTypes = ['email', 'emailAndSms', 'sms'] as const
-export const serviceProviderAppointmentReminderTypes = [
-  'email',
-  'emailAndNotification',
-  'notification',
-] as const
+export const serviceProviderAppointmentReminderTypes = ['email', 'emailAndNotification', 'notification'] as const
 
 export const brandColors = [
   'amber',
@@ -32,14 +28,7 @@ export const brandColors = [
   'yellow',
 ] as const
 
-export const clientSessionStates = [
-  'accepted',
-  'cancelled',
-  'confirmed',
-  'declined',
-  'invited',
-  'maybe',
-] as const
+export const clientSessionStates = ['accepted', 'cancelled', 'confirmed', 'declined', 'invited', 'maybe'] as const
 
 export const clientStatuses = ['current', 'lead', 'past'] as const
 
@@ -97,7 +86,11 @@ export type RewardType = Readonly<{
 
 export const rewardTypes: ReadonlyArray<RewardType> = [
   { type: '1DayTrial', title: '+1 day trial', description: '1 day has been added to your trial!' },
-  { type: '2DayTrial', title: '+2 days trial', description: '2 days have been added to your trial!' },
+  {
+    type: '2DayTrial',
+    title: '+2 days trial',
+    description: '2 days have been added to your trial!',
+  },
   { type: '2TextCredits', title: '+2 text credits', description: "You've earned 2 text credits!" },
   { type: '3TextCredits', title: '+3 text credits', description: "You've earned 3 text credits!" },
 ] as const

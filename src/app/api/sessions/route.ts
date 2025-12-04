@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { sessionListSchema, adaptSessionRow, RawSessionRow } from './shared'
 
 const querySchema = z.object({
@@ -19,13 +16,11 @@ const querySchema = z.object({
     .trim()
     .min(1, 'updatedAfter must not be empty')
     .pipe(
-      z
-        .string()
-        .datetime({
-          message: 'updatedAfter must be a valid ISO date-time string',
-        })
+      z.string().datetime({
+        message: 'updatedAfter must be a valid ISO date-time string',
+      })
     )
-    .transform(value => new Date(value))
+    .transform((value) => new Date(value))
     .optional(),
 })
 
@@ -39,16 +34,12 @@ export async function GET(request: Request) {
   const parsedQuery = querySchema.safeParse(queryParams)
 
   if (!parsedQuery.success) {
-    const detail = parsedQuery.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = parsedQuery.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid query parameters',
-        detail:
-          detail ||
-          'Request query parameters did not match the expected schema.',
+        detail: detail || 'Request query parameters did not match the expected schema.',
         type: '/invalid-query',
       }),
       { status: 400 }
@@ -56,8 +47,7 @@ export async function GET(request: Request) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching sessions',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching sessions',
   })
 
   if (!authorization.ok) {
@@ -81,9 +71,7 @@ export async function GET(request: Request) {
       query = query.where('s.updated_at', '>', updatedAfter)
     }
 
-    const rows = (await query
-      .orderBy('s.start', 'asc')
-      .execute()) as RawSessionRow[]
+    const rows = (await query.orderBy('s.start', 'asc').execute()) as RawSessionRow[]
 
     const sessions = sessionListSchema.parse(rows.map(adaptSessionRow))
 

@@ -64,7 +64,7 @@ async function createCreditPack(formData: FormData) {
     throw new Error('Could not resolve your default currency')
   }
 
-  await db.transaction().execute(async trx => {
+  await db.transaction().execute(async (trx) => {
     const productRow = await trx
       .insertInto('product')
       .values({
@@ -111,9 +111,7 @@ export default async function AddCreditPackPage() {
     <PageContainer className="flex flex-col items-center gap-6 py-8">
       <div className="flex w-full max-w-xl flex-col gap-2">
         <h1 className="text-3xl font-semibold leading-tight">Add credit pack</h1>
-        <p className="text-sm text-muted-foreground">
-          Define a pack clients can purchase and apply toward sessions.
-        </p>
+        <p className="text-sm text-muted-foreground">Define a pack clients can purchase and apply toward sessions.</p>
       </div>
 
       <form action={createCreditPack} className="w-full max-w-xl space-y-5">
@@ -134,12 +132,7 @@ export default async function AddCreditPackPage() {
 
         <div className="space-y-2">
           <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            name="description"
-            rows={3}
-            placeholder="Tell clients how this pack works"
-          />
+          <Textarea id="description" name="description" rows={3} placeholder="Tell clients how this pack works" />
         </div>
 
         <div className="flex justify-end">

@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateClientRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateClientRequest, buildErrorResponse } from '../_lib/accessToken'
 
 const serviceProviderSchema = z.object({
   firstName: z.string(),
@@ -22,8 +19,7 @@ type ServiceProvider = z.infer<typeof serviceProviderSchema>
 
 export async function GET(request: Request) {
   const authorization = await authenticateClientRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching service provider',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching service provider',
   })
 
   if (!authorization.ok) {
@@ -34,21 +30,12 @@ export async function GET(request: Request) {
     const row = await db
       .selectFrom('client')
       .innerJoin('trainer', 'trainer.id', 'client.trainer_id')
-      .innerJoin(
-        'vw_legacy_trainer',
-        'vw_legacy_trainer.id',
-        'trainer.id'
-      )
+      .innerJoin('vw_legacy_trainer', 'vw_legacy_trainer.id', 'trainer.id')
       .innerJoin('country', 'country.id', 'trainer.country_id')
       .select(({ ref, fn }) => [
         ref('trainer.first_name').as('firstName'),
         ref('trainer.last_name').as('lastName'),
-        fn
-          .coalesce(
-            ref('trainer.business_name'),
-            ref('trainer.online_bookings_business_name')
-          )
-          .as('businessName'),
+        fn.coalesce(ref('trainer.business_name'), ref('trainer.online_bookings_business_name')).as('businessName'),
         ref('trainer.online_bookings_contact_email').as('contactEmail'),
         ref('trainer.online_bookings_contact_number').as('contactNumber'),
         ref('trainer.brand_color').as('brandColor'),
@@ -65,8 +52,7 @@ export async function GET(request: Request) {
         buildErrorResponse({
           status: 404,
           title: 'Service provider not found',
-          detail:
-            'No service provider is associated with the authenticated client.',
+          detail: 'No service provider is associated with the authenticated client.',
           type: '/service-provider-not-found',
         }),
         { status: 404 }
@@ -92,8 +78,7 @@ export async function GET(request: Request) {
           buildErrorResponse({
             status: 500,
             title: 'Failed to parse service provider data from database',
-            detail:
-              'Service provider data did not match the expected response schema.',
+            detail: 'Service provider data did not match the expected response schema.',
             type: '/invalid-response',
           }),
           { status: 500 }

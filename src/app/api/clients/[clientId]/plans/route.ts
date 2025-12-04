@@ -2,42 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import BigNumber from 'bignumber.js'
 import { z } from 'zod'
 import { db, sql } from '@/lib/db'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../_lib/constants'
 import { currencyChargeLimits } from '../../../_lib/transactionFees'
-import {
-  normalizePlanRow,
-  planFrequencyValues,
-  type RawPlanRow,
-} from '../../../plans/shared'
+import { normalizePlanRow, planFrequencyValues, type RawPlanRow } from '../../../plans/shared'
 
 const paramsSchema = z.object({
-  clientId: z
-    .string()
-    .trim()
-    .min(1, 'Client id is required')
-    .uuid({ message: 'Client id must be a valid UUID.' }),
+  clientId: z.string().trim().min(1, 'Client id is required').uuid({ message: 'Client id must be a valid UUID.' }),
 })
 
 const requestBodySchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
-  amount: z
-    .number()
-    .positive('Amount must be greater than zero'),
+  amount: z.number().positive('Amount must be greater than zero'),
   frequency: z.union([
     z.literal(planFrequencyValues[0]),
     z.literal(planFrequencyValues[1]),
     z.literal(planFrequencyValues[2]),
     z.literal(planFrequencyValues[3]),
   ]),
-  startDate: z
-    .string()
-    .datetime({
-      message: 'startDate must be an ISO 8601 date-time string',
-    }),
+  startDate: z.string().datetime({
+    message: 'startDate must be an ISO 8601 date-time string',
+  }),
   endDate: z
     .string()
     .datetime({
@@ -119,8 +104,7 @@ const tailwind600: Record<string, string> = {
   yellow: '#ca8a04',
 }
 
-const resolveBrandColor = (value?: string | null) =>
-  (value && tailwind600[value]) ?? tailwind600.blue
+const resolveBrandColor = (value?: string | null) => (value && tailwind600[value]) ?? tailwind600.blue
 
 const escapeHtml = (value: string) =>
   value
@@ -141,8 +125,7 @@ const buildPlanRequestEmail = (options: {
   startDateLabel: string
   endDateLabel: string
 }) => {
-  const serviceProvider =
-    options.serviceProviderName.trim() || `${APP_NAME} Team`
+  const serviceProvider = options.serviceProviderName.trim() || `${APP_NAME} Team`
   const buttonColor = resolveBrandColor(options.brandColor)
   const logo = options.businessLogoUrl
     ? `<img src="${options.businessLogoUrl}" alt="${escapeHtml(
@@ -150,10 +133,7 @@ const buildPlanRequestEmail = (options: {
       )}" style="max-width:160px;height:auto;border-radius:12px;" />`
     : ''
 
-  const cadence =
-    options.frequencyWeeks === 1
-      ? 'every week'
-      : `every ${options.frequencyWeeks} weeks`
+  const cadence = options.frequencyWeeks === 1 ? 'every week' : `every ${options.frequencyWeeks} weeks`
 
   return `
 <!doctype html>
@@ -175,22 +155,16 @@ const buildPlanRequestEmail = (options: {
             </tr>
             <tr>
               <td style="font-size:16px;line-height:1.6;color:#1f2937;padding-bottom:16px;text-align:center;">
-                ${escapeHtml(
-                  serviceProvider
-                )} created a subscription for you: <strong>${escapeHtml(
+                ${escapeHtml(serviceProvider)} created a subscription for you: <strong>${escapeHtml(
                   options.planName
                 )}</strong>.
-                You'll be billed ${escapeHtml(options.amountText)} ${escapeHtml(
-                  cadence
-                )}.
+                You'll be billed ${escapeHtml(options.amountText)} ${escapeHtml(cadence)}.
               </td>
             </tr>
             <tr>
               <td style="font-size:14px;line-height:1.5;color:#4b5563;text-align:center;padding-bottom:16px;">
                 Start date: ${escapeHtml(options.startDateLabel)}${
-                  options.endDateLabel
-                    ? `<br/>End date: ${escapeHtml(options.endDateLabel)}`
-                    : ''
+                  options.endDateLabel ? `<br/>End date: ${escapeHtml(options.endDateLabel)}` : ''
                 }
               </td>
             </tr>
@@ -235,17 +209,13 @@ const formatIsoDateLabel = (value: Date | null | undefined) => {
 export async function POST(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Request parameters did not match the expected schema.',
+        detail: detail || 'Request parameters did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -259,9 +229,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     const validation = requestBodySchema.safeParse(rawBody)
 
     if (!validation.success) {
-      const detail = validation.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
@@ -289,8 +257,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while creating subscription',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while creating subscription',
   })
 
   if (!authorization.ok) {
@@ -307,26 +274,18 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         : parseDateOnly(parsedBody.endDate, 'endDate')
 
     if (Date.now() - startDate.getTime() >= DAY_IN_MS) {
-      throw new InvalidDateRangeError(
-        'startDate must be within the last 24 hours'
-      )
+      throw new InvalidDateRangeError('startDate must be within the last 24 hours')
     }
 
     if (startDate.getTime() > endDate.getTime()) {
-      throw new InvalidDateRangeError(
-        'startDate must be before endDate'
-      )
+      throw new InvalidDateRangeError('startDate must be before endDate')
     }
 
     const detailsRow = await db
       .selectFrom('client')
       .innerJoin('trainer', 'trainer.id', 'client.trainer_id')
       .innerJoin('country', 'country.id', 'trainer.country_id')
-      .innerJoin(
-        'supported_country_currency as scc',
-        'scc.country_id',
-        'trainer.country_id'
-      )
+      .innerJoin('supported_country_currency as scc', 'scc.country_id', 'trainer.country_id')
       .innerJoin('currency', 'currency.id', 'scc.currency_id')
       .select(({ ref }) => [
         ref('client.id').as('clientId'),
@@ -359,8 +318,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     }
 
     const currency = details.currency.toUpperCase()
-    const limits =
-      currencyChargeLimits[currency as keyof typeof currencyChargeLimits]
+    const limits = currencyChargeLimits[currency as keyof typeof currencyChargeLimits]
 
     if (!limits) {
       return NextResponse.json(
@@ -375,28 +333,17 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
     const amount = new BigNumber(parsedBody.amount).decimalPlaces(2)
     if (!amount.isFinite() || amount.lte(0)) {
-      throw new InvalidAmountError(
-        'Amount must be a positive numeric value.'
-      )
+      throw new InvalidAmountError('Amount must be a positive numeric value.')
     }
 
     const unitAmount = amount.shiftedBy(limits.smallestUnitDecimals)
     if (!unitAmount.isInteger()) {
-      throw new InvalidAmountError(
-        'Amount must be representable in the smallest currency unit.'
-      )
+      throw new InvalidAmountError('Amount must be representable in the smallest currency unit.')
     }
 
-    if (
-      unitAmount.lt(limits.minimumInSmallestUnit) ||
-      unitAmount.gt(limits.maximumInSmallestUnit)
-    ) {
-      const minDisplay = new BigNumber(limits.minimumInSmallestUnit).shiftedBy(
-        -limits.smallestUnitDecimals
-      )
-      const maxDisplay = new BigNumber(limits.maximumInSmallestUnit).shiftedBy(
-        -limits.smallestUnitDecimals
-      )
+    if (unitAmount.lt(limits.minimumInSmallestUnit) || unitAmount.gt(limits.maximumInSmallestUnit)) {
+      const minDisplay = new BigNumber(limits.minimumInSmallestUnit).shiftedBy(-limits.smallestUnitDecimals)
+      const maxDisplay = new BigNumber(limits.maximumInSmallestUnit).shiftedBy(-limits.smallestUnitDecimals)
 
       throw new InvalidAmountError(
         `Amount must be between ${minDisplay.toFixed()} and ${maxDisplay.toFixed()} ${currency}.`
@@ -407,7 +354,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     const amountStr = amount.toString()
     const baseUrl = process.env.BASE_URL ?? 'http://localhost:3001'
 
-    const plan = await db.transaction().execute(async trx => {
+    const plan = await db.transaction().execute(async (trx) => {
       const insertedPlan = await trx
         .insertInto('payment_plan')
         .values({
@@ -415,10 +362,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
           client_id: clientId,
           status: 'pending',
           start: startDate.toISOString(),
-          end_:
-            endDate === MAX_TIME
-              ? sql<Date>`'infinity'::timestamp with time zone`
-              : endDate.toISOString(),
+          end_: endDate === MAX_TIME ? sql<Date>`'infinity'::timestamp with time zone` : endDate.toISOString(),
           frequency_weekly_interval: frequencyWeeks,
           name: parsedBody.name,
           amount: amountStr,
@@ -462,13 +406,8 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       const recipientEmail = details.clientEmail ?? ''
 
       const link = new URL(baseUrl)
-      link.hash = `/client/${details.clientId}/${tokenRow.id}?email=${encodeURIComponent(
-        recipientEmail
-      )}`
-      link.searchParams.set(
-        'next',
-        `/client-dashboard/payment-plans/${planId}`
-      )
+      link.hash = `/client/${details.clientId}/${tokenRow.id}?email=${encodeURIComponent(recipientEmail)}`
+      link.searchParams.set('next', `/client-dashboard/payment-plans/${planId}`)
 
       const amountText = new Intl.NumberFormat('en-US', {
         style: 'currency',
@@ -484,12 +423,10 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         amountText,
         frequencyWeeks,
         startDateLabel: formatIsoDateLabel(startDate),
-        endDateLabel:
-          endDate === MAX_TIME ? '' : formatIsoDateLabel(endDate),
+        endDateLabel: endDate === MAX_TIME ? '' : formatIsoDateLabel(endDate),
       })
 
-      const senderName =
-        details.serviceProviderName.trim() || `${APP_NAME} Team`
+      const senderName = details.serviceProviderName.trim() || `${APP_NAME} Team`
       const subject = `Subscription Request from ${senderName}`
 
       await trx
@@ -517,8 +454,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail:
-            'We could not find a client with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
           type: '/client-not-found',
         }),
         { status: 404 }
@@ -530,8 +466,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 409,
           title: 'Client has no email',
-          detail:
-            'A client email address is required to send a subscription request.',
+          detail: 'A client email address is required to send a subscription request.',
           type: '/client-has-no-email',
         }),
         { status: 409 }
@@ -578,8 +513,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to validate subscription data',
-          detail:
-            'Subscription data did not match the expected response schema.',
+          detail: 'Subscription data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

@@ -1,10 +1,6 @@
 import BigNumber from 'bignumber.js'
 
-export type TransactionFeeType =
-  | 'domestic'
-  | 'international'
-  | 'european'
-  | 'nonEuropean'
+export type TransactionFeeType = 'domestic' | 'international' | 'european' | 'nonEuropean'
 
 export type TransactionFeeBreakdown = Readonly<{
   percentageFee: BigNumber
@@ -155,8 +151,7 @@ const europeanCountries = new Set([
   'GB',
 ])
 
-const toPercentage = (value: string) =>
-  new BigNumber(value).shiftedBy(-2)
+const toPercentage = (value: string) => new BigNumber(value).shiftedBy(-2)
 
 const toAmount = (value: string) => new BigNumber(value)
 

@@ -77,16 +77,11 @@ const smsCreditPricingTable = {
   },
 } as const satisfies Record<string, SmsCreditPricing>
 
-export type SmsCreditPricingCountryCode =
-  keyof typeof smsCreditPricingTable
+export type SmsCreditPricingCountryCode = keyof typeof smsCreditPricingTable
 
-export const getSmsCreditPricingForCountry = (
-  countryCode: string
-): SmsCreditPricing | undefined => {
+export const getSmsCreditPricingForCountry = (countryCode: string): SmsCreditPricing | undefined => {
   const normalized = countryCode.trim().toUpperCase()
-  return smsCreditPricingTable[
-    normalized as SmsCreditPricingCountryCode
-  ]
+  return smsCreditPricingTable[normalized as SmsCreditPricingCountryCode]
 }
 
 export const supportedSmsCreditPricingCountries = Object.freeze(

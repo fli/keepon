@@ -12,46 +12,38 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default:
-          "bg-primary text-primary-foreground hover:bg-primary/80 shadow-xs",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-xs",
-        ghost:
-          "text-foreground hover:bg-accent dark:hover:bg-accent/50 hover:text-accent-foreground",
+        default: 'bg-primary text-primary-foreground hover:bg-primary/80 shadow-xs',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-xs',
+        ghost: 'text-foreground hover:bg-accent dark:hover:bg-accent/50 hover:text-accent-foreground',
         outline:
-          "border bg-transparent text-foreground hover:bg-accent dark:hover:bg-accent/50 hover:text-accent-foreground shadow-xs",
-        link: "text-foreground hover:underline",
+          'border bg-transparent text-foreground hover:bg-accent dark:hover:bg-accent/50 hover:text-accent-foreground shadow-xs',
+        link: 'text-foreground hover:underline',
         destructive:
-          "bg-destructive hover:bg-destructive/80 dark:bg-destructive/80 text-destructive-foreground dark:hover:bg-destructive/60 dark:focus-visible:ring-destructive/40 focus-visible:ring-destructive/50 shadow-xs",
+          'bg-destructive hover:bg-destructive/80 dark:bg-destructive/80 text-destructive-foreground dark:hover:bg-destructive/60 dark:focus-visible:ring-destructive/40 focus-visible:ring-destructive/50 shadow-xs',
       },
       size: {
-        sm: "h-8 px-3 gap-1",
-        md: "h-9 px-4",
-        lg: "h-10 px-5",
-        "icon-sm": "size-8 [&_svg:not([class*='size-'])]:size-3",
-        icon: "size-9",
-        "icon-lg": "size-10 [&_svg:not([class*='size-'])]:size-5",
+        sm: 'h-8 px-3 gap-1',
+        md: 'h-9 px-4',
+        lg: 'h-10 px-5',
+        'icon-sm': "size-8 [&_svg:not([class*='size-'])]:size-3",
+        icon: 'size-9',
+        'icon-lg': "size-10 [&_svg:not([class*='size-'])]:size-5",
       },
     },
     defaultVariants: {
-      variant: "default",
-      size: "md",
+      variant: 'default',
+      size: 'md',
     },
   }
 )
 
 export interface ButtonProps
-  extends VariantProps<typeof buttonVariants>,
+  extends
+    VariantProps<typeof buttonVariants>,
     React.ButtonHTMLAttributes<HTMLButtonElement>,
     useRender.ComponentProps<'button'> {}
 
-function Button({
-  className,
-  variant,
-  size,
-  render = <button />,
-  ...props
-}: ButtonProps) {
+function Button({ className, variant, size, render = <button />, ...props }: ButtonProps) {
   const defaultProps = {
     'data-slot': 'button',
     className: cn(buttonVariants({ variant, size, className })),

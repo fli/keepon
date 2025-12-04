@@ -1,12 +1,7 @@
 import { db, sql, type Point } from '@/lib/db'
 import { z } from 'zod'
 
-const moneyString = z
-  .string()
-  .regex(
-    /^-?\d+(?:\.\d{2})$/,
-    'Money values must be formatted with two decimal places'
-  )
+const moneyString = z.string().regex(/^-?\d+(?:\.\d{2})$/, 'Money values must be formatted with two decimal places')
 
 const isoDateTimeString = z.string().datetime({ offset: true })
 
@@ -49,11 +44,7 @@ const serviceSaleProductSchema = baseSaleProductSchema.extend({
   googlePlaceId: z.string().nullable(),
 })
 
-export const saleProductSchema = z.union([
-  creditPackSaleProductSchema,
-  itemSaleProductSchema,
-  serviceSaleProductSchema,
-])
+export const saleProductSchema = z.union([creditPackSaleProductSchema, itemSaleProductSchema, serviceSaleProductSchema])
 
 export const saleProductListSchema = z.array(saleProductSchema)
 
@@ -89,8 +80,7 @@ const ensureDate = (value: Date | string, label: string) => {
   return date
 }
 
-const formatIso = (value: Date | string, label: string) =>
-  ensureDate(value, label).toISOString()
+const formatIso = (value: Date | string, label: string) => ensureDate(value, label).toISOString()
 
 const formatMoney = (value: string, label: string) => {
   const numeric = Number.parseFloat(value)
@@ -100,16 +90,11 @@ const formatMoney = (value: string, label: string) => {
   return numeric.toFixed(2)
 }
 
-const parseInteger = (
-  value: number | string | null | undefined,
-  label: string,
-  options: { minimum?: number } = {}
-) => {
+const parseInteger = (value: number | string | null | undefined, label: string, options: { minimum?: number } = {}) => {
   if (value === null || value === undefined) {
     throw new Error(`Missing ${label} in sale product record`)
   }
-  const numeric =
-    typeof value === 'number' ? value : Number.parseFloat(String(value))
+  const numeric = typeof value === 'number' ? value : Number.parseFloat(String(value))
   if (!Number.isFinite(numeric)) {
     throw new Error(`Invalid ${label} value encountered in sale product record`)
   }
@@ -118,9 +103,7 @@ const parseInteger = (
     throw new Error(`Invalid ${label} value encountered in sale product record`)
   }
   if (options.minimum !== undefined && rounded < options.minimum) {
-    throw new Error(
-      `${label} must be at least ${options.minimum} but was ${rounded}`
-    )
+    throw new Error(`${label} must be at least ${options.minimum} but was ${rounded}`)
   }
   return rounded
 }
@@ -136,9 +119,7 @@ const normalizeGeo = (value: Point | null): z.infer<typeof geoSchema> | null => 
   return { lat: x, lng: y }
 }
 
-const determineType = (
-  row: RawSaleProductRow
-): z.infer<typeof saleProductTypeSchema> => {
+const determineType = (row: RawSaleProductRow): z.infer<typeof saleProductTypeSchema> => {
   if (row.isService) {
     return 'service'
   }
@@ -303,7 +284,5 @@ export const fetchSaleProducts = async (
     query = query.where(({ eb }) => eb(combinedUpdatedAt, '>', updatedAfterDate))
   }
 
-  return query.orderBy('saleProduct.created_at', 'desc').execute() as Promise<
-    RawSaleProductRow[]
-  >
+  return query.orderBy('saleProduct.created_at', 'desc').execute() as Promise<RawSaleProductRow[]>
 }

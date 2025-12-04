@@ -1,23 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db, sql } from '@/lib/db'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
-import {
-  adaptRewardRow,
-  rewardRowSchema,
-  rewardSchema,
-  rewardTypeSchema,
-} from '../shared'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { adaptRewardRow, rewardRowSchema, rewardSchema, rewardTypeSchema } from '../shared'
 
 const paramsSchema = z.object({
-  rewardId: z
-    .string()
-    .trim()
-    .min(1, 'Reward id is required')
-    .uuid({ message: 'Reward id must be a valid UUID' }),
+  rewardId: z.string().trim().min(1, 'Reward id is required').uuid({ message: 'Reward id must be a valid UUID' }),
 })
 
 const patchRequestBodySchema = z
@@ -42,17 +30,13 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid reward identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected reward identifier schema.',
+        detail: detail || 'Request parameters did not match the expected reward identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -65,9 +49,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
     const bodyResult = patchRequestBodySchema.safeParse(rawBody)
 
     if (!bodyResult.success) {
-      const detail = bodyResult.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
@@ -95,8 +77,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating reward',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating reward',
   })
 
   if (!authorization.ok) {
@@ -106,7 +87,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
   const { rewardId } = paramsResult.data
 
   try {
-    const rewardRow = await db.transaction().execute(async trx => {
+    const rewardRow = await db.transaction().execute(async (trx) => {
       const rewardStatusResult = await sql<{
         type: string
         claimed: boolean
@@ -134,8 +115,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         throw new Error(INVALID_REWARD_STATE)
       }
 
-      const { type: currentType, claimed, subscriptionStatus } =
-        parsedStatus.data
+      const { type: currentType, claimed, subscriptionStatus } = parsedStatus.data
 
       const hasUpdates = Object.keys(parsedBody).length > 0
 
@@ -178,9 +158,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
           if (trialRow) {
             await sql`
               UPDATE trial
-                 SET end_time = end_time + ${
-                   effectiveType === '1DayTrial' ? 1 : 2
-                 } * '1 day'::interval
+                 SET end_time = end_time + ${effectiveType === '1DayTrial' ? 1 : 2} * '1 day'::interval
                WHERE trial.id = ${trialRow.id}
             `.execute(trx)
           } else {
@@ -189,16 +167,11 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
               VALUES (
                 ${authorization.trainerId},
                 NOW(),
-                NOW() + ${
-                  effectiveType === '1DayTrial' ? 1 : 2
-                } * '1 day'::interval
+                NOW() + ${effectiveType === '1DayTrial' ? 1 : 2} * '1 day'::interval
               )
             `.execute(trx)
           }
-        } else if (
-          effectiveType === '2TextCredits' ||
-          effectiveType === '3TextCredits'
-        ) {
+        } else if (effectiveType === '2TextCredits' || effectiveType === '3TextCredits') {
           await sql`
             INSERT INTO sms_credit (trainer_id, amount, source)
             VALUES (
@@ -240,8 +213,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Reward not found',
-          detail:
-            'We could not find a reward with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a reward with the specified identifier for the authenticated trainer.',
           type: '/reward-not-found',
         }),
         { status: 404 }
@@ -283,8 +255,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
           buildErrorResponse({
             status: 500,
             title: 'Reward is in an invalid state',
-            detail:
-              'Reward data did not match the expected schema for processing.',
+            detail: 'Reward data did not match the expected schema for processing.',
             type: '/invalid-reward-state',
           }),
           { status: 500 }
@@ -296,8 +267,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
           buildErrorResponse({
             status: 500,
             title: 'Unsupported reward type',
-            detail:
-              'The reward type is not supported for claiming in this environment.',
+            detail: 'The reward type is not supported for claiming in this environment.',
             type: '/unsupported-reward-type',
           }),
           { status: 500 }

@@ -8,12 +8,7 @@ import { Label } from '@/components/ui/label'
 import { PageContainer } from '@/components/page-container'
 
 import { createClientAction, readSessionFromCookies } from '../actions'
-import {
-  optionalValue,
-  statusOptions,
-  type StatusFilter,
-  isStatusFilter,
-} from '@/lib/app/features/clients/shared'
+import { optionalValue, statusOptions, type StatusFilter, isStatusFilter } from '@/lib/app/features/clients/shared'
 
 const getFormString = (formData: FormData, key: string, fallback = '') => {
   const value = formData.get(key)
@@ -75,21 +70,13 @@ async function AddClientContent() {
     <PageContainer className="flex flex-col items-center gap-6 py-8">
       <div className="flex w-full max-w-xl flex-col gap-2">
         <h1 className="text-3xl font-semibold leading-tight">Add client</h1>
-        <p className="text-sm text-muted-foreground">
-          Create a client record to track status and contact details.
-        </p>
+        <p className="text-sm text-muted-foreground">Create a client record to track status and contact details.</p>
       </div>
 
       <form action={addClient} className="w-full max-w-xl space-y-5">
         <div className="space-y-2">
           <Label htmlFor="firstName">First name</Label>
-          <Input
-            id="firstName"
-            name="firstName"
-            required
-            autoFocus
-            autoComplete="given-name"
-          />
+          <Input id="firstName" name="firstName" required autoFocus autoComplete="given-name" />
         </div>
 
         <div className="space-y-2">

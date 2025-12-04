@@ -1,22 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 import { ZodError } from 'zod'
 import { parseNotificationRows, paramsSchema, RawNotificationRow } from '../_shared'
 
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/notifications/new'>
 
-export async function GET(
-  request: NextRequest,
-  context: HandlerContext
-) {
+export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -31,8 +25,7 @@ export async function GET(
   const { trainerId } = paramsResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching notifications',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching notifications',
   })
 
   if (!authorization.ok) {
@@ -52,7 +45,7 @@ export async function GET(
   }
 
   try {
-    const rows = await db
+    const rows = (await db
       .selectFrom('vw_legacy_app_notification')
       .select(({ ref }) => [
         ref('vw_legacy_app_notification.id').as('id'),
@@ -62,12 +55,8 @@ export async function GET(
         ref('vw_legacy_app_notification.viewed').as('viewed'),
         ref('vw_legacy_app_notification.model_name').as('modelName'),
         ref('vw_legacy_app_notification.model_id').as('modelId'),
-        ref('vw_legacy_app_notification.expiration_interval').as(
-          'expirationInterval'
-        ),
-        ref('vw_legacy_app_notification.notification_type').as(
-          'notificationType'
-        ),
+        ref('vw_legacy_app_notification.expiration_interval').as('expirationInterval'),
+        ref('vw_legacy_app_notification.notification_type').as('notificationType'),
         ref('vw_legacy_app_notification.client_id').as('clientId'),
         ref('vw_legacy_app_notification.message_type').as('messageType'),
         ref('vw_legacy_app_notification.category').as('category'),
@@ -75,7 +64,7 @@ export async function GET(
       .where('vw_legacy_app_notification.user_id', '=', authorization.userId)
       .where('vw_legacy_app_notification.viewed', '=', false)
       .orderBy('vw_legacy_app_notification.created', 'desc')
-      .execute() as RawNotificationRow[]
+      .execute()) as RawNotificationRow[]
 
     const notifications = parseNotificationRows(rows)
 

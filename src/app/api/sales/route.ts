@@ -1,22 +1,12 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import {
-  authenticateTrainerOrClientRequest,
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
-import {
-  adaptSaleRow,
-  fetchSales,
-  saleListSchema,
-  salesQuerySchema,
-} from './shared'
+import { authenticateTrainerOrClientRequest, authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { adaptSaleRow, fetchSales, saleListSchema, salesQuerySchema } from './shared'
 import { db } from '@/lib/db'
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const normalize = (value: string | null) =>
-    value && value.trim().length > 0 ? value.trim() : undefined
+  const normalize = (value: string | null) => (value && value.trim().length > 0 ? value.trim() : undefined)
 
   const queryResult = salesQuerySchema.safeParse({
     updatedAfter: normalize(url.searchParams.get('updatedAfter')),
@@ -24,16 +14,13 @@ export async function GET(request: Request) {
   })
 
   if (!queryResult.success) {
-    const detail = queryResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = queryResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid query parameters',
-        detail:
-          detail || 'Request query parameters did not match the expected schema.',
+        detail: detail || 'Request query parameters did not match the expected schema.',
         type: '/invalid-query',
       }),
       { status: 400 }
@@ -41,10 +28,8 @@ export async function GET(request: Request) {
   }
 
   const authorization = await authenticateTrainerOrClientRequest(request, {
-    trainerExtensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching sales for trainer request',
-    clientExtensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching sales for client request',
+    trainerExtensionFailureLogMessage: 'Failed to extend access token expiry while fetching sales for trainer request',
+    clientExtensionFailureLogMessage: 'Failed to extend access token expiry while fetching sales for client request',
   })
 
   if (!authorization.ok) {
@@ -145,7 +130,7 @@ export async function POST(request: Request) {
 
   const parsed = createSaleSchema.safeParse(body)
   if (!parsed.success) {
-    const detail = parsed.error.issues.map(issue => issue.message).join('; ')
+    const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -158,8 +143,7 @@ export async function POST(request: Request) {
   }
 
   const auth = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while creating sale',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while creating sale',
   })
 
   if (!auth.ok) {
@@ -169,7 +153,7 @@ export async function POST(request: Request) {
   const { clientId, note, dueAfter, paymentRequestPassOnTransactionFee, clientSessionId } = parsed.data
 
   try {
-    const created = await db.transaction().execute(async trx => {
+    const created = await db.transaction().execute(async (trx) => {
       const sale = await trx
         .insertInto('sale')
         .values({
@@ -177,8 +161,7 @@ export async function POST(request: Request) {
           client_id: clientId,
           note: note ?? '',
           due_time: parseDueAfter(dueAfter),
-          payment_request_pass_on_transaction_fee:
-            paymentRequestPassOnTransactionFee ?? false,
+          payment_request_pass_on_transaction_fee: paymentRequestPassOnTransactionFee ?? false,
         })
         .returning('id')
         .executeTakeFirst()
@@ -187,10 +170,7 @@ export async function POST(request: Request) {
         throw new Error('Failed to create sale')
       }
 
-      await trx
-        .insertInto('sale_payment_status')
-        .values({ sale_id: sale.id, payment_status: 'none' })
-        .execute()
+      await trx.insertInto('sale_payment_status').values({ sale_id: sale.id, payment_status: 'none' }).execute()
 
       if (clientSessionId) {
         const updated = await trx

@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerOrClientRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerOrClientRequest, buildErrorResponse } from '../../_lib/accessToken'
 
 const stripeAccountSchema = z
   .object({
@@ -47,15 +44,7 @@ const stripeAccountSchema = z
             z.object({
               interval: z.literal('weekly'),
               delay_days: z.number(),
-              weekly_anchor: z.enum([
-                'monday',
-                'tuesday',
-                'wednesday',
-                'thursday',
-                'friday',
-                'saturday',
-                'sunday',
-              ]),
+              weekly_anchor: z.enum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']),
             }),
             z.object({
               interval: z.literal('monthly'),
@@ -104,9 +93,7 @@ const stripeAccountInvalidResponse = (detail?: string) =>
     buildErrorResponse({
       status: 500,
       title: 'Stripe account data invalid',
-      detail:
-        detail ||
-        'Stripe account data did not match the expected response schema.',
+      detail: detail || 'Stripe account data did not match the expected response schema.',
       type: '/invalid-stripe-account',
     }),
     { status: 500 }
@@ -128,14 +115,8 @@ export async function GET(request: Request) {
     if (authorization.actor === 'trainer') {
       const row = await db
         .selectFrom('trainer')
-        .innerJoin(
-          'stripe.account as stripeAccount',
-          'stripeAccount.id',
-          'trainer.stripe_account_id'
-        )
-        .select(({ ref }) => [
-          ref('stripeAccount.object').as('account'),
-        ])
+        .innerJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
+        .select(({ ref }) => [ref('stripeAccount.object').as('account')])
         .where('trainer.id', '=', authorization.trainerId)
         .executeTakeFirst()
 
@@ -146,9 +127,7 @@ export async function GET(request: Request) {
 
       const parsedAccount = stripeAccountSchema.safeParse(parsedRow.data.account)
       if (!parsedAccount.success) {
-        const detail = parsedAccount.error.issues
-          .map(issue => issue.message)
-          .join('; ')
+        const detail = parsedAccount.error.issues.map((issue) => issue.message).join('; ')
 
         console.error('Failed to parse Stripe account object for trainer', {
           trainerId: authorization.trainerId,
@@ -164,15 +143,8 @@ export async function GET(request: Request) {
     const row = await db
       .selectFrom('client')
       .innerJoin('trainer', 'trainer.id', 'client.trainer_id')
-      .innerJoin(
-        'stripe.account as stripeAccount',
-        'stripeAccount.id',
-        'trainer.stripe_account_id'
-      )
-      .select(() => [
-        sql<string>`stripeAccount.id`.as('id'),
-        sql<string>`stripeAccount.object ->> 'type'`.as('type'),
-      ])
+      .innerJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
+      .select(() => [sql<string>`stripeAccount.id`.as('id'), sql<string>`stripeAccount.object ->> 'type'`.as('type')])
       .where('client.id', '=', authorization.clientId)
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()
@@ -183,9 +155,7 @@ export async function GET(request: Request) {
         return stripeAccountNotFoundResponse()
       }
 
-      const detail = parsedRow.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = parsedRow.error.issues.map((issue) => issue.message).join('; ')
 
       console.error('Failed to parse Stripe account summary for client', {
         clientId: authorization.clientId,

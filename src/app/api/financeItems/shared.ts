@@ -1,24 +1,20 @@
 import { z } from 'zod'
 
-const isoDateTimeString = z
-  .union([z.string(), z.date()])
-  .transform(value => {
-    const date = value instanceof Date ? value : new Date(value)
-    if (Number.isNaN(date.getTime())) {
-      throw new Error('Invalid date-time value')
-    }
-    return date.toISOString()
-  })
+const isoDateTimeString = z.union([z.string(), z.date()]).transform((value) => {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('Invalid date-time value')
+  }
+  return date.toISOString()
+})
 
-const trimmedNullableString = z
-  .union([z.string(), z.null(), z.undefined()])
-  .transform(value => {
-    if (value === null || value === undefined) {
-      return null
-    }
-    const trimmed = value.trim()
-    return trimmed.length > 0 ? trimmed : null
-  })
+const trimmedNullableString = z.union([z.string(), z.null(), z.undefined()]).transform((value) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+})
 
 export const financeItemNoteSchema = z.object({
   id: z.string(),
@@ -105,9 +101,7 @@ const parseNullableString = (value: unknown) => {
   return trimmed.length > 0 ? trimmed : null
 }
 
-const parseOptionalIsoDateTime = (
-  value: Date | string | null | undefined
-): string | undefined => {
+const parseOptionalIsoDateTime = (value: Date | string | null | undefined): string | undefined => {
   if (value === null || value === undefined) {
     return undefined
   }
@@ -124,20 +118,14 @@ const parseNotes = (value: unknown) => {
   return value.map((note, index) => {
     const parsed = financeItemNoteSchema.safeParse(note)
     if (!parsed.success) {
-      const messages = parsed.error.issues
-        .map(issue => `${issue.message} (${issue.path.join('.')})`)
-        .join('; ')
-      throw new Error(
-        `Finance item note at index ${index} did not match schema: ${messages}`
-      )
+      const messages = parsed.error.issues.map((issue) => `${issue.message} (${issue.path.join('.')})`).join('; ')
+      throw new Error(`Finance item note at index ${index} did not match schema: ${messages}`)
     }
     return parsed.data
   })
 }
 
-export const adaptFinanceItemRow = (
-  row: FinanceItemRow
-): z.input<typeof financeItemSchema> => {
+export const adaptFinanceItemRow = (row: FinanceItemRow): z.input<typeof financeItemSchema> => {
   const id = ensureString(row.id, 'Finance item id')
   const trainerId = ensureString(row.trainerId, 'Finance item trainer id')
   const amount = parseAmount(row.amount, 'Finance item amount')

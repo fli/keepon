@@ -12,10 +12,7 @@ export const reminderOptions = [
 ] as const
 
 export type ClientReminderType = 'email' | 'sms' | 'emailAndSms'
-export type ServiceProviderReminderType =
-  | 'email'
-  | 'notification'
-  | 'emailAndNotification'
+export type ServiceProviderReminderType = 'email' | 'notification' | 'emailAndNotification'
 
 export const clientReminderTypeValues = [
   'email',

@@ -17,17 +17,13 @@ export async function GET() {
     })
 
     if (!parseResult.success) {
-      const detail = parseResult.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = parseResult.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
           status: 500,
           title: 'Missing configuration values',
-          detail:
-            detail ||
-            'Required public configuration values are missing or invalid.',
+          detail: detail || 'Required public configuration values are missing or invalid.',
           type: '/missing-configuration',
         }),
         { status: 500 }

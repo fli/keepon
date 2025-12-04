@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
-import {
-  createClientForTrainer,
-  createClientSchema,
-  listClientsForTrainer,
-} from '@/server/clients'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
+import { createClientForTrainer, createClientSchema, listClientsForTrainer } from '@/server/clients'
 import { clientListSchema } from '../../../clients/shared'
 
 const paramsSchema = z.object({
@@ -49,7 +42,7 @@ export async function GET(request: NextRequest, context: TrainerRouteContext) {
   const params = await context.params
   const paramsResult = paramsSchema.safeParse(params ?? {})
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -67,7 +60,7 @@ export async function GET(request: NextRequest, context: TrainerRouteContext) {
   })
 
   if (!queryResult.success) {
-    const detail = queryResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = queryResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -80,8 +73,7 @@ export async function GET(request: NextRequest, context: TrainerRouteContext) {
   }
 
   const auth = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching trainer clients',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching trainer clients',
   })
 
   if (!auth.ok) {
@@ -134,7 +126,7 @@ export async function POST(request: NextRequest, context: TrainerRouteContext) {
   const params = await context.params
   const paramsResult = paramsSchema.safeParse(params ?? {})
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -172,7 +164,7 @@ export async function POST(request: NextRequest, context: TrainerRouteContext) {
     const json: unknown = await request.json()
     const validation = createClientsSchema.safeParse(json)
     if (!validation.success) {
-      const detail = validation.error.issues.map(issue => issue.message).join('; ')
+      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
       return invalidBodyResponse(detail)
     }
     parsedBody = validation.data
@@ -184,16 +176,14 @@ export async function POST(request: NextRequest, context: TrainerRouteContext) {
   const payloads = Array.isArray(parsedBody) ? parsedBody : [parsedBody]
 
   try {
-    const created = await Promise.all(
-      payloads.map(payload => createClientForTrainer(auth.trainerId, payload))
-    )
+    const created = await Promise.all(payloads.map((payload) => createClientForTrainer(auth.trainerId, payload)))
 
     const parsed = clientListSchema.parse(created)
 
     return NextResponse.json(Array.isArray(parsedBody) ? parsed : parsed[0])
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const detail = error.issues.map(issue => issue.message).join('; ')
+      const detail = error.issues.map((issue) => issue.message).join('; ')
       return invalidBodyResponse(detail)
     }
 

@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z, ZodError } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
-import {
-  adaptClientSessionRow,
-  RawClientSessionRow,
-} from '../../../_lib/clientSessionsSchema'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
+import { adaptClientSessionRow, RawClientSessionRow } from '../../../_lib/clientSessionsSchema'
 
 const paramsSchema = z.object({
   clientSessionId: z
@@ -45,14 +39,12 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Client session id parameter did not match the expected schema.',
+        detail: detail || 'Client session id parameter did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -62,8 +54,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const { clientSessionId } = paramsResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while confirming client session',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while confirming client session',
   })
 
   if (!authorization.ok) {
@@ -71,7 +62,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   try {
-    const rawRow = await db.transaction().execute(async trx => {
+    const rawRow = await db.transaction().execute(async (trx) => {
       const updateResult = await trx
         .updateTable('client_session')
         .set({
@@ -130,8 +121,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client session not found',
-          detail:
-            'We could not find a client session with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client session with the specified identifier for the authenticated trainer.',
           type: '/client-session-not-found',
         }),
         { status: 404 }
@@ -143,8 +133,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse client session data from database',
-          detail:
-            'Client session data did not match the expected response schema.',
+          detail: 'Client session data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

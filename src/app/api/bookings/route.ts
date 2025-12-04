@@ -16,9 +16,7 @@ const geoSchema = z.object({
 })
 
 const baseBookingSchema = z.object({
-  email: z
-    .string({ message: 'email is required' })
-    .email('email must be valid'),
+  email: z.string({ message: 'email is required' }).email('email must be valid'),
   firstName: z.string().trim().min(1).optional(),
   lastName: z.string().trim().optional().nullable(),
   phoneNumber: z.string().trim().optional().nullable(),
@@ -41,9 +39,7 @@ const baseBookingSchema = z.object({
 
 const serviceBookingSchema = baseBookingSchema.extend({
   serviceId: z.string().uuid({ message: 'serviceId must be a UUID' }),
-  bookingTime: z
-    .string({ message: 'bookingTime is required' })
-    .datetime({ offset: true }),
+  bookingTime: z.string({ message: 'bookingTime is required' }).datetime({ offset: true }),
 })
 
 const sessionBookingSchema = baseBookingSchema.extend({
@@ -55,12 +51,7 @@ const requestSchema = z.union([serviceBookingSchema, sessionBookingSchema])
 /**
  * Response helpers
  */
-const makeError = (
-  status: number,
-  title: string,
-  type: string,
-  detail?: string
-) =>
+const makeError = (status: number, title: string, type: string, detail?: string) =>
   NextResponse.json(
     buildErrorResponse({
       status,
@@ -72,20 +63,10 @@ const makeError = (
   )
 
 const invalidJsonResponse = () =>
-  makeError(
-    400,
-    'Invalid JSON payload',
-    '/invalid-json',
-    'Request body must be valid JSON.'
-  )
+  makeError(400, 'Invalid JSON payload', '/invalid-json', 'Request body must be valid JSON.')
 
 const invalidBodyResponse = (detail?: string) =>
-  makeError(
-    400,
-    'Invalid request body',
-    '/invalid-body',
-    detail ?? 'Request body did not match the expected schema.'
-  )
+  makeError(400, 'Invalid request body', '/invalid-body', detail ?? 'Request body did not match the expected schema.')
 
 type ServiceBookingDetails = {
   bookingTimeAvailable: boolean
@@ -176,7 +157,7 @@ const fetchExistingClients = async (
 ): Promise<ExistingClient[]> => {
   return executor
     .selectFrom('client')
-    .select(eb => [
+    .select((eb) => [
       eb.ref('client.id').as('id'),
       eb.ref('client.first_name').as('firstName'),
       eb.ref('client.last_name').as('lastName'),
@@ -193,20 +174,12 @@ const fetchExistingClients = async (
     .execute()
 }
 
-const createClient = async (
-  executor: DbExecutor,
-  trainerId: string,
-  data: z.infer<typeof baseBookingSchema>
-) => {
+const createClient = async (executor: DbExecutor, trainerId: string, data: z.infer<typeof baseBookingSchema>) => {
   if (!data.firstName) {
     throw new Error('First name is required for new clients')
   }
 
-  const userRow = await executor
-    .insertInto('user_')
-    .values({ type: 'client' })
-    .returning('id')
-    .executeTakeFirst()
+  const userRow = await executor.insertInto('user_').values({ type: 'client' }).returning('id').executeTakeFirst()
 
   if (!userRow) {
     throw new Error('Failed to create user record for client')
@@ -224,12 +197,10 @@ const createClient = async (
       status: 'current',
       location: data.location ?? null,
       address: data.address ?? null,
-      geo: data.geo
-        ? sql`point(${data.geo.lat}, ${data.geo.lng})`
-        : null,
+      geo: data.geo ? sql`point(${data.geo.lat}, ${data.geo.lng})` : null,
       google_place_id: data.googlePlaceId ?? null,
     })
-    .returning(eb => [
+    .returning((eb) => [
       eb.ref('client.id').as('id'),
       eb.ref('client.first_name').as('firstName'),
       eb.ref('client.last_name').as('lastName'),
@@ -267,19 +238,16 @@ const maybeUpdateClient = async (
   const updates: Partial<Insertable<Database['client']>> = {}
   if (data.location !== undefined) updates.location = data.location
   if (data.address !== undefined) updates.address = data.address
-  if (data.googlePlaceId !== undefined)
-    updates.google_place_id = data.googlePlaceId
+  if (data.googlePlaceId !== undefined) updates.google_place_id = data.googlePlaceId
   if (data.geo !== undefined) {
-    updates.geo = data.geo
-      ? ({ x: data.geo.lat, y: data.geo.lng } satisfies Point)
-      : null
+    updates.geo = data.geo ? ({ x: data.geo.lat, y: data.geo.lng } satisfies Point) : null
   }
 
   const updated = await executor
     .updateTable('client')
     .set(updates)
     .where('client.id', '=', client.id)
-    .returning(eb => [
+    .returning((eb) => [
       eb.ref('client.id').as('id'),
       eb.ref('client.first_name').as('firstName'),
       eb.ref('client.last_name').as('lastName'),
@@ -303,9 +271,7 @@ export async function POST(request: Request) {
     const rawBody = (await request.json()) as unknown
     const validation = requestSchema.safeParse(rawBody)
     if (!validation.success) {
-      const detail = validation.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
       return invalidBodyResponse(detail || undefined)
     }
     parsed = validation.data
@@ -323,7 +289,7 @@ export async function POST(request: Request) {
 
 const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) => {
   try {
-    const result = await db.transaction().execute(async trx => {
+    const result = await db.transaction().execute(async (trx) => {
       const detailsResult = await sql<ServiceBookingDetails>`
         SELECT
           is_booking_time_available(service.id, ${data.bookingTime}::timestamptz) AS "bookingTimeAvailable",
@@ -406,26 +372,14 @@ const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) 
         } as const
       }
 
-      if (
-        !details.bookingTimeAvailable ||
-        !details.afterWindowOpens ||
-        !details.beforeWindowCloses
-      ) {
+      if (!details.bookingTimeAvailable || !details.afterWindowOpens || !details.beforeWindowCloses) {
         return {
           ok: false,
-          response: makeError(
-            409,
-            'That booking time is unavailable.',
-            '/booking-time-unavailable'
-          ),
+          response: makeError(409, 'That booking time is unavailable.', '/booking-time-unavailable'),
         } as const
       }
 
-      const existingClients = await fetchExistingClients(
-        trx,
-        details.trainerId,
-        data.email
-      )
+      const existingClients = await fetchExistingClients(trx, details.trainerId, data.email)
 
       if (existingClients.length > 1) {
         return {
@@ -451,27 +405,17 @@ const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) 
         } as const
       }
 
-      const addressRequired =
-        details.bookingRequestClientAddressOnline === 'required'
-      const hasAddress =
-        data.location ??
-        data.address ??
-        foundClient?.location ??
-        foundClient?.address
+      const addressRequired = details.bookingRequestClientAddressOnline === 'required'
+      const hasAddress = data.location ?? data.address ?? foundClient?.location ?? foundClient?.address
 
       if (addressRequired && !hasAddress) {
         return {
           ok: false,
-          response: makeError(
-            409,
-            'This booking requires you to provide your address.',
-            '/booking-requires-address'
-          ),
+          response: makeError(409, 'This booking requires you to provide your address.', '/booking-requires-address'),
         } as const
       }
 
-      const bookingQuestionRequired =
-        details.bookingQuestionState === 'required' && details.bookingQuestion
+      const bookingQuestionRequired = details.bookingQuestionState === 'required' && details.bookingQuestion
       if (bookingQuestionRequired && !data.bookingQuestionResponse) {
         return {
           ok: false,
@@ -487,11 +431,7 @@ const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) 
       if (details.bookingPaymentType === 'fullPrepayment' && priceNumber > 0) {
         return {
           ok: false,
-          response: makeError(
-            409,
-            'This booking must be fully prepaid.',
-            '/booking-requires-deposit'
-          ),
+          response: makeError(409, 'This booking must be fully prepaid.', '/booking-requires-deposit'),
         } as const
       }
 
@@ -534,9 +474,7 @@ const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) 
           trainer_id: details.trainerId,
           location: details.bookingLocation,
           address: details.bookingAddress,
-          geo: details.bookingGeo
-            ? ({ x: details.bookingGeo.lat, y: details.bookingGeo.lng } satisfies Point)
-            : null,
+          geo: details.bookingGeo ? ({ x: details.bookingGeo.lat, y: details.bookingGeo.lng } satisfies Point) : null,
           google_place_id: details.bookingGooglePlaceId,
           booking_payment_type: details.bookingPaymentType,
           request_client_address_online: details.bookingRequestClientAddressOnline,
@@ -561,9 +499,7 @@ const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) 
           price: details.bookingPrice ?? null,
           booked_online: true,
           booking_question: details.bookingQuestion,
-          booking_question_response: details.bookingQuestion
-            ? data.bookingQuestionResponse ?? null
-            : null,
+          booking_question_response: details.bookingQuestion ? (data.bookingQuestionResponse ?? null) : null,
         })
         .returning(['id', 'booking_id'])
         .executeTakeFirst()
@@ -585,17 +521,13 @@ const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) 
     return NextResponse.json({ id: result.bookingId })
   } catch (error) {
     console.error('Failed to create booking (service)', error)
-    return makeError(
-      500,
-      'Failed to create booking',
-      '/internal-server-error'
-    )
+    return makeError(500, 'Failed to create booking', '/internal-server-error')
   }
 }
 
 const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) => {
   try {
-    const result = await db.transaction().execute(async trx => {
+    const result = await db.transaction().execute(async (trx) => {
       const detailsResult = await sql<SessionBookingDetails>`
         SELECT
           session.id AS "sessionId",
@@ -681,11 +613,7 @@ const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) 
       if (!details.afterWindowOpens || !details.beforeWindowCloses) {
         return {
           ok: false,
-          response: makeError(
-            409,
-            'That booking time is unavailable.',
-            '/booking-time-unavailable'
-          ),
+          response: makeError(409, 'That booking time is unavailable.', '/booking-time-unavailable'),
         } as const
       }
 
@@ -696,11 +624,7 @@ const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) 
         } as const
       }
 
-      const existingClients = await fetchExistingClients(
-        trx,
-        details.trainerId,
-        data.email
-      )
+      const existingClients = await fetchExistingClients(trx, details.trainerId, data.email)
 
       if (existingClients.length > 1) {
         return {
@@ -726,27 +650,17 @@ const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) 
         } as const
       }
 
-      const addressRequired =
-        details.bookingRequestClientAddressOnline === 'required'
-      const hasAddress =
-        data.location ??
-        data.address ??
-        foundClient?.location ??
-        foundClient?.address
+      const addressRequired = details.bookingRequestClientAddressOnline === 'required'
+      const hasAddress = data.location ?? data.address ?? foundClient?.location ?? foundClient?.address
 
       if (addressRequired && !hasAddress) {
         return {
           ok: false,
-          response: makeError(
-            409,
-            'This booking requires you to provide your address.',
-            '/booking-requires-address'
-          ),
+          response: makeError(409, 'This booking requires you to provide your address.', '/booking-requires-address'),
         } as const
       }
 
-      const bookingQuestionRequired =
-        details.bookingQuestionState === 'required' && details.bookingQuestion
+      const bookingQuestionRequired = details.bookingQuestionState === 'required' && details.bookingQuestion
       if (bookingQuestionRequired && !data.bookingQuestionResponse) {
         return {
           ok: false,
@@ -762,11 +676,7 @@ const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) 
       if (details.bookingPaymentType === 'fullPrepayment' && priceNumber > 0) {
         return {
           ok: false,
-          response: makeError(
-            409,
-            'This booking must be fully prepaid.',
-            '/booking-requires-deposit'
-          ),
+          response: makeError(409, 'This booking must be fully prepaid.', '/booking-requires-deposit'),
         } as const
       }
 
@@ -790,11 +700,7 @@ const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) 
       if (clientAlreadyBooked) {
         return {
           ok: false,
-          response: makeError(
-            409,
-            'Client is already booked into this event.',
-            '/already-booked-in-event'
-          ),
+          response: makeError(409, 'Client is already booked into this event.', '/already-booked-in-event'),
         } as const
       }
 
@@ -807,9 +713,7 @@ const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) 
           price: details.bookingPrice ?? null,
           booked_online: true,
           booking_question: details.bookingQuestion,
-          booking_question_response: details.bookingQuestion
-            ? data.bookingQuestionResponse ?? null
-            : null,
+          booking_question_response: details.bookingQuestion ? (data.bookingQuestionResponse ?? null) : null,
         })
         .returning(['id', 'booking_id'])
         .executeTakeFirst()
@@ -831,10 +735,6 @@ const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) 
     return NextResponse.json({ id: result.bookingId })
   } catch (error) {
     console.error('Failed to create booking (session)', error)
-    return makeError(
-      500,
-      'Failed to create booking',
-      '/internal-server-error'
-    )
+    return makeError(500, 'Failed to create booking', '/internal-server-error')
   }
 }

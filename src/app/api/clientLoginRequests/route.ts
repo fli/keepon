@@ -3,22 +3,13 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
-import {
-  APP_EMAIL,
-  APP_NAME,
-  KEEPON_LOGO_COLOR_URL,
-} from '../_lib/constants'
+import { APP_EMAIL, APP_NAME, KEEPON_LOGO_COLOR_URL } from '../_lib/constants'
 
 const requestSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, 'Email is required')
-    .email('Email must be a valid email address.'),
+  email: z.string().trim().min(1, 'Email is required').email('Email must be a valid email address.'),
 })
 
-const generateRandomSixDigitCode = () =>
-  crypto.randomInt(0, 1_000_000).toString().padStart(6, '0')
+const generateRandomSixDigitCode = () => crypto.randomInt(0, 1_000_000).toString().padStart(6, '0')
 
 const buildEmailHtml = (code: string) => `
 <!doctype html>
@@ -98,9 +89,7 @@ export async function POST(request: Request) {
     const validation = requestSchema.safeParse(rawBody)
 
     if (!validation.success) {
-      const detail = validation.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
       return createInvalidBodyResponse(detail)
     }
@@ -114,7 +103,7 @@ export async function POST(request: Request) {
   const { email } = parsedBody
 
   try {
-    await db.transaction().execute(async trx => {
+    await db.transaction().execute(async (trx) => {
       const clientRow = await trx
         .selectFrom('client')
         .select('client.email')
@@ -164,11 +153,9 @@ export async function POST(request: Request) {
       return new Response(null, { status: 204 })
     }
 
-    console.error(
-      'Failed to create client login request',
-      error instanceof Error ? error : new Error(String(error)),
-      { email }
-    )
+    console.error('Failed to create client login request', error instanceof Error ? error : new Error(String(error)), {
+      email,
+    })
 
     return createInternalErrorResponse()
   }

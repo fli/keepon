@@ -1,15 +1,8 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
-import {
-  adaptClientSessionRow,
-  clientSessionListSchema,
-  RawClientSessionRow,
-} from '../_lib/clientSessionsSchema'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { adaptClientSessionRow, clientSessionListSchema, RawClientSessionRow } from '../_lib/clientSessionsSchema'
 
 const querySchema = z.object({
   sessionId: z.string().min(1).optional(),
@@ -22,20 +15,14 @@ export async function GET(request: Request) {
   const clientIdParam = url.searchParams.get('clientId')
 
   const normalizedQuery = {
-    sessionId:
-      sessionIdParam && sessionIdParam.trim().length > 0
-        ? sessionIdParam.trim()
-        : undefined,
-    clientId:
-      clientIdParam && clientIdParam.trim().length > 0
-        ? clientIdParam.trim()
-        : undefined,
+    sessionId: sessionIdParam && sessionIdParam.trim().length > 0 ? sessionIdParam.trim() : undefined,
+    clientId: clientIdParam && clientIdParam.trim().length > 0 ? clientIdParam.trim() : undefined,
   }
 
   const queryResult = querySchema.safeParse(normalizedQuery)
 
   if (!queryResult.success) {
-    const detail = queryResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = queryResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -48,8 +35,7 @@ export async function GET(request: Request) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching client sessions',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching client sessions',
   })
 
   if (!authorization.ok) {
@@ -90,11 +76,9 @@ export async function GET(request: Request) {
       query = query.where('v.clientId', '=', queryResult.data.clientId)
     }
 
-    const rows = (await query
-      .orderBy('v.createdAt', 'desc')
-      .execute()) as RawClientSessionRow[]
+    const rows = (await query.orderBy('v.createdAt', 'desc').execute()) as RawClientSessionRow[]
 
-    const clientSessions = rows.map(row => adaptClientSessionRow(row))
+    const clientSessions = rows.map((row) => adaptClientSessionRow(row))
 
     const parsedClientSessions = clientSessionListSchema.parse(clientSessions)
 

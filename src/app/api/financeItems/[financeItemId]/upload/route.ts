@@ -2,19 +2,9 @@ import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
-import {
-  PublicBucketNotConfiguredError,
-  uploadToPublicBucket,
-} from '../../../_lib/storage'
-import {
-  adaptFinanceItemRow,
-  financeItemSchema,
-  type FinanceItemRow,
-} from '../../shared'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
+import { PublicBucketNotConfiguredError, uploadToPublicBucket } from '../../../_lib/storage'
+import { adaptFinanceItemRow, financeItemSchema, type FinanceItemRow } from '../../shared'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 const allowedExtensions = new Set(['jpg', 'jpeg', 'png', 'gif'])
@@ -30,8 +20,7 @@ const createNotFoundResponse = () =>
     buildErrorResponse({
       status: 404,
       title: 'Finance item not found',
-      detail:
-        'We could not find a finance item with the specified identifier for the authenticated trainer.',
+      detail: 'We could not find a finance item with the specified identifier for the authenticated trainer.',
       type: '/finance-item-not-found',
     }),
     { status: 404 }
@@ -42,9 +31,7 @@ const createInvalidParamsResponse = (detail?: string) =>
     buildErrorResponse({
       status: 400,
       title: 'Invalid path parameters',
-      detail:
-        detail ??
-        'Finance item identifier parameter did not match the expected schema.',
+      detail: detail ?? 'Finance item identifier parameter did not match the expected schema.',
       type: '/invalid-path-parameters',
     }),
     { status: 400 }
@@ -55,9 +42,7 @@ const createInvalidBodyResponse = (detail?: string) =>
     buildErrorResponse({
       status: 400,
       title: 'Invalid request body',
-      detail:
-        detail ??
-        'Request body must be multipart/form-data with an image file field named "image".',
+      detail: detail ?? 'Request body must be multipart/form-data with an image file field named "image".',
       type: '/invalid-body',
     }),
     { status: 400 }
@@ -107,10 +92,7 @@ const parseFinanceItem = (row: FinanceItemRow) => {
   }
 }
 
-const fetchFinanceItem = async (
-  trainerId: string,
-  financeItemId: string
-): Promise<FinanceItemRow | undefined> =>
+const fetchFinanceItem = async (trainerId: string, financeItemId: string): Promise<FinanceItemRow | undefined> =>
   (await db
     .selectFrom('vw_legacy_finance_item as v')
     .select(({ ref }) => [
@@ -134,9 +116,7 @@ export async function POST(request: Request, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return createInvalidParamsResponse(detail || undefined)
   }
@@ -144,18 +124,14 @@ export async function POST(request: Request, context: HandlerContext) {
   const { financeItemId } = paramsResult.data
 
   const auth = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while uploading finance item image',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while uploading finance item image',
   })
 
   if (!auth.ok) {
     return auth.response
   }
 
-  const existingFinanceItem = await fetchFinanceItem(
-    auth.trainerId,
-    financeItemId
-  )
+  const existingFinanceItem = await fetchFinanceItem(auth.trainerId, financeItemId)
 
   if (!existingFinanceItem) {
     return createNotFoundResponse()
@@ -177,8 +153,7 @@ export async function POST(request: Request, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse finance item data from database',
-          detail:
-            'Finance item data did not match the expected response schema.',
+          detail: 'Finance item data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
@@ -195,12 +170,7 @@ export async function POST(request: Request, context: HandlerContext) {
   try {
     buffer = Buffer.from(await image.arrayBuffer())
   } catch (error) {
-    console.error(
-      'Failed to read finance item upload buffer',
-      auth.trainerId,
-      financeItemId,
-      error
-    )
+    console.error('Failed to read finance item upload buffer', auth.trainerId, financeItemId, error)
     return createInvalidBodyResponse('Unable to read uploaded image.')
   }
 
@@ -208,10 +178,7 @@ export async function POST(request: Request, context: HandlerContext) {
     const { fileTypeFromBuffer } = await import('file-type')
     const detected = await fileTypeFromBuffer(buffer)
 
-    if (
-      !detected ||
-      !allowedExtensions.has(detected.ext.toLowerCase())
-    ) {
+    if (!detected || !allowedExtensions.has(detected.ext.toLowerCase())) {
       return createInvalidFileTypeResponse()
     }
 
@@ -237,10 +204,7 @@ export async function POST(request: Request, context: HandlerContext) {
       return createNotFoundResponse()
     }
 
-    const financeItem = await fetchFinanceItem(
-      auth.trainerId,
-      financeItemId
-    )
+    const financeItem = await fetchFinanceItem(auth.trainerId, financeItemId)
 
     if (!financeItem) {
       return createNotFoundResponse()
@@ -253,8 +217,7 @@ export async function POST(request: Request, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse finance item data from database',
-          detail:
-            'Finance item data did not match the expected response schema.',
+          detail: 'Finance item data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
@@ -267,12 +230,7 @@ export async function POST(request: Request, context: HandlerContext) {
       return createMissingBucketResponse()
     }
 
-    console.error(
-      'Failed to upload finance item image',
-      auth.trainerId,
-      financeItemId,
-      error
-    )
+    console.error('Failed to upload finance item image', auth.trainerId, financeItemId, error)
 
     return createUnexpectedErrorResponse()
   }

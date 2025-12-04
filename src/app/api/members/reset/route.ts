@@ -2,20 +2,12 @@ import { NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { buildErrorResponse } from '../../_lib/accessToken'
-import {
-  APP_EMAIL,
-  APP_NAME,
-  KEEPON_LOGO_COLOR_URL,
-} from '../../_lib/constants'
+import { APP_EMAIL, APP_NAME, KEEPON_LOGO_COLOR_URL } from '../../_lib/constants'
 
 const PASSWORD_RESET_TTL_MINUTES = 15
 
 const requestSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, 'Email is required')
-    .email('Email must be a valid email address.'),
+  email: z.string().trim().min(1, 'Email is required').email('Email must be a valid email address.'),
 })
 
 class MemberNotFoundError extends Error {
@@ -52,8 +44,7 @@ const createMemberNotFoundResponse = () =>
     buildErrorResponse({
       status: 404,
       title: 'No user with that email',
-      detail:
-        'We could not find a trainer account associated with the provided email address.',
+      detail: 'We could not find a trainer account associated with the provided email address.',
       type: '/member-not-found',
     }),
     { status: 404 }
@@ -133,9 +124,7 @@ export async function POST(request: Request) {
     const validation = requestSchema.safeParse(rawBody)
 
     if (!validation.success) {
-      const detail = validation.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
       return createInvalidBodyResponse(detail)
     }
@@ -150,7 +139,7 @@ export async function POST(request: Request) {
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3001'
 
   try {
-    await db.transaction().execute(async trx => {
+    await db.transaction().execute(async (trx) => {
       const result = await sql<{
         accessToken: string
         userId: string

@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useCallback, useEffect, useMemo, type AnchorHTMLAttributes } from 'react'
 import Link from 'next/link'
@@ -19,14 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   isStatusFilter,
   normalizeStatus,
@@ -57,17 +50,10 @@ export function ClientsGrid({ clients }: Props) {
   const quickFilter = quickFilterParam
   const statusFilter: StatusFilter | 'all' = isStatusFilter(statusParam) ? statusParam : 'all'
   const pageSize =
-    Number.isFinite(pageSizeParam) && PAGE_SIZE_OPTIONS.includes(pageSizeParam)
-      ? pageSizeParam
-      : PAGE_SIZE_DEFAULT
+    Number.isFinite(pageSizeParam) && PAGE_SIZE_OPTIONS.includes(pageSizeParam) ? pageSizeParam : PAGE_SIZE_DEFAULT
 
   const updateQuery = useCallback(
-    (updates: {
-      q?: string
-      status?: StatusFilter | 'all'
-      page?: number
-      pageSize?: number
-    }) => {
+    (updates: { q?: string; status?: StatusFilter | 'all'; page?: number; pageSize?: number }) => {
       const params = new URLSearchParams(searchParams.toString())
 
       if (updates.q !== undefined) {
@@ -122,8 +108,7 @@ export function ClientsGrid({ clients }: Props) {
     const term = quickFilter.trim().toLowerCase()
 
     return clients.filter((client) => {
-      const matchesStatus =
-        statusFilter === 'all' || normalizeStatus(client.status) === statusFilter
+      const matchesStatus = statusFilter === 'all' || normalizeStatus(client.status) === statusFilter
 
       if (!matchesStatus) return false
 
@@ -255,8 +240,7 @@ export function ClientsGrid({ clients }: Props) {
             ) : (
               paginatedClients.map((client) => {
                 const status = normalizeStatus(client.status)
-                const initials =
-                  (client.firstName?.[0] ?? '') + (client.lastName?.[0] ?? '') || '?'
+                const initials = (client.firstName?.[0] ?? '') + (client.lastName?.[0] ?? '') || '?'
 
                 return (
                   <TableRow
@@ -284,8 +268,7 @@ export function ClientsGrid({ clients }: Props) {
                         </Avatar>
                         <div className="flex min-w-0 flex-col">
                           <span className="truncate font-medium text-sm">
-                            {`${client.firstName ?? ''} ${client.lastName ?? ''}`.trim() ||
-                              'Unnamed client'}
+                            {`${client.firstName ?? ''} ${client.lastName ?? ''}`.trim() || 'Unnamed client'}
                           </span>
                           <span className="truncate text-xs text-muted-foreground">
                             {client.email || client.mobileNumber || 'No contact info'}
@@ -320,7 +303,9 @@ export function ClientsGrid({ clients }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
         <div>
           {filteredClients.length > 0 ? (
-            <>Showing {showingStart}–{showingEnd} of {filteredClients.length}</>
+            <>
+              Showing {showingStart}–{showingEnd} of {filteredClients.length}
+            </>
           ) : (
             'No clients found'
           )}
@@ -356,7 +341,7 @@ export function ClientsGrid({ clients }: Props) {
 
               const hrefParams = new URLSearchParams(searchParams.toString())
               hrefParams.set('page', String(pageNumber))
-              const pageHref = (`${pathname}?${hrefParams.toString()}`) as Route
+              const pageHref = `${pathname}?${hrefParams.toString()}` as Route
 
               return (
                 <PaginationItem key={pageNumber}>

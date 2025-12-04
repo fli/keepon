@@ -2,32 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import type { Point } from '@/lib/db/generated'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { getStripeClient } from '../../_lib/stripeClient'
 import { adaptClientRow, clientSchema } from '../shared'
 
 const paramsSchema = z.object({
-  clientId: z
-    .string()
-    .trim()
-    .min(1, 'Client id is required')
-    .uuid({ message: 'Client id must be a valid UUID' }),
+  clientId: z.string().trim().min(1, 'Client id is required').uuid({ message: 'Client id must be a valid UUID' }),
 })
 
 const deleteResponseSchema = z.object({
-  count: z
-    .number()
-    .int()
-    .nonnegative(),
+  count: z.number().int().nonnegative(),
 })
 
 const nullableTrimmedString = z
   .union([z.string(), z.null()])
   .optional()
-  .transform(value => {
+  .transform((value) => {
     if (value === undefined) return undefined
     if (value === null) return null
     const trimmed = value.trim()
@@ -37,7 +27,7 @@ const nullableTrimmedString = z
 const nullablePhoneString = z
   .union([z.string(), z.null()])
   .optional()
-  .transform(value => {
+  .transform((value) => {
     if (value === undefined) return undefined
     if (value === null) return null
     const trimmed = value.trim()
@@ -47,59 +37,41 @@ const nullablePhoneString = z
 const nullableEmail = z
   .union([z.string(), z.null()])
   .optional()
-  .transform(value => {
+  .transform((value) => {
     if (value === undefined) return undefined
     if (value === null) return null
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
   })
-  .refine(
-    value =>
-      value === undefined ||
-      value === null ||
-      z.string().email().safeParse(value).success,
-    {
-      message: 'Email must be a valid email address.',
-    }
-  )
+  .refine((value) => value === undefined || value === null || z.string().email().safeParse(value).success, {
+    message: 'Email must be a valid email address.',
+  })
 
 const nullableUrl = z
   .union([z.string(), z.null()])
   .optional()
-  .transform(value => {
+  .transform((value) => {
     if (value === undefined) return undefined
     if (value === null) return null
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
   })
-  .refine(
-    value =>
-      value === undefined ||
-      value === null ||
-      z.string().url().safeParse(value).success,
-    {
-      message: 'profileImageURL must be a valid URL.',
-    }
-  )
+  .refine((value) => value === undefined || value === null || z.string().url().safeParse(value).success, {
+    message: 'profileImageURL must be a valid URL.',
+  })
 
-const birthdaySchema = z.preprocess(
-  value => {
-    if (value === undefined) return undefined
-    if (value === null) return null
-    if (typeof value === 'string') {
-      const trimmed = value.trim()
-      return trimmed.length > 0 ? trimmed : null
-    }
-    return value
-  },
-  z.union([z.coerce.date(), z.null()]).optional()
-)
+const birthdaySchema = z.preprocess((value) => {
+  if (value === undefined) return undefined
+  if (value === null) return null
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+  return value
+}, z.union([z.coerce.date(), z.null()]).optional())
 
 const geoSchema = z
-  .union([
-    z.object({ lat: z.number(), lng: z.number() }),
-    z.object({ lat: z.null(), lng: z.null() }),
-  ])
+  .union([z.object({ lat: z.number(), lng: z.number() }), z.object({ lat: z.null(), lng: z.null() })])
   .nullable()
   .optional()
 
@@ -142,17 +114,13 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid client identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected client identifier schema.',
+        detail: detail || 'Request parameters did not match the expected client identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -162,8 +130,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const { clientId } = paramsResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching client',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching client',
   })
 
   if (!authorization.ok) {
@@ -183,8 +150,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail:
-            'We could not find a client with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
           type: '/client-not-found',
         }),
         { status: 404 }
@@ -200,20 +166,14 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse client data from database',
-          detail:
-            'Client data did not match the expected response schema.',
+          detail: 'Client data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
       )
     }
 
-    console.error(
-      'Failed to fetch client',
-      authorization.trainerId,
-      clientId,
-      error
-    )
+    console.error('Failed to fetch client', authorization.trainerId, clientId, error)
 
     return NextResponse.json(
       buildErrorResponse({
@@ -230,17 +190,13 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid client identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected client identifier schema.',
+        detail: detail || 'Request parameters did not match the expected client identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -256,9 +212,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     const validation = requestBodySchema.safeParse(rawBody)
 
     if (!validation.success) {
-      const detail = validation.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
@@ -289,13 +243,10 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     )
   }
 
-  const hasUpdates = Object.values(parsedBody).some(
-    value => value !== undefined
-  )
+  const hasUpdates = Object.values(parsedBody).some((value) => value !== undefined)
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating client',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating client',
   })
 
   if (!authorization.ok) {
@@ -326,8 +277,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           buildErrorResponse({
             status: 404,
             title: 'Client not found',
-            detail:
-              'We could not find a client with the specified identifier for the authenticated trainer.',
+            detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
             type: '/client-not-found',
           }),
           { status: 404 }
@@ -366,27 +316,17 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   }
 
   try {
-    await db.transaction().execute(async trx => {
+    await db.transaction().execute(async (trx) => {
       const detailsRow = await trx
         .selectFrom('client as client')
-        .innerJoin(
-          'trainer as trainer',
-          'trainer.id',
-          'client.trainer_id'
-        )
-        .leftJoin(
-          'stripe.account as stripeAccount',
-          'stripeAccount.id',
-          'trainer.stripe_account_id'
-        )
+        .innerJoin('trainer as trainer', 'trainer.id', 'client.trainer_id')
+        .leftJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
         .select(({ ref }) => [
           ref('client.email').as('email'),
           ref('client.user_id').as('userId'),
           ref('client.stripe_customer_id').as('stripeCustomerId'),
           ref('trainer.stripe_account_id').as('stripeAccountId'),
-          sql<string | null>`stripeAccount.object ->> 'type'`.as(
-            'stripeAccountType'
-          ),
+          sql<string | null>`stripeAccount.object ->> 'type'`.as('stripeAccountType'),
         ])
         .where('client.id', '=', clientId)
         .where('client.trainer_id', '=', authorization.trainerId)
@@ -399,9 +339,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       const details = clientDetailsSchema.parse(detailsRow)
 
       const changeValidEmail =
-        parsedBody.email !== undefined &&
-        details.email !== null &&
-        parsedBody.email !== details.email
+        parsedBody.email !== undefined && details.email !== null && parsedBody.email !== details.email
 
       const updates: Partial<{
         status: string
@@ -422,35 +360,24 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       }> = {}
 
       if (parsedBody.status !== undefined) updates.status = parsedBody.status
-      if (parsedBody.firstName !== undefined)
-        updates.first_name = parsedBody.firstName
-      if (parsedBody.lastName !== undefined)
-        updates.last_name = parsedBody.lastName
+      if (parsedBody.firstName !== undefined) updates.first_name = parsedBody.firstName
+      if (parsedBody.lastName !== undefined) updates.last_name = parsedBody.lastName
       if (parsedBody.email !== undefined) updates.email = parsedBody.email
-      if (parsedBody.mobileNumber !== undefined)
-        updates.mobile_number = parsedBody.mobileNumber
-      if (parsedBody.otherNumber !== undefined)
-        updates.other_number = parsedBody.otherNumber
-      if (parsedBody.birthday !== undefined)
-        updates.birthday = parsedBody.birthday
+      if (parsedBody.mobileNumber !== undefined) updates.mobile_number = parsedBody.mobileNumber
+      if (parsedBody.otherNumber !== undefined) updates.other_number = parsedBody.otherNumber
+      if (parsedBody.birthday !== undefined) updates.birthday = parsedBody.birthday
       if (parsedBody.emergencyContactName !== undefined)
         updates.emergency_contact_name = parsedBody.emergencyContactName
       if (parsedBody.emergencyContactMobileNumber !== undefined)
-        updates.emergency_contact_mobile_number =
-          parsedBody.emergencyContactMobileNumber
-      if (parsedBody.profileImageURL !== undefined)
-        updates.profile_image_url = parsedBody.profileImageURL
+        updates.emergency_contact_mobile_number = parsedBody.emergencyContactMobileNumber
+      if (parsedBody.profileImageURL !== undefined) updates.profile_image_url = parsedBody.profileImageURL
       if (parsedBody.company !== undefined) updates.company = parsedBody.company
       if (parsedBody.notes !== undefined) updates.notes = parsedBody.notes
-      if (parsedBody.location !== undefined)
-        updates.location = parsedBody.location
+      if (parsedBody.location !== undefined) updates.location = parsedBody.location
       if (parsedBody.address !== undefined) updates.address = parsedBody.address
-      if (parsedBody.googlePlaceId !== undefined)
-        updates.google_place_id = parsedBody.googlePlaceId
+      if (parsedBody.googlePlaceId !== undefined) updates.google_place_id = parsedBody.googlePlaceId
 
-      let updateBuilder = trx
-        .updateTable('client')
-        .set(updates)
+      let updateBuilder = trx.updateTable('client').set(updates)
 
       if (parsedBody.geo !== undefined) {
         const geoValue =
@@ -480,12 +407,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           .execute()
       }
 
-      if (
-        changeValidEmail &&
-        details.stripeCustomerId &&
-        details.stripeAccountId &&
-        details.stripeAccountType
-      ) {
+      if (changeValidEmail && details.stripeCustomerId && details.stripeAccountId && details.stripeAccountType) {
         const stripeClient = getStripeClient()
 
         if (!stripeClient) {
@@ -493,9 +415,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         }
 
         const stripeOptions =
-          details.stripeAccountType === 'standard'
-            ? { stripeAccount: details.stripeAccountId }
-            : undefined
+          details.stripeAccountType === 'standard' ? { stripeAccount: details.stripeAccountId } : undefined
 
         const paymentMethods = await stripeClient.paymentMethods
           .list(
@@ -509,13 +429,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           .autoPagingToArray({ limit: 1000 })
 
         await Promise.all(
-          paymentMethods.map(method =>
-            stripeClient.paymentMethods.detach(
-              method.id,
-              undefined,
-              stripeOptions
-            )
-          )
+          paymentMethods.map((method) => stripeClient.paymentMethods.detach(method.id, undefined, stripeOptions))
         )
       }
     })
@@ -527,8 +441,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail:
-            'We could not find a client with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
           type: '/client-not-found',
         }),
         { status: 404 }
@@ -542,8 +455,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail:
-            'We could not find a client with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
           type: '/client-not-found',
         }),
         { status: 404 }
@@ -555,8 +467,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to validate client update response',
-          detail:
-            'Client update response did not match the expected schema.',
+          detail: 'Client update response did not match the expected schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
@@ -609,17 +520,13 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid client identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected client identifier schema.',
+        detail: detail || 'Request parameters did not match the expected client identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -629,8 +536,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   const { clientId } = paramsResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while deleting client',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while deleting client',
   })
 
   if (!authorization.ok) {
@@ -638,7 +544,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   }
 
   try {
-    const deleteResult = await db.transaction().execute(async trx => {
+    const deleteResult = await db.transaction().execute(async (trx) => {
       const client = await trx
         .selectFrom('client')
         .select(({ ref }) => [ref('client.id').as('id')])
@@ -687,8 +593,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail:
-            'We could not find a client with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
           type: '/client-not-found',
         }),
         { status: 404 }
@@ -700,8 +605,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to validate client deletion response',
-          detail:
-            'Client deletion response did not match the expected schema.',
+          detail: 'Client deletion response did not match the expected schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

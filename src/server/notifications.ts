@@ -42,12 +42,8 @@ export async function listTrainerNotifications(
       ref('vw_legacy_app_notification.viewed').as('viewed'),
       ref('vw_legacy_app_notification.model_name').as('modelName'),
       ref('vw_legacy_app_notification.model_id').as('modelId'),
-      ref('vw_legacy_app_notification.expiration_interval').as(
-        'expirationInterval'
-      ),
-      ref('vw_legacy_app_notification.notification_type').as(
-        'notificationType'
-      ),
+      ref('vw_legacy_app_notification.expiration_interval').as('expirationInterval'),
+      ref('vw_legacy_app_notification.notification_type').as('notificationType'),
       ref('vw_legacy_app_notification.client_id').as('clientId'),
       ref('vw_legacy_app_notification.message_type').as('messageType'),
       ref('vw_legacy_app_notification.category').as('category'),
@@ -84,10 +80,7 @@ export async function markNotificationAsViewed(
   }
 }
 
-export async function markAllNotificationsAsViewed(
-  trainerId: string,
-  userId: string
-): Promise<number> {
+export async function markAllNotificationsAsViewed(trainerId: string, userId: string): Promise<number> {
   const result = await db
     .updateTable('app_notification')
     .set({ viewed: true })

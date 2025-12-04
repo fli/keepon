@@ -5,18 +5,12 @@ import { type ClientReminder, type ServiceProviderReminder } from '@/lib/reminde
 
 const serviceProviderReminderSchema = z.object({
   type: z.enum(['email', 'notification', 'emailAndNotification']),
-  timeBeforeStart: z
-    .string()
-    .trim()
-    .min(1, 'Reminder time is required'),
+  timeBeforeStart: z.string().trim().min(1, 'Reminder time is required'),
 })
 
 const clientReminderSchema = z.object({
   type: z.enum(['email', 'sms', 'emailAndSms']),
-  timeBeforeStart: z
-    .string()
-    .trim()
-    .min(1, 'Reminder time is required'),
+  timeBeforeStart: z.string().trim().min(1, 'Reminder time is required'),
 })
 
 export const reminderSettingsSchema = z.object({
@@ -32,11 +26,8 @@ let clientReminderTypeCache: string[] | null = null
 
 const loadClientReminderTypes = async () => {
   if (clientReminderTypeCache) return clientReminderTypeCache
-  const rows = await db
-    .selectFrom('client_appointment_reminder_type')
-    .select('type')
-    .execute()
-  clientReminderTypeCache = rows.map(row => row.type)
+  const rows = await db.selectFrom('client_appointment_reminder_type').select('type').execute()
+  clientReminderTypeCache = rows.map((row) => row.type)
   return clientReminderTypeCache
 }
 
@@ -55,24 +46,14 @@ const mapClientTypeToDb = async (type: string | null | undefined) => {
   return type
 }
 
-export async function getReminderSettings(
-  trainerId: string
-): Promise<ReminderSettings> {
+export async function getReminderSettings(trainerId: string): Promise<ReminderSettings> {
   const row = await db
     .selectFrom('vw_legacy_trainer')
     .select(({ ref }) => [
-      ref(
-        'vw_legacy_trainer.default_service_provider_appointment_reminder_1'
-      ).as('serviceProviderReminder1'),
-      ref(
-        'vw_legacy_trainer.default_service_provider_appointment_reminder_2'
-      ).as('serviceProviderReminder2'),
-      ref('vw_legacy_trainer.default_client_appointment_reminder_1').as(
-        'clientReminder1'
-      ),
-      ref('vw_legacy_trainer.default_client_appointment_reminder_2').as(
-        'clientReminder2'
-      ),
+      ref('vw_legacy_trainer.default_service_provider_appointment_reminder_1').as('serviceProviderReminder1'),
+      ref('vw_legacy_trainer.default_service_provider_appointment_reminder_2').as('serviceProviderReminder2'),
+      ref('vw_legacy_trainer.default_client_appointment_reminder_1').as('clientReminder1'),
+      ref('vw_legacy_trainer.default_client_appointment_reminder_2').as('clientReminder2'),
     ])
     .where('vw_legacy_trainer.id', '=', trainerId)
     .executeTakeFirst()
@@ -84,9 +65,7 @@ export async function getReminderSettings(
   try {
     const record = row as Record<string, unknown>
 
-    const normalizeClientReminder = (
-      reminder: unknown
-    ): { type: string; timeBeforeStart: string } | null => {
+    const normalizeClientReminder = (reminder: unknown): { type: string; timeBeforeStart: string } | null => {
       if (!reminder || typeof reminder !== 'object') {
         return null
       }
@@ -131,18 +110,12 @@ export async function updateReminderSettings(
   const clientType2 = await mapClientTypeToDb(parsed.clientReminder2?.type)
 
   const updates: Record<string, unknown> = {
-    default_service_provider_appointment_reminder_1:
-      parsed.serviceProviderReminder1?.timeBeforeStart ?? null,
-    default_service_provider_appointment_reminder_2:
-      parsed.serviceProviderReminder2?.timeBeforeStart ?? null,
-    default_client_appointment_reminder_1:
-      parsed.clientReminder1?.timeBeforeStart ?? null,
-    default_client_appointment_reminder_2:
-      parsed.clientReminder2?.timeBeforeStart ?? null,
-    default_service_provider_appointment_reminder_1_type:
-      parsed.serviceProviderReminder1?.type ?? sql`DEFAULT`,
-    default_service_provider_appointment_reminder_2_type:
-      parsed.serviceProviderReminder2?.type ?? sql`DEFAULT`,
+    default_service_provider_appointment_reminder_1: parsed.serviceProviderReminder1?.timeBeforeStart ?? null,
+    default_service_provider_appointment_reminder_2: parsed.serviceProviderReminder2?.timeBeforeStart ?? null,
+    default_client_appointment_reminder_1: parsed.clientReminder1?.timeBeforeStart ?? null,
+    default_client_appointment_reminder_2: parsed.clientReminder2?.timeBeforeStart ?? null,
+    default_service_provider_appointment_reminder_1_type: parsed.serviceProviderReminder1?.type ?? sql`DEFAULT`,
+    default_service_provider_appointment_reminder_2_type: parsed.serviceProviderReminder2?.type ?? sql`DEFAULT`,
     default_client_appointment_reminder_1_type: clientType1,
     default_client_appointment_reminder_2_type: clientType2,
   }

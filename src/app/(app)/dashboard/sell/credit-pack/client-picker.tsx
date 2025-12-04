@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useCallback, useMemo } from 'react'
 import Link from 'next/link'
@@ -50,8 +50,7 @@ export function ClientPicker({ clients }: Props) {
 
   const filteredClients = useMemo(() => {
     return clients.filter((client) => {
-      const matchesStatus =
-        statusFilter === 'all' || normalizeStatus(client.status) === statusFilter
+      const matchesStatus = statusFilter === 'all' || normalizeStatus(client.status) === statusFilter
       return matchesStatus
     })
   }, [clients, statusFilter])
@@ -59,17 +58,19 @@ export function ClientPicker({ clients }: Props) {
   const goToClient = useCallback(
     (clientId: string) => {
       const params = new URLSearchParams(searchParams.toString())
-      const href = (params.size > 0
-        ? `/dashboard/sell/credit-pack/${clientId}?${params.toString()}`
-        : `/dashboard/sell/credit-pack/${clientId}`) as Route
+      const href = (
+        params.size > 0
+          ? `/dashboard/sell/credit-pack/${clientId}?${params.toString()}`
+          : `/dashboard/sell/credit-pack/${clientId}`
+      ) as Route
       router.push(href)
     },
     [router, searchParams]
   )
 
-  const redirectTarget = (searchParams.size > 0
-    ? `/dashboard/sell/credit-pack?${searchParams.toString()}`
-    : '/dashboard/sell/credit-pack') as Route
+  const redirectTarget = (
+    searchParams.size > 0 ? `/dashboard/sell/credit-pack?${searchParams.toString()}` : '/dashboard/sell/credit-pack'
+  ) as Route
   const redirectParam = encodeURIComponent(redirectTarget)
   const addClientHref = `/clients/add?redirect=${redirectParam}` as Route
 
@@ -79,9 +80,7 @@ export function ClientPicker({ clients }: Props) {
         <div className="flex items-center gap-2">
           {STATUS_TABS.map((status) => {
             const label =
-              status === 'all'
-                ? 'All'
-                : statusOptions.find((option) => option.id === status)?.label ?? status
+              status === 'all' ? 'All' : (statusOptions.find((option) => option.id === status)?.label ?? status)
             const active = statusFilter === status
             return (
               <Button
@@ -95,11 +94,7 @@ export function ClientPicker({ clients }: Props) {
               </Button>
             )
           })}
-          <Button
-            size="sm"
-            render={<Link href={addClientHref} />}
-            className="inline-flex items-center gap-2"
-          >
+          <Button size="sm" render={<Link href={addClientHref} />} className="inline-flex items-center gap-2">
             <Plus className="size-4" aria-hidden />
             New client
           </Button>
@@ -114,8 +109,7 @@ export function ClientPicker({ clients }: Props) {
         ) : (
           filteredClients.map((client) => {
             const status = normalizeStatus(client.status)
-            const initials =
-              (client.firstName?.[0] ?? '') + (client.lastName?.[0] ?? '') || '?'
+            const initials = (client.firstName?.[0] ?? '') + (client.lastName?.[0] ?? '') || '?'
 
             return (
               <button
@@ -150,9 +144,7 @@ export function ClientPicker({ clients }: Props) {
                   <p className="truncate text-sm text-muted-foreground">
                     {client.email || client.mobileNumber || 'No contact info'}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground/80">
-                    {client.company || 'Individual'}
-                  </p>
+                  <p className="truncate text-xs text-muted-foreground/80">{client.company || 'Individual'}</p>
                 </div>
               </button>
             )

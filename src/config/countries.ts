@@ -241,7 +241,12 @@ export const countries: ReadonlyArray<Country> = [
   { id: 804, alpha2: 'UA', alpha3: 'UKR', name: 'Ukraine' },
   { id: 807, alpha2: 'MK', alpha3: 'MKD', name: 'North Macedonia' },
   { id: 818, alpha2: 'EG', alpha3: 'EGY', name: 'Egypt' },
-  { id: 826, alpha2: 'GB', alpha3: 'GBR', name: 'United Kingdom of Great Britain and Northern Ireland' },
+  {
+    id: 826,
+    alpha2: 'GB',
+    alpha3: 'GBR',
+    name: 'United Kingdom of Great Britain and Northern Ireland',
+  },
   { id: 831, alpha2: 'GG', alpha3: 'GGY', name: 'Guernsey' },
   { id: 832, alpha2: 'JE', alpha3: 'JEY', name: 'Jersey' },
   { id: 833, alpha2: 'IM', alpha3: 'IMN', name: 'Isle of Man' },

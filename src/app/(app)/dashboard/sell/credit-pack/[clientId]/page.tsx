@@ -34,12 +34,10 @@ export default async function SelectCreditPackPage({
     }, {})
   ).toString()
 
-  const currentHref = (queryString
-    ? `/dashboard/sell/credit-pack/${clientId}?${queryString}`
-    : `/dashboard/sell/credit-pack/${clientId}`) as Route
-  const backHref = (queryString
-    ? `/dashboard/sell/credit-pack?${queryString}`
-    : '/dashboard/sell/credit-pack') as Route
+  const currentHref = (
+    queryString ? `/dashboard/sell/credit-pack/${clientId}?${queryString}` : `/dashboard/sell/credit-pack/${clientId}`
+  ) as Route
+  const backHref = (queryString ? `/dashboard/sell/credit-pack?${queryString}` : '/dashboard/sell/credit-pack') as Route
   const redirectParam = encodeURIComponent(currentHref)
   const addCreditPackHref = `/settings/credit-packs/add?redirect=${redirectParam}` as Route
 
@@ -63,10 +61,7 @@ export default async function SelectCreditPackPage({
           <Button size="sm" variant="outline" render={<Link href={backHref} />}>
             Change client
           </Button>
-          <Button
-            size="sm"
-            render={<Link href={addCreditPackHref} />}
-          >
+          <Button size="sm" render={<Link href={addCreditPackHref} />}>
             New credit pack
           </Button>
         </div>
@@ -81,11 +76,7 @@ export default async function SelectCreditPackPage({
           </div>
         }
       >
-        <CreditPackSelectorLoader
-          clientId={clientId}
-          backQuery={queryString}
-          creditPacksPromise={creditPacksPromise}
-        />
+        <CreditPackSelectorLoader clientId={clientId} backQuery={queryString} creditPacksPromise={creditPacksPromise} />
       </Suspense>
     </PageContainer>
   )

@@ -50,10 +50,7 @@ export function WeekView({ date: selectedDate, onDateChange }: WeekViewProps) {
               <div className="space-y-3">
                 {day.events.length ? (
                   day.events.map((event) => (
-                    <div
-                      key={event.id}
-                      className="rounded-xl border bg-card px-3 py-2 text-sm shadow-xs"
-                    >
+                    <div key={event.id} className="rounded-xl border bg-card px-3 py-2 text-sm shadow-xs">
                       <p className="font-semibold leading-tight">{event.name}</p>
                       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                         <Clock3 className="size-4" aria-hidden />

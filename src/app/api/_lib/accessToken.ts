@@ -47,12 +47,7 @@ type BuildErrorResponseArgs = {
   type?: string
 }
 
-export const buildErrorResponse = ({
-  status,
-  title,
-  detail,
-  type,
-}: BuildErrorResponseArgs) => ({
+export const buildErrorResponse = ({ status, title, detail, type }: BuildErrorResponseArgs) => ({
   code: status,
   status,
   message: detail ?? title,
@@ -206,11 +201,7 @@ export const authenticateTrainerRequest = async (
 
   const authRow = await db
     .selectFrom('access_token')
-    .innerJoin(
-      'vw_legacy_trainer',
-      'vw_legacy_trainer.member_id',
-      'access_token.user_id'
-    )
+    .innerJoin('vw_legacy_trainer', 'vw_legacy_trainer.member_id', 'access_token.user_id')
     .select(({ ref }) => [
       ref('access_token.id').as('accessToken'),
       ref('access_token.user_id').as('userId'),
@@ -222,11 +213,7 @@ export const authenticateTrainerRequest = async (
     .executeTakeFirst()
 
   const parsedAuthRow = authRowSchema.safeParse(authRow)
-  if (
-    !parsedAuthRow.success ||
-    !parsedAuthRow.data.trainerId ||
-    parsedAuthRow.data.expiresAt.getTime() < Date.now()
-  ) {
+  if (!parsedAuthRow.success || !parsedAuthRow.data.trainerId || parsedAuthRow.data.expiresAt.getTime() < Date.now()) {
     return {
       ok: false,
       response: createInvalidTokenResponse(),
@@ -246,8 +233,7 @@ export const authenticateTrainerRequest = async (
       .execute()
   } catch (extensionError) {
     console.error(
-      options.extensionFailureLogMessage ??
-        'Failed to extend access token expiry for trainer request',
+      options.extensionFailureLogMessage ?? 'Failed to extend access token expiry for trainer request',
       extensionError
     )
   }
@@ -266,11 +252,7 @@ export async function validateTrainerToken(
 ): Promise<{ trainerId: string; userId: string; accessToken: string }> {
   const authRow = await db
     .selectFrom('access_token')
-    .innerJoin(
-      'vw_legacy_trainer',
-      'vw_legacy_trainer.member_id',
-      'access_token.user_id'
-    )
+    .innerJoin('vw_legacy_trainer', 'vw_legacy_trainer.member_id', 'access_token.user_id')
     .select(({ ref }) => [
       ref('access_token.id').as('accessToken'),
       ref('access_token.user_id').as('userId'),
@@ -298,18 +280,12 @@ export async function validateTrainerToken(
     await db
       .updateTable('access_token')
       .set({
-        expires_at: new Date(
-          Date.now() + TRAINER_ACCESS_TOKEN_EXTENSION_MS
-        ),
+        expires_at: new Date(Date.now() + TRAINER_ACCESS_TOKEN_EXTENSION_MS),
       })
       .where('id', '=', parsed.data.accessToken)
       .execute()
   } catch (error) {
-    console.error(
-      options.extensionFailureLogMessage ??
-        'Failed to extend trainer access token',
-      error
-    )
+    console.error(options.extensionFailureLogMessage ?? 'Failed to extend trainer access token', error)
   }
 
   return {
@@ -350,18 +326,14 @@ export const authenticateClientRequest = async (
     .executeTakeFirst()
 
   const parsedAuthRow = clientAuthRowSchema.safeParse(authRow)
-  if (
-    !parsedAuthRow.success ||
-    parsedAuthRow.data.expiresAt.getTime() < Date.now()
-  ) {
+  if (!parsedAuthRow.success || parsedAuthRow.data.expiresAt.getTime() < Date.now()) {
     return {
       ok: false,
       response: createInvalidTokenResponse(),
     }
   }
 
-  const { clientId, trainerId, accessToken: parsedAccessToken, userId } =
-    parsedAuthRow.data
+  const { clientId, trainerId, accessToken: parsedAccessToken, userId } = parsedAuthRow.data
 
   try {
     await db
@@ -374,8 +346,7 @@ export const authenticateClientRequest = async (
       .execute()
   } catch (extensionError) {
     console.error(
-      options.extensionFailureLogMessage ??
-        'Failed to extend access token expiry for client request',
+      options.extensionFailureLogMessage ?? 'Failed to extend access token expiry for client request',
       extensionError
     )
   }
@@ -392,9 +363,7 @@ export const authenticateClientRequest = async (
 export const authenticateTrainerOrClientRequest = async (
   request: Request,
   options: AuthenticateTrainerOrClientOptions = {}
-): Promise<
-  AuthenticateTrainerOrClientSuccess | AuthenticateTrainerOrClientFailure
-> => {
+): Promise<AuthenticateTrainerOrClientSuccess | AuthenticateTrainerOrClientFailure> => {
   const accessToken = await extractAccessToken(request)
   if (!accessToken) {
     return {
@@ -405,11 +374,7 @@ export const authenticateTrainerOrClientRequest = async (
 
   const authRow = await db
     .selectFrom('access_token')
-    .leftJoin(
-      'vw_legacy_trainer',
-      'vw_legacy_trainer.member_id',
-      'access_token.user_id'
-    )
+    .leftJoin('vw_legacy_trainer', 'vw_legacy_trainer.member_id', 'access_token.user_id')
     .leftJoin('client', 'client.user_id', 'access_token.user_id')
     .select(({ ref }) => [
       ref('access_token.id').as('accessToken'),
@@ -421,17 +386,12 @@ export const authenticateTrainerOrClientRequest = async (
       ref('client.trainer_id').as('clientTrainerId'),
     ])
     .where('access_token.id', '=', accessToken)
-    .where(({ eb }) =>
-      eb.or([
-        eb('access_token.type', '=', 'api'),
-        eb('access_token.type', '=', 'client_dashboard'),
-      ])
-    )
+    .where(({ eb }) => eb.or([eb('access_token.type', '=', 'api'), eb('access_token.type', '=', 'client_dashboard')]))
     .executeTakeFirst()
 
-  let parsedAuthRow:
-    | ReturnType<typeof trainerOrClientAuthRowSchema.safeParse>
-    | { success: false } = { success: false }
+  let parsedAuthRow: ReturnType<typeof trainerOrClientAuthRowSchema.safeParse> | { success: false } = {
+    success: false,
+  }
 
   if (authRow?.type === 'api') {
     if (authRow.accessToken && authRow.userId && authRow.trainerId) {
@@ -444,12 +404,7 @@ export const authenticateTrainerOrClientRequest = async (
       })
     }
   } else if (authRow?.type === 'client_dashboard') {
-    if (
-      authRow.accessToken &&
-      authRow.userId &&
-      authRow.clientId &&
-      authRow.clientTrainerId
-    ) {
+    if (authRow.accessToken && authRow.userId && authRow.clientId && authRow.clientTrainerId) {
       parsedAuthRow = trainerOrClientAuthRowSchema.safeParse({
         type: 'client_dashboard',
         accessToken: authRow.accessToken,
@@ -476,11 +431,9 @@ export const authenticateTrainerOrClientRequest = async (
   }
 
   const trainerExtensionLogMessage =
-    options.trainerExtensionFailureLogMessage ??
-    'Failed to extend access token expiry for trainer request'
+    options.trainerExtensionFailureLogMessage ?? 'Failed to extend access token expiry for trainer request'
   const clientExtensionLogMessage =
-    options.clientExtensionFailureLogMessage ??
-    'Failed to extend access token expiry for client request'
+    options.clientExtensionFailureLogMessage ?? 'Failed to extend access token expiry for client request'
 
   if (parsedAuthRow.data.type === 'api') {
     try {

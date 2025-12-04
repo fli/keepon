@@ -32,10 +32,7 @@ const getIcsFromDir = (dir: string): string[] => {
     const fullPath = path.join(dir, dirent.name)
     if (dirent.isDirectory()) {
       files.push(...getIcsFromDir(fullPath))
-    } else if (
-      dirent.isFile() &&
-      path.extname(dirent.name).toLowerCase() === '.ics'
-    ) {
+    } else if (dirent.isFile() && path.extname(dirent.name).toLowerCase() === '.ics') {
       files.push(fullPath)
     }
   }
@@ -62,9 +59,7 @@ const loadTimeZoneInfo = (): TimeZoneInfoMap => {
 
     for (const file of calFiles) {
       const data = fs.readFileSync(file, { encoding: 'utf8' })
-      const match = /(?:^|\n)(BEGIN:VTIMEZONE\n[\s\S]+?\nEND:VTIMEZONE)(?:$|\n)/.exec(
-        data
-      )
+      const match = /(?:^|\n)(BEGIN:VTIMEZONE\n[\s\S]+?\nEND:VTIMEZONE)(?:$|\n)/.exec(data)
       if (!match) {
         continue
       }
@@ -127,8 +122,7 @@ const formatDateTimeInTimeZone = (date: Date, timeZone: string) => {
     hour12: false,
   }).formatToParts(date)
 
-  const lookup = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find(part => part.type === type)?.value ?? '00'
+  const lookup = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? '00'
 
   return `${lookup('year')}${lookup('month')}${lookup('day')}T${lookup('hour')}${lookup('minute')}${lookup('second')}`
 }
@@ -207,17 +201,13 @@ export async function GET(request: Request) {
   const parsedQuery = querySchema.safeParse(query)
 
   if (!parsedQuery.success) {
-    const detail = parsedQuery.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = parsedQuery.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid query parameters',
-        detail:
-          detail ||
-          'Request query parameters did not match the expected schema.',
+        detail: detail || 'Request query parameters did not match the expected schema.',
         type: '/invalid-query-parameters',
       }),
       { status: 400 }

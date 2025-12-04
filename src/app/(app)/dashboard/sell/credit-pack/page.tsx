@@ -46,11 +46,7 @@ export default async function SellCreditPackStartPage() {
   )
 }
 
-async function ClientPickerLoader({
-  clientsPromise,
-}: {
-  clientsPromise: ReturnType<typeof loadClients>
-}) {
+async function ClientPickerLoader({ clientsPromise }: { clientsPromise: ReturnType<typeof loadClients> }) {
   const clients = await clientsPromise
   return <ClientPicker clients={clients} />
 }

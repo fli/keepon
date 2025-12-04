@@ -68,9 +68,7 @@ export async function POST(request: Request) {
     const validation = notificationSchema.safeParse(rawBody)
 
     if (!validation.success) {
-      const detail = validation.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
       return createInvalidBodyResponse(detail || undefined)
     }
@@ -91,28 +89,25 @@ export async function POST(request: Request) {
   const isProduction = isProductionEnvironment()
 
   if (environment === 'Sandbox' && isProduction) {
-    console.debug(
-      'App Store server notification skipped due to production environment mismatch',
-      { environment, appEnv: 'production' }
-    )
+    console.debug('App Store server notification skipped due to production environment mismatch', {
+      environment,
+      appEnv: 'production',
+    })
     return new Response(null, { status: 204 })
   }
 
   if (environment === 'PROD' && !isProduction) {
-    console.debug(
-      'App Store server notification skipped due to non-production environment mismatch',
-      { environment, appEnv: 'non-production' }
-    )
+    console.debug('App Store server notification skipped due to non-production environment mismatch', {
+      environment,
+      appEnv: 'non-production',
+    })
     return new Response(null, { status: 204 })
   }
 
   const sanitizedNotification = sanitizeNotification(notification)
 
   try {
-    await db
-      .insertInto('app_store_server_notification')
-      .values({ object: sanitizedNotification })
-      .execute()
+    await db.insertInto('app_store_server_notification').values({ object: sanitizedNotification }).execute()
   } catch (error) {
     console.error('Failed to record App Store server notification', {
       error,

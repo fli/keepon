@@ -41,16 +41,14 @@ export function ProjectedPaidCard({ payments }: ProjectedPaidCardProps) {
     <Card className="gap-0">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-foreground">
-            Payments
-          </p>
+          <p className="text-sm font-semibold text-foreground">Payments</p>
           <NativeSelect
             aria-label="Select revenue timeframe"
             value={timeframe}
-            onChange={event => setTimeframe(event.target.value as Timeframe)}
+            onChange={(event) => setTimeframe(event.target.value as Timeframe)}
             containerClassName="w-36"
           >
-            {timeframeOptions.map(option => (
+            {timeframeOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -61,24 +59,16 @@ export function ProjectedPaidCard({ payments }: ProjectedPaidCardProps) {
       <CardContent className="pt-0">
         <div className="flex items-center gap-4">
           <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">
-              Projected
-            </p>
+            <p className="text-sm font-medium text-muted-foreground">Projected</p>
             <p className="text-2xl font-semibold text-foreground">
-              {selected && currency
-                ? formatCurrency(selected.projected, currency)
-                : '—'}
+              {selected && currency ? formatCurrency(selected.projected, currency) : '—'}
             </p>
           </div>
           <div className="h-10 w-px bg-border mx-3" aria-hidden />
           <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">
-              Paid
-            </p>
+            <p className="text-sm font-medium text-muted-foreground">Paid</p>
             <p className="text-2xl font-semibold text-foreground">
-              {selected && currency
-                ? formatCurrency(selected.paid, currency)
-                : '—'}
+              {selected && currency ? formatCurrency(selected.paid, currency) : '—'}
             </p>
           </div>
         </div>

@@ -1,25 +1,21 @@
 import { z } from 'zod'
 import type { Selectable, VwLegacyClient } from '@/lib/db'
 
-const isoDateTimeString = z
-  .union([z.string(), z.date()])
-  .transform(value => {
-    const date = value instanceof Date ? value : new Date(value)
-    if (Number.isNaN(date.getTime())) {
-      throw new Error('Invalid date-time value')
-    }
-    return date.toISOString()
-  })
+const isoDateTimeString = z.union([z.string(), z.date()]).transform((value) => {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('Invalid date-time value')
+  }
+  return date.toISOString()
+})
 
-const isoDateString = z
-  .union([z.string(), z.date()])
-  .transform(value => {
-    const date = value instanceof Date ? value : new Date(value)
-    if (Number.isNaN(date.getTime())) {
-      throw new Error('Invalid date value')
-    }
-    return date.toISOString().slice(0, 10)
-  })
+const isoDateString = z.union([z.string(), z.date()]).transform((value) => {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('Invalid date value')
+  }
+  return date.toISOString().slice(0, 10)
+})
 
 const sessionPackSchema = z.object({
   id: z.string(),
@@ -28,13 +24,7 @@ const sessionPackSchema = z.object({
   amount: z.number(),
   sessionsTotal: z.number(),
   sessionsRemaining: z.number(),
-  paymentStatus: z.enum([
-    'requested',
-    'rejected',
-    'paid',
-    'refunded',
-    'pending',
-  ]),
+  paymentStatus: z.enum(['requested', 'rejected', 'paid', 'refunded', 'pending']),
   paymentMethod: z.enum(['card', 'cash']),
   stripeCharge: z.string().nullable(),
   stripeRefund: z.string().nullable(),
@@ -47,14 +37,7 @@ const paymentPlanPaymentSchema = z.object({
   date: isoDateTimeString,
   amount: z.number(),
   outstandingAmount: z.number(),
-  status: z.enum([
-    'paid',
-    'rejected',
-    'refunded',
-    'cancelled',
-    'paused',
-    'pending',
-  ]),
+  status: z.enum(['paid', 'rejected', 'refunded', 'cancelled', 'paused', 'pending']),
   planId: z.string(),
   currency: z.string(),
 })
@@ -76,9 +59,7 @@ const paymentPlanSchema = z.object({
   currency: z.string(),
   startDate: isoDateTimeString.optional(),
   endDate: isoDateTimeString.nullable().optional(),
-  frequency: z
-    .union([z.literal(7), z.literal(14), z.literal(21), z.literal(28)])
-    .optional(),
+  frequency: z.union([z.literal(7), z.literal(14), z.literal(21), z.literal(28)]).optional(),
   planPayments: z.array(paymentPlanPaymentSchema).optional(),
   planPauses: z.array(paymentPlanPauseSchema).optional(),
   nextPaymentDate: isoDateTimeString.nullable().optional(),
@@ -89,13 +70,7 @@ const paymentPlanSchema = z.object({
 const clientNoteSchema = z.object({
   id: z.string(),
   content: z.string(),
-  classification: z.enum([
-    'notes',
-    'goals',
-    'medication',
-    'currentInjuries',
-    'pastInjuries',
-  ]),
+  classification: z.enum(['notes', 'goals', 'medication', 'currentInjuries', 'pastInjuries']),
   clientId: z.string(),
 })
 

@@ -44,13 +44,7 @@ const screenEventSchema = z.object({
 
 const requestSchema = z.object({
   batch: z
-    .array(
-      z.discriminatedUnion('type', [
-        identifyEventSchema,
-        trackEventSchema,
-        screenEventSchema,
-      ])
-    )
+    .array(z.discriminatedUnion('type', [identifyEventSchema, trackEventSchema, screenEventSchema]))
     .min(1, 'batch must contain at least one event'),
   sentAt: dateLikeSchema.optional(),
   context: looseRecord.optional(),
@@ -119,11 +113,7 @@ const toNullableNumber = (...values: Array<unknown>): number | null => {
   for (const value of values) {
     if (value === undefined || value === null) continue
     const numeric =
-      typeof value === 'number'
-        ? value
-        : typeof value === 'string'
-          ? Number.parseFloat(value)
-          : Number.NaN
+      typeof value === 'number' ? value : typeof value === 'string' ? Number.parseFloat(value) : Number.NaN
 
     if (Number.isFinite(numeric)) {
       return numeric
@@ -176,9 +166,7 @@ export async function POST(request: Request) {
     const raw = (await request.json()) as unknown
     const parsed = requestSchema.safeParse(raw)
     if (!parsed.success) {
-      const detail = parsed.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
       return createInvalidBodyResponse(detail || undefined)
     }
     body = parsed.data
@@ -191,23 +179,15 @@ export async function POST(request: Request) {
   const requestSentAt = parseDate(body.sentAt)
   const requestContext = body.context ?? {}
 
-  const rows: AnalyticsRow[] = body.batch.map(event => {
+  const rows: AnalyticsRow[] = body.batch.map((event) => {
     const eventContext = event.context ?? {}
     const eventSentAt = parseDate(event.sentAt)
     const eventTimestamp = parseDate(event.timestamp)
-    const timestamp = computeTimestamp(
-      now,
-      requestSentAt,
-      eventSentAt,
-      eventTimestamp
-    )
+    const timestamp = computeTimestamp(now, requestSentAt, eventSentAt, eventTimestamp)
 
-    const properties =
-      event.type === 'track' ? toJsonOrNull(event.properties) : null
-    const screenName =
-      event.type === 'screen' ? toNullableString(event.name) : null
-    const eventName =
-      event.type === 'track' ? toNullableString(event.event) : null
+    const properties = event.type === 'track' ? toJsonOrNull(event.properties) : null
+    const screenName = event.type === 'screen' ? toNullableString(event.name) : null
+    const eventName = event.type === 'track' ? toNullableString(event.event) : null
 
     const row: AnalyticsRow = {
       anonymous_id: toNullableString(event.anonymousId),
@@ -218,10 +198,7 @@ export async function POST(request: Request) {
       type: event.type,
       received_at: now,
       timestamp,
-      context_active: toNullableBoolean(
-        requestContext.active,
-        eventContext.active
-      ),
+      context_active: toNullableBoolean(requestContext.active, eventContext.active),
       context_app_name: toNullableString(
         (requestContext.app as Record<string, unknown> | undefined)?.name,
         (eventContext.app as Record<string, unknown> | undefined)?.name
@@ -243,13 +220,11 @@ export async function POST(request: Request) {
         (eventContext.campaign as Record<string, unknown> | undefined)?.name
       ),
       context_campaign_source: toNullableString(
-        (requestContext.campaign as Record<string, unknown> | undefined)
-          ?.source,
+        (requestContext.campaign as Record<string, unknown> | undefined)?.source,
         (eventContext.campaign as Record<string, unknown> | undefined)?.source
       ),
       context_campaign_medium: toNullableString(
-        (requestContext.campaign as Record<string, unknown> | undefined)
-          ?.medium,
+        (requestContext.campaign as Record<string, unknown> | undefined)?.medium,
         (eventContext.campaign as Record<string, unknown> | undefined)?.medium
       ),
       context_campaign_term: toNullableString(
@@ -257,8 +232,7 @@ export async function POST(request: Request) {
         (eventContext.campaign as Record<string, unknown> | undefined)?.term
       ),
       context_campaign_content: toNullableString(
-        (requestContext.campaign as Record<string, unknown> | undefined)
-          ?.content,
+        (requestContext.campaign as Record<string, unknown> | undefined)?.content,
         (eventContext.campaign as Record<string, unknown> | undefined)?.content
       ),
       context_device_id: toNullableString(
@@ -266,22 +240,16 @@ export async function POST(request: Request) {
         (eventContext.device as Record<string, unknown> | undefined)?.id
       ),
       context_device_advertising_id: toNullableString(
-        (requestContext.device as Record<string, unknown> | undefined)
-          ?.advertisingId,
-        (eventContext.device as Record<string, unknown> | undefined)
-          ?.advertisingId
+        (requestContext.device as Record<string, unknown> | undefined)?.advertisingId,
+        (eventContext.device as Record<string, unknown> | undefined)?.advertisingId
       ),
       context_device_ad_tracking_enabled: toNullableString(
-        (requestContext.device as Record<string, unknown> | undefined)
-          ?.adTrackingEnabled,
-        (eventContext.device as Record<string, unknown> | undefined)
-          ?.adTrackingEnabled
+        (requestContext.device as Record<string, unknown> | undefined)?.adTrackingEnabled,
+        (eventContext.device as Record<string, unknown> | undefined)?.adTrackingEnabled
       ),
       context_device_manufacturer: toNullableString(
-        (requestContext.device as Record<string, unknown> | undefined)
-          ?.manufacturer,
-        (eventContext.device as Record<string, unknown> | undefined)
-          ?.manufacturer
+        (requestContext.device as Record<string, unknown> | undefined)?.manufacturer,
+        (eventContext.device as Record<string, unknown> | undefined)?.manufacturer
       ),
       context_device_model: toNullableString(
         (requestContext.device as Record<string, unknown> | undefined)?.model,
@@ -305,37 +273,28 @@ export async function POST(request: Request) {
         (eventContext.library as Record<string, unknown> | undefined)?.name
       ),
       context_library_version: toNullableString(
-        (requestContext.library as Record<string, unknown> | undefined)
-          ?.version,
+        (requestContext.library as Record<string, unknown> | undefined)?.version,
         (eventContext.library as Record<string, unknown> | undefined)?.version
       ),
-      context_locale: toNullableString(
-        requestContext.locale,
-        eventContext.locale
-      ),
+      context_locale: toNullableString(requestContext.locale, eventContext.locale),
       context_location_city: toNullableString(
         (requestContext.location as Record<string, unknown> | undefined)?.city,
         (eventContext.location as Record<string, unknown> | undefined)?.city
       ),
       context_location_country: toNullableString(
-        (requestContext.location as Record<string, unknown> | undefined)
-          ?.country,
+        (requestContext.location as Record<string, unknown> | undefined)?.country,
         (eventContext.location as Record<string, unknown> | undefined)?.country
       ),
       context_location_latitude: toNullableNumber(
-        (requestContext.location as Record<string, unknown> | undefined)
-          ?.latitude,
+        (requestContext.location as Record<string, unknown> | undefined)?.latitude,
         (eventContext.location as Record<string, unknown> | undefined)?.latitude
       ),
       context_location_longitude: toNullableNumber(
-        (requestContext.location as Record<string, unknown> | undefined)
-          ?.longitude,
-        (eventContext.location as Record<string, unknown> | undefined)
-          ?.longitude
+        (requestContext.location as Record<string, unknown> | undefined)?.longitude,
+        (eventContext.location as Record<string, unknown> | undefined)?.longitude
       ),
       context_location_region: toNullableString(
-        (requestContext.location as Record<string, unknown> | undefined)
-          ?.region,
+        (requestContext.location as Record<string, unknown> | undefined)?.region,
         (eventContext.location as Record<string, unknown> | undefined)?.region
       ),
       context_location_speed: toNullableNumber(
@@ -343,18 +302,15 @@ export async function POST(request: Request) {
         (eventContext.location as Record<string, unknown> | undefined)?.speed
       ),
       context_network_bluetooth: toNullableBoolean(
-        (requestContext.network as Record<string, unknown> | undefined)
-          ?.bluetooth,
-        (eventContext.network as Record<string, unknown> | undefined)
-          ?.bluetooth
+        (requestContext.network as Record<string, unknown> | undefined)?.bluetooth,
+        (eventContext.network as Record<string, unknown> | undefined)?.bluetooth
       ),
       context_network_carrier: toNullableString(
         (requestContext.network as Record<string, unknown> | undefined)?.carrier,
         (eventContext.network as Record<string, unknown> | undefined)?.carrier
       ),
       context_network_cellular: toNullableBoolean(
-        (requestContext.network as Record<string, unknown> | undefined)
-          ?.cellular,
+        (requestContext.network as Record<string, unknown> | undefined)?.cellular,
         (eventContext.network as Record<string, unknown> | undefined)?.cellular
       ),
       context_network_wifi: toNullableBoolean(
@@ -425,18 +381,9 @@ export async function POST(request: Request) {
         (requestContext.screen as Record<string, unknown> | undefined)?.width,
         (eventContext.screen as Record<string, unknown> | undefined)?.width
       ),
-      context_timezone: toNullableString(
-        requestContext.timezone,
-        eventContext.timezone
-      ),
-      context_group_id: toNullableString(
-        requestContext.groupId,
-        eventContext.groupId
-      ),
-      context_user_agent: toNullableString(
-        requestContext.userAgent,
-        eventContext.userAgent
-      ),
+      context_timezone: toNullableString(requestContext.timezone, eventContext.timezone),
+      context_group_id: toNullableString(requestContext.groupId, eventContext.groupId),
+      context_user_agent: toNullableString(requestContext.userAgent, eventContext.userAgent),
     }
 
     const messageId = toNullableString(event.messageId)
@@ -455,7 +402,7 @@ export async function POST(request: Request) {
     await db
       .insertInto('analytics_data')
       .values(rows)
-      .onConflict(oc => oc.doNothing())
+      .onConflict((oc) => oc.doNothing())
       .execute()
   } catch (error) {
     console.error('Failed to insert analytics batch', { error })

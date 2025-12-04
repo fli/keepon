@@ -1,12 +1,6 @@
 import { redirect } from 'next/navigation'
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageContainer } from '@/components/page-container'
 import { readSessionFromCookies } from '../../session.server'
 
@@ -23,9 +17,7 @@ export default async function FinancePage() {
         <Card>
           <CardHeader>
             <CardDescription>Payouts</CardDescription>
-            <CardTitle className="text-lg">
-              Reconciliation moves to the dashboard data source.
-            </CardTitle>
+            <CardTitle className="text-lg">Reconciliation moves to the dashboard data source.</CardTitle>
           </CardHeader>
         </Card>
         <Card>

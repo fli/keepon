@@ -54,10 +54,7 @@ export default async function ServicesPage() {
     services = z.array(serviceProductSchema).parse(data)
   } catch (cause: unknown) {
     console.error('ServicesPage: failed to load services', cause)
-    error =
-      cause instanceof Error
-        ? cause.message
-        : 'Unable to load services right now. Please try again shortly.'
+    error = cause instanceof Error ? cause.message : 'Unable to load services right now. Please try again shortly.'
   }
 
   return (

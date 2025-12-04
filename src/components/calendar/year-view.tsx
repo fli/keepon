@@ -28,10 +28,7 @@ export function YearView({ date }: YearViewProps) {
             </div>
             <div className="mt-2 grid grid-cols-7 gap-px rounded-lg bg-border text-sm">
               {Array.from({ length: 30 }).map((_, idx) => (
-                <div
-                  key={idx}
-                  className="flex h-9 items-center justify-center bg-card text-muted-foreground"
-                >
+                <div key={idx} className="flex h-9 items-center justify-center bg-card text-muted-foreground">
                   {idx + 1}
                 </div>
               ))}

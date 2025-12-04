@@ -2,11 +2,7 @@ import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 
 import { Badge } from '@/components/ui/badge'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-} from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { PageContainer } from '@/components/page-container'
 
 import { statusColors, normalizeStatus, optionalValue } from '@/lib/app/features/clients/shared'

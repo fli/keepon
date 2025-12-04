@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 
 const paramsSchema = z.object({
   invitationId: z
@@ -37,17 +34,13 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid session invitation identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected session invitation identifier schema.',
+        detail: detail || 'Request parameters did not match the expected session invitation identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -55,8 +48,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while deleting session invitation',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while deleting session invitation',
   })
 
   if (!authorization.ok) {
@@ -73,17 +65,14 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
       .where('client_session.state', '=', 'invited')
       .executeTakeFirst()
 
-    const deletedCount = normalizeDeletedCount(
-      deleteResult?.numDeletedRows ?? 0
-    )
+    const deletedCount = normalizeDeletedCount(deleteResult?.numDeletedRows ?? 0)
 
     if (deletedCount === 0) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
           title: 'Session invitation not found',
-          detail:
-            'We could not find an invitation with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find an invitation with the specified identifier for the authenticated trainer.',
           type: '/session-invitation-not-found',
         }),
         { status: 404 }

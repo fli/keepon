@@ -31,11 +31,7 @@ export default async function ClientsPage() {
         </div>
       </div>
 
-      <Suspense
-        fallback={
-          <ClientsGridSkeleton />
-        }
-      >
+      <Suspense fallback={<ClientsGridSkeleton />}>
         <ClientsGrid clients={clients} />
       </Suspense>
     </PageContainer>

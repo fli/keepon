@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
   const parsed = trainerSignupSchema.safeParse(body)
   if (!parsed.success) {
-    const detail = parsed.error.issues.map(issue => issue.message).join('; ')
+    const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
     return invalidBodyResponse(detail || undefined)
   }
 

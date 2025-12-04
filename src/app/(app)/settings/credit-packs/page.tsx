@@ -65,7 +65,9 @@ export default async function CreditPacksPage() {
               Review packs of credits that clients can purchase and apply toward sessions.
             </p>
           </div>
-          <Button size="sm" render={<Link href="/settings/credit-packs/add" />}>Add credit pack</Button>
+          <Button size="sm" render={<Link href="/settings/credit-packs/add" />}>
+            Add credit pack
+          </Button>
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </div>
@@ -81,7 +83,7 @@ export default async function CreditPacksPage() {
           {creditPacks.length === 0 ? (
             <div className="px-4 py-6 text-sm text-muted-foreground">{error ?? 'No credit packs yet.'}</div>
           ) : (
-            creditPacks.map(pack => (
+            creditPacks.map((pack) => (
               <div
                 key={pack.id}
                 className="grid grid-cols-4 items-center gap-3 px-4 py-4 transition-colors hover:bg-muted/40"

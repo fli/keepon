@@ -20,10 +20,7 @@ type Props = {
 }
 
 export function ServicesTable({ services, error }: Props) {
-  const sorted = useMemo(
-    () => [...services].sort((a, b) => a.name.localeCompare(b.name)),
-    [services]
-  )
+  const sorted = useMemo(() => [...services].sort((a, b) => a.name.localeCompare(b.name)), [services])
 
   return (
     <div className="overflow-hidden rounded-lg border border-border shadow-sm">
@@ -41,7 +38,7 @@ export function ServicesTable({ services, error }: Props) {
             No services yet. Add a service in the legacy app and it will appear here.
           </div>
         ) : (
-          sorted.map(service => (
+          sorted.map((service) => (
             <div
               key={service.id}
               className="grid grid-cols-4 items-center gap-3 px-4 py-4 transition-colors hover:bg-muted/40"
@@ -61,9 +58,7 @@ export function ServicesTable({ services, error }: Props) {
               </div>
               <div className="font-medium">{service.name}</div>
               <div>{formatDuration(service.durationMinutes)}</div>
-              <div className="text-right font-medium tabular-nums">
-                {formatPrice(service.price, service.currency)}
-              </div>
+              <div className="text-right font-medium tabular-nums">{formatPrice(service.price, service.currency)}</div>
             </div>
           ))
         )}
@@ -83,8 +78,7 @@ function formatDuration(minutes?: number | null) {
 }
 
 function formatPrice(amount: string | number, currency: string) {
-  const parsed =
-    typeof amount === 'number' ? amount : Number.parseFloat(amount ?? '0')
+  const parsed = typeof amount === 'number' ? amount : Number.parseFloat(amount ?? '0')
   const safeAmount = Number.isFinite(parsed) ? parsed : 0
   try {
     return new Intl.NumberFormat('en', {

@@ -62,11 +62,11 @@ export default async function ItemsPage() {
           <div>
             <p className="text-sm uppercase tracking-wide text-muted-foreground">Settings</p>
             <h1 className="text-3xl font-semibold leading-tight">Items</h1>
-            <p className="text-sm text-muted-foreground">
-              Sell add-ons and one-off items.
-            </p>
+            <p className="text-sm text-muted-foreground">Sell add-ons and one-off items.</p>
           </div>
-          <Button size="sm" render={<Link href="/settings/items/add" />}>Add item</Button>
+          <Button size="sm" render={<Link href="/settings/items/add" />}>
+            Add item
+          </Button>
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </div>
@@ -81,18 +81,14 @@ export default async function ItemsPage() {
           {sorted.length === 0 ? (
             <div className="px-4 py-6 text-sm text-muted-foreground">{error ?? 'No items yet.'}</div>
           ) : (
-            sorted.map(item => (
+            sorted.map((item) => (
               <div
                 key={item.id}
                 className="grid grid-cols-3 items-center gap-3 px-4 py-4 transition-colors hover:bg-muted/40"
               >
                 <div className="font-medium">{item.name}</div>
-                <div className="truncate text-muted-foreground">
-                  {item.description?.trim() || '—'}
-                </div>
-                <div className="text-right">
-                  {formatPrice(item.price, item.currency)}
-                </div>
+                <div className="truncate text-muted-foreground">{item.description?.trim() || '—'}</div>
+                <div className="text-right">{formatPrice(item.price, item.currency)}</div>
               </div>
             ))
           )}

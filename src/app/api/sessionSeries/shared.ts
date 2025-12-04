@@ -13,15 +13,8 @@ import { type Selectable, type VwLegacySessionSeries2 } from '@/lib/db'
 type RawRow = Selectable<VwLegacySessionSeries2>
 
 export const sessionTypeSchema = z.enum(['single', 'group', 'event'])
-export const bookingPaymentTypeSchema = z.enum([
-  'hidePrice',
-  'noPrepayment',
-  'fullPrepayment',
-])
-export const requestClientAddressOnlineValueSchema = z.enum([
-  'optional',
-  'required',
-])
+export const bookingPaymentTypeSchema = z.enum(['hidePrice', 'noPrepayment', 'fullPrepayment'])
+export const requestClientAddressOnlineValueSchema = z.enum(['optional', 'required'])
 export const bookingQuestionStateValueSchema = z.enum(['optional', 'required'])
 
 export const serviceProviderReminderSchema = z.object({
@@ -112,10 +105,7 @@ export type Session = z.infer<typeof sessionSchema>
 export type SessionSeries = z.infer<typeof sessionSeriesSchema>
 export type RawSessionSeriesRow = RawRow
 
-const bookingPaymentTypeMap: Record<
-  string,
-  z.infer<typeof bookingPaymentTypeSchema>
-> = {
+const bookingPaymentTypeMap: Record<string, z.infer<typeof bookingPaymentTypeSchema>> = {
   hidePrice: 'hidePrice',
   hide_price: 'hidePrice',
   noPrepayment: 'noPrepayment',
@@ -216,8 +206,7 @@ const normalizeBookingPaymentType = (
     return null
   }
 
-  const normalized =
-    bookingPaymentTypeMap[trimmed] ?? bookingPaymentTypeMap[trimmed.toLowerCase()]
+  const normalized = bookingPaymentTypeMap[trimmed] ?? bookingPaymentTypeMap[trimmed.toLowerCase()]
 
   if (!normalized) {
     throw new Error(`${label} contained an unexpected value`)
@@ -257,10 +246,7 @@ const parseOptionalReminder = <Schema extends z.ZodTypeAny>(
 
   return schema.parse({
     type: record.type,
-    timeBeforeStart: coerceString(
-      record.timeBeforeStart,
-      `${label}.timeBeforeStart`
-    ),
+    timeBeforeStart: coerceString(record.timeBeforeStart, `${label}.timeBeforeStart`),
   })
 }
 
@@ -286,14 +272,8 @@ const parseGeo = (value: unknown): z.infer<typeof geoSchema> | null => {
 
   const record = candidate as Record<string, unknown>
 
-  const lat =
-    record.lat === null || record.lat === undefined
-      ? null
-      : ensureFiniteNumber(record.lat, 'geo.lat')
-  const lng =
-    record.lng === null || record.lng === undefined
-      ? null
-      : ensureFiniteNumber(record.lng, 'geo.lng')
+  const lat = record.lat === null || record.lat === undefined ? null : ensureFiniteNumber(record.lat, 'geo.lat')
+  const lng = record.lng === null || record.lng === undefined ? null : ensureFiniteNumber(record.lng, 'geo.lng')
 
   return geoSchema.parse({ lat, lng })
 }
@@ -310,10 +290,7 @@ const parseInvitations = (value: unknown, label: string) =>
     }
   })
 
-const normalizeRequestClientAddressOnline = (
-  value: unknown,
-  label: string
-) => {
+const normalizeRequestClientAddressOnline = (value: unknown, label: string) => {
   if (value === null || value === undefined) {
     return null
   }
@@ -331,10 +308,7 @@ const normalizeRequestClientAddressOnline = (
   return result.data
 }
 
-const normalizeBookingQuestionState = (
-  value: unknown,
-  label: string
-) => {
+const normalizeBookingQuestionState = (value: unknown, label: string) => {
   if (value === null || value === undefined) {
     return null
   }
@@ -364,9 +338,7 @@ const normalizeNullableSessionType = (value: unknown, label: string) => {
 }
 
 const parseSessions = (value: unknown): Session[] =>
-  normalizeJsonArray(value, 'sessions').map((entry, index) =>
-    parseSession(entry, index)
-  )
+  normalizeJsonArray(value, 'sessions').map((entry, index) => parseSession(entry, index))
 
 const parseSession = (value: unknown, index: number): Session => {
   if (typeof value !== 'object' || value === null) {
@@ -378,44 +350,26 @@ const parseSession = (value: unknown, index: number): Session => {
 
   const parsedSession = {
     id: ensureString(record.id, `${label}.id`),
-    sessionSeriesId: ensureString(
-      record.sessionSeriesId ?? record.session_series_id,
-      `${label}.sessionSeriesId`
-    ),
+    sessionSeriesId: ensureString(record.sessionSeriesId ?? record.session_series_id, `${label}.sessionSeriesId`),
     timezone: ensureString(record.timezone, `${label}.timezone`),
     date: ensureString(record.date, `${label}.date`),
     length: ensureFiniteNumber(record.length, `${label}.length`),
     clientSessions: clientSessionListSchema.parse(
-      normalizeJsonArray(
-        record.clientSessions ?? record.client_sessions,
-        `${label}.clientSessions`
-      )
+      normalizeJsonArray(record.clientSessions ?? record.client_sessions, `${label}.clientSessions`)
     ),
-    notes: adaptNotes(
-      normalizeJsonArray(record.notes, `${label}.notes`)
-    ),
-    bookedOnline: ensureBoolean(
-      record.bookedOnline ?? record.booked_online,
-      `${label}.bookedOnline`
-    ),
+    notes: adaptNotes(normalizeJsonArray(record.notes, `${label}.notes`)),
+    bookedOnline: ensureBoolean(record.bookedOnline ?? record.booked_online, `${label}.bookedOnline`),
     serviceId: parseNullableString(record.serviceId ?? record.service_id),
     location: parseNullableString(record.location),
     address: parseNullableString(record.address),
     geo: parseGeo(record.geo),
-    googlePlaceId: parseNullableString(
-      record.googlePlaceId ?? record.google_place_id
-    ),
+    googlePlaceId: parseNullableString(record.googlePlaceId ?? record.google_place_id),
     bookingPaymentType: normalizeBookingPaymentType(
       record.bookingPaymentType ?? record.booking_payment_type,
       `${label}.bookingPaymentType`
     ),
-    maximumAttendance: nullableNumber.parse(
-      record.maximumAttendance ?? record.maximum_attendance
-    ),
-    invitations: parseInvitations(
-      record.invitations,
-      `${label}.invitations`
-    ),
+    maximumAttendance: nullableNumber.parse(record.maximumAttendance ?? record.maximum_attendance),
+    invitations: parseInvitations(record.invitations, `${label}.invitations`),
     serviceProviderReminder1: parseOptionalReminder(
       record.serviceProviderReminder1 ?? record.service_provider_reminder_1,
       serviceProviderReminderSchema,
@@ -444,37 +398,24 @@ const parseSession = (value: unknown, index: number): Session => {
       record.bufferMinutesAfter ?? record.buffer_minutes_after,
       `${label}.bufferMinutesAfter`
     ),
-    bookableOnline: ensureBoolean(
-      record.bookableOnline ?? record.bookable_online,
-      `${label}.bookableOnline`
-    ),
+    bookableOnline: ensureBoolean(record.bookableOnline ?? record.bookable_online, `${label}.bookableOnline`),
     description: parseNullableString(record.description),
-    canClientsCancel: ensureBoolean(
-      record.canClientsCancel ?? record.can_clients_cancel,
-      `${label}.canClientsCancel`
-    ),
+    canClientsCancel: ensureBoolean(record.canClientsCancel ?? record.can_clients_cancel, `${label}.canClientsCancel`),
     cancellationAdvanceNoticeDuration: parseNullableString(
-      record.cancellationAdvanceNoticeDuration ??
-        record.cancellation_advance_notice_duration
+      record.cancellationAdvanceNoticeDuration ?? record.cancellation_advance_notice_duration
     ),
     requestClientAddressOnline: normalizeRequestClientAddressOnline(
-      record.requestClientAddressOnline ??
-        record.request_client_address_online,
+      record.requestClientAddressOnline ?? record.request_client_address_online,
       `${label}.requestClientAddressOnline`
     ),
-    bookingQuestion: parseNullableString(
-      record.bookingQuestion ?? record.booking_question
-    ),
+    bookingQuestion: parseNullableString(record.bookingQuestion ?? record.booking_question),
     bookingQuestionState: normalizeBookingQuestionState(
       record.bookingQuestionState ?? record.booking_question_state,
       `${label}.bookingQuestionState`
     ),
     startTime: isoDateTimeString.parse(record.startTime ?? record.start_time),
     name: parseNullableString(record.name),
-    type: normalizeNullableSessionType(
-      record.type,
-      `${label}.type`
-    ),
+    type: normalizeNullableSessionType(record.type, `${label}.type`),
     price: parseNullableString(record.price),
     currency: parseNullableString(record.currency),
   }
@@ -494,10 +435,7 @@ const collectClientIds = (sessions: Session[]) => {
   return Array.from(ids)
 }
 
-export const normalizeSessionSeriesRow = (
-  row: RawSessionSeriesRow,
-  index: number
-): SessionSeries => {
+export const normalizeSessionSeriesRow = (row: RawSessionSeriesRow, index: number): SessionSeries => {
   const label = `sessionSeries[${index}]`
   const createdAt = isoDateTimeString.parse(row.createdAt)
   const sessionType = sessionTypeSchema.parse(row.sessionType)
@@ -513,18 +451,12 @@ export const normalizeSessionSeriesRow = (
       sessionColor: parseNullableString(row.sessionColor),
       avatarName: parseNullableString(row.avatarName),
       imageURL: parseNullableString(row.imageURL),
-      sessionLength: ensureFiniteNumber(
-        row.sessionLength,
-        `${label}.sessionLength`
-      ),
+      sessionLength: ensureFiniteNumber(row.sessionLength, `${label}.sessionLength`),
       timezone: ensureString(row.timezone, `${label}.timezone`),
       startDate: ensureString(row.startDate, `${label}.startDate`),
       endDate: ensureString(row.endDate, `${label}.endDate`),
       repeatsEvery: nullableNumber.parse(row.repeatsEvery),
-      reminderHours: ensureFiniteNumber(
-        row.reminderHours,
-        `${label}.reminderHours`
-      ),
+      reminderHours: ensureFiniteNumber(row.reminderHours, `${label}.reminderHours`),
       location: parseNullableString(row.location),
       price: nullableNumber.parse(row.price),
       currency: ensureString(row.currency, `${label}.currency`),

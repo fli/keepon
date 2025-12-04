@@ -1,3 +1,3 @@
 - React v19.2
 - On every Codex startup, first call `mcp__next-devtools__init` (Next.js DevTools MCP init) before any other actions; once it returns, immediately continue with the triggering user request in the same turn (don't stop after “Initialization complete.”).
-- Issue tracking uses Beads (`bd`). The repo is already initialized; use `bd ready --json` to pick work and see `beads/AGENTS.md` for the full agent workflow.
+- Issue tracking uses Beads (`bd`). The repo is already initialized; use `bd ready --json` to pick work. For workflow details, see https://github.com/steveyegge/beads#readme.

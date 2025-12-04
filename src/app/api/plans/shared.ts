@@ -3,14 +3,7 @@ import { type Selectable, type VwLegacyPlan } from '@/lib/db'
 
 export const isoDateTimeString = z.string().datetime({ offset: true })
 
-export const planPaymentStatusSchema = z.enum([
-  'paid',
-  'rejected',
-  'refunded',
-  'cancelled',
-  'paused',
-  'pending',
-])
+export const planPaymentStatusSchema = z.enum(['paid', 'rejected', 'refunded', 'cancelled', 'paused', 'pending'])
 
 export type PlanPaymentStatus = z.infer<typeof planPaymentStatusSchema>
 
@@ -50,12 +43,7 @@ export const planSchema = z.object({
   currency: z.string(),
   startDate: isoDateTimeString.optional(),
   endDate: isoDateTimeString.nullable().optional(),
-  frequency: z.union([
-    z.literal(7),
-    z.literal(14),
-    z.literal(21),
-    z.literal(28),
-  ]).optional(),
+  frequency: z.union([z.literal(7), z.literal(14), z.literal(21), z.literal(28)]).optional(),
   planPayments: z.array(planPaymentSchema).optional(),
   planPauses: z.array(planPauseSchema).optional(),
   nextPaymentDate: isoDateTimeString.nullable().optional(),
@@ -91,10 +79,7 @@ const ensureIsoDateTimeString = (value: unknown, label: string): string => {
   throw new Error(`Invalid ${label}`)
 }
 
-const toOptionalIsoDateTimeString = (
-  value: Date | string | null | undefined,
-  label: string
-): string | undefined => {
+const toOptionalIsoDateTimeString = (value: Date | string | null | undefined, label: string): string | undefined => {
   if (value === null || value === undefined) {
     return undefined
   }
@@ -150,10 +135,7 @@ const ensureString = (value: unknown, label: string): string => {
   throw new Error(`Invalid ${label}`)
 }
 
-const ensurePlanPaymentStatus = (
-  value: unknown,
-  label: string
-): PlanPaymentStatus => {
+const ensurePlanPaymentStatus = (value: unknown, label: string): PlanPaymentStatus => {
   if (typeof value !== 'string') {
     throw new Error(`Invalid ${label}`)
   }
@@ -183,30 +165,12 @@ const parsePlanPayments = (value: unknown): PlanPayment[] => {
 
     return planPaymentSchema.parse({
       id: ensureString(record.id, `plan payment id at index ${index}`),
-      date: ensureIsoDateTimeString(
-        record.date,
-        `plan payment date at index ${index}`
-      ),
-      amount: ensureNumber(
-        record.amount,
-        `plan payment amount at index ${index}`
-      ),
-      outstandingAmount: ensureNumber(
-        record.outstandingAmount,
-        `plan payment outstanding amount at index ${index}`
-      ),
-      status: ensurePlanPaymentStatus(
-        record.status,
-        `plan payment status at index ${index}`
-      ),
-      planId: ensureString(
-        record.planId,
-        `plan payment plan id at index ${index}`
-      ),
-      currency: ensureString(
-        record.currency,
-        `plan payment currency at index ${index}`
-      ),
+      date: ensureIsoDateTimeString(record.date, `plan payment date at index ${index}`),
+      amount: ensureNumber(record.amount, `plan payment amount at index ${index}`),
+      outstandingAmount: ensureNumber(record.outstandingAmount, `plan payment outstanding amount at index ${index}`),
+      status: ensurePlanPaymentStatus(record.status, `plan payment status at index ${index}`),
+      planId: ensureString(record.planId, `plan payment plan id at index ${index}`),
+      currency: ensureString(record.currency, `plan payment currency at index ${index}`),
     })
   })
 }
@@ -232,37 +196,25 @@ const parsePlanPauses = (value: unknown): PlanPause[] => {
       planId: string
     } = {
       id: ensureString(record.id, `plan pause id at index ${index}`),
-      planId: ensureString(
-        record.planId,
-        `plan pause plan id at index ${index}`
-      ),
+      planId: ensureString(record.planId, `plan pause plan id at index ${index}`),
     }
 
     if (record.startDate !== undefined && record.startDate !== null) {
-      pause.startDate = ensureIsoDateTimeString(
-        record.startDate,
-        `plan pause start date at index ${index}`
-      )
+      pause.startDate = ensureIsoDateTimeString(record.startDate, `plan pause start date at index ${index}`)
     }
 
     if (record.endDate !== undefined) {
       pause.endDate =
         record.endDate === null
           ? null
-          : ensureIsoDateTimeString(
-              record.endDate,
-              `plan pause end date at index ${index}`
-            )
+          : ensureIsoDateTimeString(record.endDate, `plan pause end date at index ${index}`)
     }
 
     if (record.reminderDate !== undefined) {
       pause.reminderDate =
         record.reminderDate === null
           ? null
-          : ensureIsoDateTimeString(
-              record.reminderDate,
-              `plan pause reminder date at index ${index}`
-            )
+          : ensureIsoDateTimeString(record.reminderDate, `plan pause reminder date at index ${index}`)
     }
 
     return planPauseSchema.parse(pause)
@@ -293,9 +245,7 @@ const parseSessionSeriesIds = (value: unknown): string[] => {
   return sessionSeriesIdListSchema.parse(normalized)
 }
 
-const parseFrequency = (
-  value: unknown
-): PlanFrequency | undefined => {
+const parseFrequency = (value: unknown): PlanFrequency | undefined => {
   if (value === null || value === undefined) {
     return undefined
   }
@@ -331,18 +281,12 @@ export const normalizePlanRow = (row: RawPlanRow): Plan => {
     sessionSeriesIds: parseSessionSeriesIds(row.sessionSeriesIds),
   }
 
-  const startDate = toOptionalIsoDateTimeString(
-    row.startDate,
-    'plan start date'
-  )
+  const startDate = toOptionalIsoDateTimeString(row.startDate, 'plan start date')
   if (startDate !== undefined) {
     plan.startDate = startDate
   }
 
-  const endDate = toNullableIsoDateTimeString(
-    row.endDate,
-    'plan end date'
-  )
+  const endDate = toNullableIsoDateTimeString(row.endDate, 'plan end date')
   if (endDate !== undefined) {
     plan.endDate = endDate
   }
@@ -352,18 +296,12 @@ export const normalizePlanRow = (row: RawPlanRow): Plan => {
     plan.frequency = frequency
   }
 
-  const nextPaymentDate = toNullableIsoDateTimeString(
-    row.nextPaymentDate,
-    'plan next payment date'
-  )
+  const nextPaymentDate = toNullableIsoDateTimeString(row.nextPaymentDate, 'plan next payment date')
   if (nextPaymentDate !== undefined) {
     plan.nextPaymentDate = nextPaymentDate
   }
 
-  const lastPaymentDate = toNullableIsoDateTimeString(
-    row.lastPaymentDate,
-    'plan last payment date'
-  )
+  const lastPaymentDate = toNullableIsoDateTimeString(row.lastPaymentDate, 'plan last payment date')
   if (lastPaymentDate !== undefined) {
     plan.lastPaymentDate = lastPaymentDate
   }

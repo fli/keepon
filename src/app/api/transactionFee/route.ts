@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server'
 import BigNumber from 'bignumber.js'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import {
   currencyChargeLimits,
   getTransactionFee,
@@ -18,9 +15,9 @@ const amountSchema = z
   .string()
   .trim()
   .min(1, 'Amount is required.')
-  .transform(value => new BigNumber(value))
-  .refine(amount => amount.isFinite(), 'Amount must be a finite number.')
-  .refine(amount => amount.gte(0), 'Amount must be greater than or equal to 0.')
+  .transform((value) => new BigNumber(value))
+  .refine((amount) => amount.isFinite(), 'Amount must be a finite number.')
+  .refine((amount) => amount.gte(0), 'Amount must be greater than or equal to 0.')
 
 const querySchema = z.object({
   amount: amountSchema,
@@ -28,19 +25,19 @@ const querySchema = z.object({
     .string()
     .trim()
     .min(1, 'Currency is required.')
-    .transform(value => value.toUpperCase()),
+    .transform((value) => value.toUpperCase()),
   cardCountry: z
     .string()
     .trim()
     .min(2, 'Card country code must contain at least 2 characters.')
-    .transform(value => value.toUpperCase()),
+    .transform((value) => value.toUpperCase()),
 })
 
 const trainerCountrySchema = z.object({
   country: z
     .string()
     .min(2, 'Trainer country code must contain at least 2 characters.')
-    .transform(value => value.toUpperCase()),
+    .transform((value) => value.toUpperCase()),
 })
 
 const feeTypeSchema = z.enum([
@@ -66,8 +63,7 @@ type Query = z.infer<typeof querySchema>
 
 export async function GET(request: Request) {
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while calculating transaction fee',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while calculating transaction fee',
   })
 
   if (!authorization.ok) {
@@ -84,7 +80,7 @@ export async function GET(request: Request) {
   const parsedQuery = querySchema.safeParse(rawQuery)
   if (!parsedQuery.success) {
     const detail = parsedQuery.error.issues
-      .map(issue => {
+      .map((issue) => {
         if (issue.message === 'Required') {
           const path = issue.path.join('.') || 'query'
           return `Query parameter "${path}" is required.`
@@ -96,10 +92,7 @@ export async function GET(request: Request) {
       buildErrorResponse({
         status: 400,
         title: 'Invalid query parameters',
-        detail:
-          detail.length > 0
-            ? detail
-            : 'The provided query parameters are invalid.',
+        detail: detail.length > 0 ? detail : 'The provided query parameters are invalid.',
         type: '/invalid-query',
       }),
       { status: 400 }
@@ -108,8 +101,7 @@ export async function GET(request: Request) {
 
   const { amount, currency, cardCountry } = parsedQuery.data
 
-  const limits =
-    currencyChargeLimits[currency as keyof typeof currencyChargeLimits]
+  const limits = currencyChargeLimits[currency as keyof typeof currencyChargeLimits]
 
   if (!limits) {
     return NextResponse.json(
@@ -147,8 +139,7 @@ export async function GET(request: Request) {
       buildErrorResponse({
         status: 404,
         title: 'Trainer not found',
-        detail:
-          'No trainer record was found for the authenticated access token.',
+        detail: 'No trainer record was found for the authenticated access token.',
         type: '/trainer-not-found',
       }),
       { status: 404 }
@@ -157,17 +148,12 @@ export async function GET(request: Request) {
 
   const parsedTrainer = trainerCountrySchema.safeParse(trainerRow)
   if (!parsedTrainer.success) {
-    const detail = parsedTrainer.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = parsedTrainer.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 500,
         title: 'Failed to parse trainer country',
-        detail:
-          detail.length > 0
-            ? detail
-            : 'Trainer country did not match the expected schema.',
+        detail: detail.length > 0 ? detail : 'Trainer country did not match the expected schema.',
         type: '/invalid-database-response',
       }),
       { status: 500 }
@@ -189,18 +175,14 @@ export async function GET(request: Request) {
         buildErrorResponse({
           status: 500,
           title: 'Invalid fee configuration',
-          detail:
-            'Percentage fee results in a zero denominator while calculating pass on amount.',
+          detail: 'Percentage fee results in a zero denominator while calculating pass on amount.',
           type: '/invalid-fee-configuration',
         }),
         { status: 500 }
       )
     }
 
-    const passOnAmount = amount
-      .plus(fee.fixedFee)
-      .dividedBy(denominator)
-      .decimalPlaces(limits.smallestUnitDecimals)
+    const passOnAmount = amount.plus(fee.fixedFee).dividedBy(denominator).decimalPlaces(limits.smallestUnitDecimals)
 
     const transactionFee = amount
       .multipliedBy(fee.percentageFee)
@@ -247,15 +229,12 @@ export async function GET(request: Request) {
     }
 
     if (error instanceof z.ZodError) {
-      const detail = error.issues.map(issue => issue.message).join('; ')
+      const detail = error.issues.map((issue) => issue.message).join('; ')
       return NextResponse.json(
         buildErrorResponse({
           status: 500,
           title: 'Failed to validate transaction fee response',
-          detail:
-            detail.length > 0
-              ? detail
-              : 'Transaction fee response did not match the expected schema.',
+          detail: detail.length > 0 ? detail : 'Transaction fee response did not match the expected schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

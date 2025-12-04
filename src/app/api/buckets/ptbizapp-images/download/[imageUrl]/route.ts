@@ -12,9 +12,7 @@ const createInvalidPathResponse = (detail?: string) =>
     buildErrorResponse({
       status: 400,
       title: 'Invalid path parameters',
-      detail:
-        detail ??
-        'Request parameters did not match the expected schema.',
+      detail: detail ?? 'Request parameters did not match the expected schema.',
       type: '/invalid-path-parameters',
     }),
     { status: 400 }
@@ -42,19 +40,13 @@ const createMissingBucketResponse = () =>
     { status: 500 }
   )
 
-type HandlerContext =
-  RouteContext<'/api/buckets/ptbizapp-images/download/[imageUrl]'>
+type HandlerContext = RouteContext<'/api/buckets/ptbizapp-images/download/[imageUrl]'>
 
-export async function GET(
-  _request: Request,
-  context: HandlerContext
-) {
+export async function GET(_request: Request, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return createInvalidPathResponse(detail || undefined)
   }
@@ -67,10 +59,7 @@ export async function GET(
   }
 
   if (parsed.name.endsWith('image') || parsed.name.endsWith('profile')) {
-    return NextResponse.redirect(
-      `https://ptbizapp-images.s3.amazonaws.com/${imageUrl}`,
-      302
-    )
+    return NextResponse.redirect(`https://ptbizapp-images.s3.amazonaws.com/${imageUrl}`, 302)
   }
 
   const publicBucketName = process.env.PUBLIC_BUCKET_NAME?.trim()

@@ -32,9 +32,7 @@ async function UserPageContent({ params }: { params: Promise<{ userId: string }>
       <p className="text-sm uppercase tracking-wide text-muted-foreground">User</p>
       <h1 className="text-3xl font-semibold">User {userId}</h1>
       <Card>
-        <CardContent className="py-4 text-sm text-muted-foreground">
-          This route now renders on the server.
-        </CardContent>
+        <CardContent className="py-4 text-sm text-muted-foreground">This route now renders on the server.</CardContent>
       </Card>
     </PageContainer>
   )

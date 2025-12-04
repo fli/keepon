@@ -1,23 +1,15 @@
 import crypto from 'node:crypto'
 import path from 'node:path'
 import { NextResponse } from 'next/server'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
-import {
-  PublicBucketNotConfiguredError,
-  uploadToPublicBucket,
-} from '../../../_lib/storage'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
+import { PublicBucketNotConfiguredError, uploadToPublicBucket } from '../../../_lib/storage'
 
 const createInvalidBodyResponse = (detail?: string) =>
   NextResponse.json(
     buildErrorResponse({
       status: 400,
       title: 'Invalid request body',
-      detail:
-        detail ??
-        'Request body must be multipart/form-data with a file field named "file".',
+      detail: detail ?? 'Request body must be multipart/form-data with a file field named "file".',
       type: '/invalid-body',
     }),
     { status: 400 }
@@ -47,11 +39,7 @@ const createMissingBucketResponse = () =>
 
 const makeRandomB64urlToken = async () => {
   const bytes = crypto.randomBytes(18)
-  return bytes
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '')
+  return bytes.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 
 const sanitizeBaseName = (filename: string) => {

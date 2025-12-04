@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { adaptSessionRow, RawSessionRow } from '../shared'
 
 const paramsSchema = z.object({
-  sessionId: z
-    .string()
-    .trim()
-    .min(1, 'sessionId must not be empty'),
+  sessionId: z.string().trim().min(1, 'sessionId must not be empty'),
 })
 
 type HandlerContext = RouteContext<'/api/sessions/[sessionId]'>
@@ -20,15 +14,12 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const parsedParams = paramsSchema.safeParse(await context.params)
 
   if (!parsedParams.success) {
-    const detail = parsedParams.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = parsedParams.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail || 'Request path parameters did not match the expected schema.',
+        detail: detail || 'Request path parameters did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -36,8 +27,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching session',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching session',
   })
 
   if (!authorization.ok) {

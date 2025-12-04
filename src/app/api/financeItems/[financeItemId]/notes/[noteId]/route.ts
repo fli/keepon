@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 import { financeItemNoteSchema } from '../../../shared'
 
 const paramsSchema = z.object({
@@ -13,10 +10,7 @@ const paramsSchema = z.object({
     .trim()
     .min(1, 'Finance item id must not be empty.')
     .uuid({ message: 'Finance item id must be a valid UUID.' }),
-  noteId: z
-    .string({ message: 'Note id is required.' })
-    .trim()
-    .min(1, 'Note id must not be empty.'),
+  noteId: z.string({ message: 'Note id is required.' }).trim().min(1, 'Note id must not be empty.'),
 })
 
 const requestBodySchema = z.object({
@@ -36,17 +30,13 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Finance item note path parameters did not match the expected schema.',
+        detail: detail || 'Finance item note path parameters did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -62,9 +52,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     const bodyResult = requestBodySchema.safeParse(rawBody)
 
     if (!bodyResult.success) {
-      const detail = bodyResult.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
@@ -79,11 +67,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
     parsedBody = bodyResult.data
   } catch (error) {
-    console.error(
-      'Failed to parse finance item note update request body',
-      financeItemId,
-      error
-    )
+    console.error('Failed to parse finance item note update request body', financeItemId, error)
 
     return NextResponse.json(
       buildErrorResponse({
@@ -97,8 +81,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating finance item note',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating finance item note',
   })
 
   if (!authorization.ok) {
@@ -137,8 +120,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Finance item not found',
-          detail:
-            'We could not find a finance item with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a finance item with the specified identifier for the authenticated trainer.',
           type: '/finance-item-not-found',
         }),
         { status: 404 }
@@ -150,8 +132,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to validate finance item note response',
-          detail:
-            'Finance item note response did not match the expected schema.',
+          detail: 'Finance item note response did not match the expected schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

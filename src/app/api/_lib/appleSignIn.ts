@@ -90,13 +90,9 @@ const decodeSegmentToJson = <T>(segment: string): T => {
 }
 
 const importAppleKey = async (jwk: AppleJwk): Promise<CryptoKey> =>
-  getSubtleCrypto().importKey(
-    'jwk',
-    { ...jwk, ext: true },
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['verify']
-  )
+  getSubtleCrypto().importKey('jwk', { ...jwk, ext: true }, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, [
+    'verify',
+  ])
 
 const fetchAppleJwks = async (): Promise<AppleJwk[]> => {
   if (cachedJwks && Date.now() - cachedJwks.fetchedAt < JWKS_CACHE_TTL_MS) {
@@ -111,10 +107,7 @@ const fetchAppleJwks = async (): Promise<AppleJwk[]> => {
   })
 
   if (!response.ok) {
-    throw new AppleSignInError(
-      `Failed to fetch Apple JWKS: ${response.status}`,
-      'jwks_fetch_failed'
-    )
+    throw new AppleSignInError(`Failed to fetch Apple JWKS: ${response.status}`, 'jwks_fetch_failed')
   }
 
   const parsed = jwksSchema.safeParse(await response.json())
@@ -132,7 +125,7 @@ const fetchAppleJwks = async (): Promise<AppleJwk[]> => {
 
 const findMatchingJwk = async (kid: string) => {
   const keys = await fetchAppleJwks()
-  return keys.find(key => key.kid === kid) ?? null
+  return keys.find((key) => key.kid === kid) ?? null
 }
 
 export type VerifyAppleIdentityTokenOptions = {
@@ -154,11 +147,7 @@ export const verifyAppleIdentityToken = async (
     throw new AppleSignInError('Identity token is malformed', 'invalid_token')
   }
 
-  const [encodedHeader, encodedPayload, encodedSignature] = segments as [
-    string,
-    string,
-    string,
-  ]
+  const [encodedHeader, encodedPayload, encodedSignature] = segments as [string, string, string]
 
   let header: z.infer<typeof headerSchema>
   try {
@@ -199,10 +188,7 @@ export const verifyAppleIdentityToken = async (
     throw new AppleSignInError('Identity token has expired', 'expired_token')
   }
 
-  if (
-    options.expectedNonce &&
-    (!payload.nonce || payload.nonce !== options.expectedNonce)
-  ) {
+  if (options.expectedNonce && (!payload.nonce || payload.nonce !== options.expectedNonce)) {
     throw new AppleSignInError('Identity token nonce mismatch', 'nonce_mismatch')
   }
 

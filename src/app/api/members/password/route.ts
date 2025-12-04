@@ -1,18 +1,11 @@
 import { NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 
 const requestSchema = z.object({
-  currentPassword: z
-    .string()
-    .min(1, 'Current password is required'),
-  password: z
-    .string()
-    .min(5, 'Password must be at least 5 characters long'),
+  currentPassword: z.string().min(1, 'Current password is required'),
+  password: z.string().min(5, 'Password must be at least 5 characters long'),
 })
 
 const invalidJsonResponse = () =>
@@ -65,9 +58,7 @@ export async function POST(request: Request) {
     const validation = requestSchema.safeParse(rawBody)
 
     if (!validation.success) {
-      const detail = validation.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
       return invalidBodyResponse(detail || undefined)
     }
@@ -79,8 +70,7 @@ export async function POST(request: Request) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while changing password',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while changing password',
   })
 
   if (!authorization.ok) {

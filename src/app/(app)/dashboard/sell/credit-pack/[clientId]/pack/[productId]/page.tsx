@@ -33,9 +33,9 @@ export default async function SellPaymentPage({
     }, {})
   ).toString()
 
-  const changePackHref = (queryString
-    ? `/dashboard/sell/credit-pack/${clientId}?${queryString}`
-    : `/dashboard/sell/credit-pack/${clientId}`) as Route
+  const changePackHref = (
+    queryString ? `/dashboard/sell/credit-pack/${clientId}?${queryString}` : `/dashboard/sell/credit-pack/${clientId}`
+  ) as Route
 
   return (
     <PageContainer className="flex flex-col gap-6 py-8">

@@ -197,8 +197,6 @@ const baseSections: SettingSection[] = [
   },
 ]
 
-export function getSettingsSections(_options?: {
-  includeLabs?: boolean
-}): SettingSection[] {
+export function getSettingsSections(_options?: { includeLabs?: boolean }): SettingSection[] {
   return baseSections
 }

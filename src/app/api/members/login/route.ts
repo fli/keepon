@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const rawBody: unknown = await request.json()
     const parsed = loginRequestSchema.safeParse(rawBody)
     if (!parsed.success) {
-      const detail = parsed.error.issues.map(issue => issue.message).join('; ')
+      const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
       return invalidBodyResponse(detail || undefined)
     }
 

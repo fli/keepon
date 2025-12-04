@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 
 const FALLBACK_TRIAL_DURATION = '14 days'
 
@@ -26,7 +23,7 @@ const defaultTrialDuration = (() => {
   if (!result.success) {
     console.warn(
       'DEFAULT_TRIAL_DURATION is invalid, falling back to "14 days". Issues:',
-      result.error.issues.map(issue => issue.message).join('; ')
+      result.error.issues.map((issue) => issue.message).join('; ')
     )
     return FALLBACK_TRIAL_DURATION
   }
@@ -47,8 +44,7 @@ const TRIAL_NOT_FOUND_ERROR = 'TRIAL_NOT_FOUND'
 
 export async function POST(request: Request) {
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while creating trial',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while creating trial',
   })
 
   if (!authorization.ok) {
@@ -56,7 +52,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const trialRow = await db.transaction().execute(async trx => {
+    const trialRow = await db.transaction().execute(async (trx) => {
       const insertedTrial = await sql<TrialRow>`
         INSERT INTO trial (trainer_id, start_time, end_time)
         SELECT
@@ -141,8 +137,7 @@ export async function POST(request: Request) {
         buildErrorResponse({
           status: 404,
           title: 'Trial not found',
-          detail:
-            'No trial information is available for the authenticated trainer.',
+          detail: 'No trial information is available for the authenticated trainer.',
           type: '/trial-not-found',
         }),
         { status: 404 }

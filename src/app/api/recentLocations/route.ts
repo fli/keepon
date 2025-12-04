@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 
 const geoSchema = z
   .object({
@@ -63,9 +60,7 @@ const normalizeGeo = (value: unknown): z.infer<typeof geoSchema> | null => {
 
   if (typeof value === 'string') {
     const trimmed = value.trim()
-    const match = trimmed.match(
-      /^\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?$/
-    )
+    const match = trimmed.match(/^\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?$/)
     if (match && match[1] !== undefined && match[2] !== undefined) {
       const lat = Number.parseFloat(match[1])
       const lng = Number.parseFloat(match[2])
@@ -80,24 +75,9 @@ const normalizeGeo = (value: unknown): z.infer<typeof geoSchema> | null => {
     const arrayValue: readonly unknown[] = value
     const first = arrayValue[0]
     const second = arrayValue[1]
-    const lat =
-      typeof first === 'number'
-        ? first
-        : typeof first === 'string'
-          ? Number.parseFloat(first)
-          : undefined
-    const lng =
-      typeof second === 'number'
-        ? second
-        : typeof second === 'string'
-          ? Number.parseFloat(second)
-          : undefined
-    if (
-      lat !== undefined &&
-      lng !== undefined &&
-      !Number.isNaN(lat) &&
-      !Number.isNaN(lng)
-    ) {
+    const lat = typeof first === 'number' ? first : typeof first === 'string' ? Number.parseFloat(first) : undefined
+    const lng = typeof second === 'number' ? second : typeof second === 'string' ? Number.parseFloat(second) : undefined
+    if (lat !== undefined && lng !== undefined && !Number.isNaN(lat) && !Number.isNaN(lng)) {
       return { lat, lng }
     }
     return null
@@ -124,12 +104,7 @@ const normalizeGeo = (value: unknown): z.infer<typeof geoSchema> | null => {
             : lngValue === null
               ? null
               : undefined
-      if (
-        typeof lat === 'number' &&
-        typeof lng === 'number' &&
-        !Number.isNaN(lat) &&
-        !Number.isNaN(lng)
-      ) {
+      if (typeof lat === 'number' && typeof lng === 'number' && !Number.isNaN(lat) && !Number.isNaN(lng)) {
         return { lat, lng }
       }
       if (lat === null && lng === null) {
@@ -138,23 +113,10 @@ const normalizeGeo = (value: unknown): z.infer<typeof geoSchema> | null => {
     }
     if ('x' in record && 'y' in record) {
       const lat =
-        typeof record.x === 'number'
-          ? record.x
-          : typeof record.x === 'string'
-            ? Number.parseFloat(record.x)
-            : undefined
+        typeof record.x === 'number' ? record.x : typeof record.x === 'string' ? Number.parseFloat(record.x) : undefined
       const lng =
-        typeof record.y === 'number'
-          ? record.y
-          : typeof record.y === 'string'
-            ? Number.parseFloat(record.y)
-            : undefined
-      if (
-        lat !== undefined &&
-        lng !== undefined &&
-        !Number.isNaN(lat) &&
-        !Number.isNaN(lng)
-      ) {
+        typeof record.y === 'number' ? record.y : typeof record.y === 'string' ? Number.parseFloat(record.y) : undefined
+      if (lat !== undefined && lng !== undefined && !Number.isNaN(lat) && !Number.isNaN(lng)) {
         return { lat, lng }
       }
     }
@@ -167,10 +129,7 @@ const dedupeAndSortLocations = (rows: RawLocationRow[]) => {
   const map = new Map<string, NormalizedLocationRow>()
 
   for (const row of rows) {
-    const location =
-      typeof row.location === 'string' && row.location.length > 0
-        ? row.location
-        : null
+    const location = typeof row.location === 'string' && row.location.length > 0 ? row.location : null
 
     if (!location) {
       continue
@@ -193,16 +152,13 @@ const dedupeAndSortLocations = (rows: RawLocationRow[]) => {
     }
   }
 
-  return Array.from(map.values()).sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-  )
+  return Array.from(map.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 }
 
 export async function GET(request: Request) {
   try {
     const authorization = await authenticateTrainerRequest(request, {
-      extensionFailureLogMessage:
-        'Failed to extend access token expiry while fetching recent locations',
+      extensionFailureLogMessage: 'Failed to extend access token expiry while fetching recent locations',
     })
     if (!authorization.ok) {
       return authorization.response
@@ -236,20 +192,18 @@ export async function GET(request: Request) {
         .execute(),
     ])
 
-    const combinedRows: RawLocationRow[] = [...sessionRows, ...serviceRows].map(
-      row => ({
-        location: row.location ?? null,
-        address: row.address ?? null,
-        geo: row.geo ?? null,
-        googlePlaceId: row.googlePlaceId ?? null,
-        createdAt: row.createdAt,
-      })
-    )
+    const combinedRows: RawLocationRow[] = [...sessionRows, ...serviceRows].map((row) => ({
+      location: row.location ?? null,
+      address: row.address ?? null,
+      geo: row.geo ?? null,
+      googlePlaceId: row.googlePlaceId ?? null,
+      createdAt: row.createdAt,
+    }))
 
     const normalizedRows = dedupeAndSortLocations(combinedRows)
 
     const responseBody = recentLocationListSchema.parse(
-      normalizedRows.map(row => ({
+      normalizedRows.map((row) => ({
         location: row.location,
         address: row.address,
         geo: row.geo,

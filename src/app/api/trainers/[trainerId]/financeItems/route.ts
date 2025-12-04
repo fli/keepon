@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
-import {
-  adaptFinanceItemRow,
-  financeItemListSchema,
-  type FinanceItemRow,
-} from '../../../financeItems/shared'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
+import { adaptFinanceItemRow, financeItemListSchema, type FinanceItemRow } from '../../../financeItems/shared'
 
 const paramsSchema = z.object({
   trainerId: z.string().min(1, 'Trainer id is required'),
@@ -19,7 +12,7 @@ const querySchema = z.object({
   updatedAtGt: z
     .string()
     .trim()
-    .transform(value => {
+    .transform((value) => {
       const parsed = new Date(value)
       if (Number.isNaN(parsed.getTime())) {
         throw new Error('Invalid updatedAt.gt value')
@@ -31,16 +24,11 @@ const querySchema = z.object({
 
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/financeItems'>
 
-export async function GET(
-  request: NextRequest,
-  context: HandlerContext
-) {
+export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -58,23 +46,16 @@ export async function GET(
   const updatedAtGtParam = url.searchParams.get('filter[where][updatedAt][gt]')
 
   const queryResult = querySchema.safeParse({
-    updatedAtGt:
-      updatedAtGtParam && updatedAtGtParam.trim().length > 0
-        ? updatedAtGtParam
-        : undefined,
+    updatedAtGt: updatedAtGtParam && updatedAtGtParam.trim().length > 0 ? updatedAtGtParam : undefined,
   })
 
   if (!queryResult.success) {
-    const detail = queryResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = queryResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid query parameters',
-        detail:
-          detail ||
-          'Request query parameters did not match the expected schema.',
+        detail: detail || 'Request query parameters did not match the expected schema.',
         type: '/invalid-query',
       }),
       { status: 400 }
@@ -82,8 +63,7 @@ export async function GET(
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching finance items',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching finance items',
   })
 
   if (!authorization.ok) {
@@ -130,9 +110,7 @@ export async function GET(
       .orderBy('v.createdAt', 'desc')
       .execute()) as FinanceItemRow[]
 
-    const financeItems = financeItemListSchema.parse(
-      rows.map(row => adaptFinanceItemRow(row))
-    )
+    const financeItems = financeItemListSchema.parse(rows.map((row) => adaptFinanceItemRow(row)))
 
     return NextResponse.json(financeItems)
   } catch (error) {
@@ -141,8 +119,7 @@ export async function GET(
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse finance item data from database',
-          detail:
-            'Finance item data did not match the expected response schema.',
+          detail: 'Finance item data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

@@ -5,26 +5,15 @@ import { z } from 'zod'
 import { login, logout } from '@/server/auth'
 import { createTrainerAccount, trainerSignupSchema } from '@/server/trainers'
 import { listProducts } from '@/server/products'
-import {
-  listClientsForTrainer,
-  createClientForTrainer,
-} from '@/server/clients'
-import {
-  createSaleForTrainer,
-  requestPaymentForSale,
-} from '@/server/sales'
+import { listClientsForTrainer, createClientForTrainer } from '@/server/clients'
+import { createSaleForTrainer, requestPaymentForSale } from '@/server/sales'
 import { createSaleProductForTrainer } from '@/server/saleProducts'
 import { createManualSalePaymentForTrainer } from '@/server/salePayments'
 import { validateTrainerToken } from '@/app/api/_lib/accessToken'
 
 const greetingInputSchema = z
   .object({
-    name: z
-      .string()
-      .trim()
-      .min(1, 'name must not be empty')
-      .max(64, 'name is too long')
-      .optional(),
+    name: z.string().trim().min(1, 'name must not be empty').max(64, 'name is too long').optional(),
   })
   .optional()
 
@@ -36,7 +25,7 @@ const loginResponseSchema = z.object({
 
 const signupInputSchema = trainerSignupSchema
 
-const numeric = z.union([z.string(), z.number()]).transform(value => {
+const numeric = z.union([z.string(), z.number()]).transform((value) => {
   const parsed = typeof value === 'number' ? value : Number.parseFloat(value)
   return Number.isFinite(parsed) ? parsed : 0
 })
@@ -119,17 +108,15 @@ export const appRouter = os.router({
     })),
   },
   greeting: {
-    welcome: os
-      .input(greetingInputSchema)
-      .handler(async ({ input }) => {
-        const name = input?.name?.trim()
-        const safeName = name && name.length > 0 ? name : 'friend'
+    welcome: os.input(greetingInputSchema).handler(async ({ input }) => {
+      const name = input?.name?.trim()
+      const safeName = name && name.length > 0 ? name : 'friend'
 
-        return {
-          message: `Hello, ${safeName}!`,
-          timestamp: new Date().toISOString(),
-        }
-      }),
+      return {
+        message: `Hello, ${safeName}!`,
+        timestamp: new Date().toISOString(),
+      }
+    }),
   },
   auth: {
     login: os
@@ -148,24 +135,17 @@ export const appRouter = os.router({
         const parsed = loginResponseSchema.parse(await login(input))
         return { token: parsed.id, userId: parsed.userId, trainerId: parsed.trainerId }
       }),
-    signup: os
-      .input(signupInputSchema)
-      .handler(async ({ input }) => {
-        const payload =
-          'country' in input
-            ? { ...input, country: input.country.toUpperCase() }
-            : input
+    signup: os.input(signupInputSchema).handler(async ({ input }) => {
+      const payload = 'country' in input ? { ...input, country: input.country.toUpperCase() } : input
 
-        const parsed = loginResponseSchema.parse(await createTrainerAccount(payload))
-        return { token: parsed.id, userId: parsed.userId, trainerId: parsed.trainerId }
-      }),
-    logout: os
-      .input(z.object({ token: z.string().min(1) }))
-      .handler(async ({ input }) => {
-        await logout(input.token)
+      const parsed = loginResponseSchema.parse(await createTrainerAccount(payload))
+      return { token: parsed.id, userId: parsed.userId, trainerId: parsed.trainerId }
+    }),
+    logout: os.input(z.object({ token: z.string().min(1) })).handler(async ({ input }) => {
+      await logout(input.token)
 
-        return { ok: true as const }
-      }),
+      return { ok: true as const }
+    }),
   },
   clients: {
     list: os
@@ -226,22 +206,18 @@ export const appRouter = os.router({
       }),
   },
   products: {
-    list: os
-      .input(z.object({ token: z.string().min(1) }))
-      .handler(async ({ input }) => {
-        const { trainerId } = await validateTrainerToken(input.token)
-        const products = await listProducts(trainerId, {})
-        return z.array(productSchema).parse(products)
-      }),
+    list: os.input(z.object({ token: z.string().min(1) })).handler(async ({ input }) => {
+      const { trainerId } = await validateTrainerToken(input.token)
+      const products = await listProducts(trainerId, {})
+      return z.array(productSchema).parse(products)
+    }),
   },
   services: {
-    list: os
-      .input(z.object({ token: z.string().min(1) }))
-      .handler(async ({ input }) => {
-        const { trainerId } = await validateTrainerToken(input.token)
-        const products = await listProducts(trainerId, { type: 'service' })
-        return z.array(serviceProductSchema).parse(products)
-      }),
+    list: os.input(z.object({ token: z.string().min(1) })).handler(async ({ input }) => {
+      const { trainerId } = await validateTrainerToken(input.token)
+      const products = await listProducts(trainerId, { type: 'service' })
+      return z.array(serviceProductSchema).parse(products)
+    }),
   },
   sales: {
     create: os
@@ -258,9 +234,7 @@ export const appRouter = os.router({
       .handler(async ({ input }) => {
         const { token, ...payload } = input
         const { trainerId } = await validateTrainerToken(token)
-        const parsed = saleSchema.pick({ id: true }).parse(
-          await createSaleForTrainer(trainerId, payload)
-        )
+        const parsed = saleSchema.pick({ id: true }).parse(await createSaleForTrainer(trainerId, payload))
         return { id: parsed.id }
       }),
     requestPayment: os
@@ -278,7 +252,7 @@ export const appRouter = os.router({
           token: z.string().min(1),
           saleId: z.string().uuid(),
           productId: z.string().optional(),
-          price: z.union([z.string(), z.number()]).transform(v => v.toString()),
+          price: z.union([z.string(), z.number()]).transform((v) => v.toString()),
           currency: z.string().min(1),
           name: z.string().min(1),
           type: z.enum(['creditPack', 'item', 'service']),
@@ -303,7 +277,7 @@ export const appRouter = os.router({
         z.object({
           token: z.string().min(1),
           saleId: z.string().uuid(),
-          amount: z.union([z.string(), z.number()]).transform(v => v.toString()),
+          amount: z.union([z.string(), z.number()]).transform((v) => v.toString()),
           currency: z.string().min(1),
           method: z.enum(['cash', 'electronic']),
           specificMethodName: z.string().nullable().optional(),
@@ -312,10 +286,7 @@ export const appRouter = os.router({
       .handler(async ({ input }) => {
         const { token, ...payload } = input
         const { trainerId } = await validateTrainerToken(token)
-        const payment = await createManualSalePaymentForTrainer(
-          trainerId,
-          payload
-        )
+        const payment = await createManualSalePaymentForTrainer(trainerId, payload)
         return salePaymentSchema.parse(payment)
       }),
   },

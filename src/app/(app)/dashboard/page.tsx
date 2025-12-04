@@ -3,30 +3,14 @@ import { redirect } from 'next/navigation'
 import { getDashboardSummary, type DashboardSummary } from '@/server/dashboard'
 
 import { Badge } from '@/components/ui/badge'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import {
-  AlertCircle,
-  Bell,
-  Calendar,
-  ChevronRight,
-  Clock,
-  PenSquare,
-} from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { AlertCircle, Bell, Calendar, ChevronRight, Clock, PenSquare } from 'lucide-react'
 import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
 import { readSessionFromCookies } from '../../session.server'
 import { ProjectedPaidCard } from './projected-paid-card'
 
-async function loadDashboard(
-  trainerId: string,
-  userId: string
-): Promise<DashboardSummary> {
+async function loadDashboard(trainerId: string, userId: string): Promise<DashboardSummary> {
   return getDashboardSummary(trainerId, userId)
 }
 
@@ -53,8 +37,7 @@ export default async function DashboardPage() {
   try {
     data = await loadDashboard(session.trainerId, session.userId)
   } catch (err) {
-    dashboardError =
-      err instanceof Error ? err.message : 'Unable to load dashboard'
+    dashboardError = err instanceof Error ? err.message : 'Unable to load dashboard'
   }
 
   const greeting = (() => {
@@ -67,14 +50,10 @@ export default async function DashboardPage() {
 
   const trialDaysRemaining = data?.trainer.trialDaysRemaining ?? 0
   const showTrial = trialDaysRemaining > 0
-  const trialText = showTrial
-    ? `${trialDaysRemaining} day${trialDaysRemaining === 1 ? '' : 's'} left on trial`
-    : null
+  const trialText = showTrial ? `${trialDaysRemaining} day${trialDaysRemaining === 1 ? '' : 's'} left on trial` : null
   const showSetupPayments = Boolean(data?.trainer.paymentsSetupRequired)
   const showOnlineBookingsOnboarding =
-    typeof data?.onlineBookings.serviceCount === 'number'
-      ? data.onlineBookings.serviceCount <= 2
-      : false
+    typeof data?.onlineBookings.serviceCount === 'number' ? data.onlineBookings.serviceCount <= 2 : false
 
   return (
     <PageContainer className="flex flex-col gap-8 py-8">
@@ -83,12 +62,7 @@ export default async function DashboardPage() {
           <h1 className="text-3xl font-semibold leading-tight">{greeting}</h1>
           <div className="flex flex-wrap gap-2">
             {showTrial && trialText ? (
-              <Button
-                variant="outline"
-                size="sm"
-                type="button"
-                className="gap-1 pr-2"
-              >
+              <Button variant="outline" size="sm" type="button" className="gap-1 pr-2">
                 <span>{trialText}</span>
                 <ChevronRight className="size-4" aria-hidden />
                 <span className="sr-only">View plan</span>
@@ -108,16 +82,10 @@ export default async function DashboardPage() {
               </Button>
             ) : null}
           </div>
-          {dashboardError ? (
-            <p className="text-sm text-destructive">{dashboardError}</p>
-          ) : null}
+          {dashboardError ? <p className="text-sm text-destructive">{dashboardError}</p> : null}
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="secondary"
-                type="button"
-                render={<Link href="/dashboard/sell/credit-pack" prefetch />}
-              >
+              <Button variant="secondary" type="button" render={<Link href="/dashboard/sell/credit-pack" prefetch />}>
                 Sell credit pack
               </Button>
               <Button variant="secondary" type="button">
@@ -182,12 +150,7 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent className="pt-0 mt-auto">
               <CardTitle className="text-3xl text-foreground">
-                {data
-                  ? formatCurrency(
-                      data.payments.overdue.total,
-                      data.payments.currency
-                    )
-                  : '—'}
+                {data ? formatCurrency(data.payments.overdue.total, data.payments.currency) : '—'}
               </CardTitle>
             </CardContent>
           </Card>
@@ -201,24 +164,16 @@ export default async function DashboardPage() {
             <CardContent className="pt-0 text-sm text-muted-foreground mt-auto">
               <div className="flex items-center gap-3">
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Pending
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground">Pending</p>
                   <p className="text-2xl font-semibold text-foreground">
-                    {data
-                      ? formatCurrency(data.funds.pending, data.funds.currency)
-                      : '—'}
+                    {data ? formatCurrency(data.funds.pending, data.funds.currency) : '—'}
                   </p>
                 </div>
                 <div className="h-10 w-px bg-border mx-3" aria-hidden />
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Available
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground">Available</p>
                   <p className="text-2xl font-semibold text-foreground">
-                    {data
-                      ? formatCurrency(data.funds.available, data.funds.currency)
-                      : '—'}
+                    {data ? formatCurrency(data.funds.available, data.funds.currency) : '—'}
                   </p>
                 </div>
               </div>
@@ -228,9 +183,7 @@ export default async function DashboardPage() {
           {showSetupPayments ? (
             <Card className="flex flex-col gap-3 border-dashed">
               <CardHeader className="pb-2 space-y-2">
-                <CardDescription className="text-sm font-semibold text-foreground">
-                  Setup payments
-                </CardDescription>
+                <CardDescription className="text-sm font-semibold text-foreground">Setup payments</CardDescription>
                 <p className="text-sm text-muted-foreground">
                   Get verified to accept card payments and enable payouts.
                 </p>
@@ -254,9 +207,7 @@ export default async function DashboardPage() {
                 <CardDescription className="text-sm font-semibold text-foreground">
                   Active subscriptions
                 </CardDescription>
-                <CardTitle className="text-3xl text-foreground">
-                  {data?.subscriptions.activePlans ?? 0}
-                </CardTitle>
+                <CardTitle className="text-3xl text-foreground">{data?.subscriptions.activePlans ?? 0}</CardTitle>
               </div>
               <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
             </CardHeader>
@@ -265,12 +216,8 @@ export default async function DashboardPage() {
           <Card className="flex flex-col">
             <CardHeader className="pb-1 flex items-center justify-between">
               <div>
-                <CardDescription className="text-sm font-semibold text-foreground">
-                  Active packs
-                </CardDescription>
-                <CardTitle className="text-3xl text-foreground">
-                  {data?.subscriptions.activePacks ?? 0}
-                </CardTitle>
+                <CardDescription className="text-sm font-semibold text-foreground">Active packs</CardDescription>
+                <CardTitle className="text-3xl text-foreground">{data?.subscriptions.activePacks ?? 0}</CardTitle>
               </div>
               <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
             </CardHeader>
@@ -283,9 +230,7 @@ export default async function DashboardPage() {
         <div className="grid">
           <Card className="flex flex-col">
             <CardHeader className="pb-2">
-              <CardDescription className="text-sm font-semibold text-foreground">
-                Next appointment
-              </CardDescription>
+              <CardDescription className="text-sm font-semibold text-foreground">Next appointment</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 mt-auto">
               {data?.nextAppointment ? (
@@ -293,25 +238,18 @@ export default async function DashboardPage() {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="size-4" aria-hidden />
                     <span>
-                      {new Date(data.nextAppointment.startTime).toLocaleString(
-                        undefined,
-                        {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        }
-                      )}
+                      {new Date(data.nextAppointment.startTime).toLocaleString(undefined, {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
                     </span>
                   </div>
-                  <p className="text-lg font-semibold leading-tight">
-                    {data.nextAppointment.title}
-                  </p>
+                  <p className="text-lg font-semibold leading-tight">{data.nextAppointment.title}</p>
                   {data.nextAppointment.location ? (
-                    <p className="text-sm text-muted-foreground">
-                      {data.nextAppointment.location}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{data.nextAppointment.location}</p>
                   ) : null}
                   <Button size="sm" variant="secondary" className="mt-1 w-fit">
                     View appointment
@@ -319,12 +257,9 @@ export default async function DashboardPage() {
                 </>
               ) : (
                 <>
-                  <p className="text-lg font-semibold leading-tight">
-                    Your day&apos;s completely free
-                  </p>
+                  <p className="text-lg font-semibold leading-tight">Your day&apos;s completely free</p>
                   <p className="text-sm text-muted-foreground">
-                    Book some appointments or take some time to yourself,
-                    whatever it is make sure you enjoy it.
+                    Book some appointments or take some time to yourself, whatever it is make sure you enjoy it.
                   </p>
                   <Button size="sm" className="w-fit">
                     Add an appointment or event
@@ -361,9 +296,7 @@ export default async function DashboardPage() {
                 <CardDescription className="text-sm font-semibold text-foreground">
                   Example booking page
                 </CardDescription>
-                <p className="text-sm text-muted-foreground">
-                  Preview what your clients will see when they book.
-                </p>
+                <p className="text-sm text-muted-foreground">Preview what your clients will see when they book.</p>
               </CardHeader>
               <CardContent className="pt-0 mt-auto">
                 <Button variant="secondary" className="w-fit">
@@ -381,11 +314,7 @@ export default async function DashboardPage() {
                     Today&apos;s online booking availability
                   </CardDescription>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Edit online booking availability"
-                >
+                <Button variant="ghost" size="icon-sm" aria-label="Edit online booking availability">
                   <PenSquare className="size-4" aria-hidden />
                 </Button>
               </div>
@@ -393,11 +322,7 @@ export default async function DashboardPage() {
             <CardContent className="pt-3 space-y-2 mt-auto">
               <div className="inline-flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm font-medium text-foreground">
                 <Clock className="size-4" aria-hidden />
-                <span>
-                  {data?.onlineBookings.bookableCount
-                    ? '9:00 am - 9:00 pm'
-                    : 'Set availability'}
-                </span>
+                <span>{data?.onlineBookings.bookableCount ? '9:00 am - 9:00 pm' : 'Set availability'}</span>
               </div>
               <p className="text-sm text-muted-foreground">
                 {data?.onlineBookings.bookableCount

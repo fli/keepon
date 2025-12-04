@@ -1,22 +1,14 @@
 import { NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerOrClientRequest,
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
-import {
-  adaptSalePaymentRow,
-  salePaymentSchema,
-  type SalePaymentRow,
-} from '../_lib/salePayments'
+import { authenticateTrainerOrClientRequest, authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { adaptSalePaymentRow, salePaymentSchema, type SalePaymentRow } from '../_lib/salePayments'
 
 const querySchema = z.object({
   saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }).optional(),
   updatedAfter: z
     .string()
-    .transform(value => {
+    .transform((value) => {
       const parsed = new Date(value)
       if (Number.isNaN(parsed.getTime())) {
         throw new Error('updatedAfter must be a valid ISO 8601 datetime string')
@@ -24,20 +16,13 @@ const querySchema = z.object({
       return parsed
     })
     .optional(),
-  paymentPlanId: z
-    .string()
-    .uuid({ message: 'paymentPlanId must be a valid UUID' })
-    .optional(),
-  clientId: z
-    .string()
-    .uuid({ message: 'clientId must be a valid UUID' })
-    .optional(),
+  paymentPlanId: z.string().uuid({ message: 'paymentPlanId must be a valid UUID' }).optional(),
+  clientId: z.string().uuid({ message: 'clientId must be a valid UUID' }).optional(),
 })
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const normalize = (value: string | null) =>
-    value && value.trim().length > 0 ? value.trim() : undefined
+  const normalize = (value: string | null) => (value && value.trim().length > 0 ? value.trim() : undefined)
 
   const queryResult = querySchema.safeParse({
     saleId: normalize(url.searchParams.get('saleId')),
@@ -47,7 +32,7 @@ export async function GET(request: Request) {
   })
 
   if (!queryResult.success) {
-    const detail = queryResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = queryResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -107,17 +92,9 @@ export async function GET(request: Request) {
       )
       .innerJoin('currency', 'currency.id', 'supportedCountryCurrency.currency_id')
       .leftJoin('payment_manual as paymentManual', 'paymentManual.id', 'payment.id')
-      .leftJoin(
-        'payment_credit_pack as paymentCreditPack',
-        'paymentCreditPack.id',
-        'payment.id'
-      )
+      .leftJoin('payment_credit_pack as paymentCreditPack', 'paymentCreditPack.id', 'payment.id')
       .leftJoin('payment_stripe as paymentStripe', 'paymentStripe.id', 'payment.id')
-      .leftJoin(
-        'payment_subscription as paymentSubscription',
-        'paymentSubscription.id',
-        'payment.id'
-      )
+      .leftJoin('payment_subscription as paymentSubscription', 'paymentSubscription.id', 'payment.id')
       .leftJoin(
         'stripe_payment_intent as stripePaymentIntent',
         'stripePaymentIntent.id',
@@ -173,7 +150,7 @@ export async function GET(request: Request) {
 
     const rows = (await query.orderBy('payment.created_at', 'desc').execute()) as SalePaymentRow[]
 
-    const salePayments = rows.map(row => adaptSalePaymentRow(row))
+    const salePayments = rows.map((row) => adaptSalePaymentRow(row))
     const responseBody = z.array(salePaymentSchema).parse(salePayments)
 
     return NextResponse.json(responseBody)
@@ -204,7 +181,7 @@ export async function GET(request: Request) {
 
 const requestSchema = z.object({
   saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }),
-  amount: z.union([z.string(), z.number()]).transform(value => value.toString()),
+  amount: z.union([z.string(), z.number()]).transform((value) => value.toString()),
   currency: z.string().min(1),
   type: z.literal('manual'),
   method: z.enum(['cash', 'electronic']),
@@ -231,7 +208,7 @@ export async function POST(request: Request) {
 
   const parsed = requestSchema.safeParse(body)
   if (!parsed.success) {
-    const detail = parsed.error.issues.map(issue => issue.message).join('; ')
+    const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -244,8 +221,7 @@ export async function POST(request: Request) {
   }
 
   const auth = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while creating sale payment',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while creating sale payment',
   })
 
   if (!auth.ok) {
@@ -255,7 +231,7 @@ export async function POST(request: Request) {
   const { saleId, amount, method, specificMethodName } = parsed.data
 
   try {
-    const paymentResult = await db.transaction().execute(async trx => {
+    const paymentResult = await db.transaction().execute(async (trx) => {
       const saleRow = await trx
         .selectFrom('sale')
         .select(['id', 'client_id'])

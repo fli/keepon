@@ -8,15 +8,12 @@ export type ClientItem = ClientList[number]
 const nullableTrimmedString = z
   .string()
   .trim()
-  .transform(value => (value.length === 0 ? null : value))
+  .transform((value) => (value.length === 0 ? null : value))
   .nullable()
   .optional()
 
 export const createClientSchema = z.object({
-  firstName: z
-    .string()
-    .trim()
-    .min(1, 'First name is required'),
+  firstName: z.string().trim().min(1, 'First name is required'),
   lastName: nullableTrimmedString,
   email: nullableTrimmedString,
   mobileNumber: nullableTrimmedString,
@@ -36,10 +33,7 @@ export const createClientSchema = z.object({
 
 export type CreateClientInput = z.infer<typeof createClientSchema>
 
-export async function listClientsForTrainer(
-  trainerId: string,
-  sessionId?: string | null
-): Promise<ClientList> {
+export async function listClientsForTrainer(trainerId: string, sessionId?: string | null): Promise<ClientList> {
   let clientQuery = db
     .selectFrom('vw_legacy_client as client')
     .selectAll('client')
@@ -52,27 +46,18 @@ export async function listClientsForTrainer(
       .where('client_session.session_id', '=', sessionId)
       .as('session_clients')
 
-    clientQuery = clientQuery.innerJoin(
-      sessionClients,
-      'session_clients.client_id',
-      'client.id'
-    )
+    clientQuery = clientQuery.innerJoin(sessionClients, 'session_clients.client_id', 'client.id')
   }
 
   const clientRows = await clientQuery.execute()
   return clientListSchema.parse(clientRows.map(adaptClientRow))
 }
 
-export async function createClientForTrainer(
-  trainerId: string,
-  payload: CreateClientInput
-): Promise<ClientItem> {
+export async function createClientForTrainer(trainerId: string, payload: CreateClientInput): Promise<ClientItem> {
   const parsed = createClientSchema.parse(payload)
-  const geo: Point | null = parsed.geo
-    ? { x: parsed.geo.lat, y: parsed.geo.lng }
-    : null
+  const geo: Point | null = parsed.geo ? { x: parsed.geo.lat, y: parsed.geo.lng } : null
 
-  const created: Selectable<VwLegacyClient>[] = await db.transaction().execute(async trx => {
+  const created: Selectable<VwLegacyClient>[] = await db.transaction().execute(async (trx) => {
     const userRows = await trx
       .insertInto('user_')
       .values([{ type: 'client' }])
@@ -105,13 +90,9 @@ export async function createClientForTrainer(
       .returning('id')
       .execute()
 
-    const ids = clientRows.map(row => row.id)
+    const ids = clientRows.map((row) => row.id)
 
-    const newClients = await trx
-      .selectFrom('vw_legacy_client')
-      .selectAll()
-      .where('id', 'in', ids)
-      .execute()
+    const newClients = await trx.selectFrom('vw_legacy_client').selectAll().where('id', 'in', ids).execute()
 
     return newClients
   })

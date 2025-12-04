@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 
 const paramsSchema = z.object({
   trainerId: z.string().min(1, 'Trainer id is required'),
@@ -17,7 +14,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
@@ -33,8 +30,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const { trainerId } = paramsResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching tax items',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching tax items',
   })
 
   if (!authorization.ok) {

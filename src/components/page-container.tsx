@@ -9,10 +9,5 @@ type PageContainerProps = HTMLAttributes<HTMLDivElement>
  * Full-width with consistent horizontal padding.
  */
 export function PageContainer({ className, ...props }: PageContainerProps) {
-  return (
-    <div
-      className={cn('w-full px-6', className)}
-      {...props}
-    />
-  )
+  return <div className={cn('w-full px-6', className)} {...props} />
 }

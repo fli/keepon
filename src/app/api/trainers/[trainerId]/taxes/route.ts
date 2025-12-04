@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 
 const paramsSchema = z.object({
   trainerId: z.string().min(1, 'Trainer id is required'),
@@ -33,8 +30,7 @@ const parsePercent = (value: string | number | null): number | null => {
     return null
   }
 
-  const numeric =
-    typeof value === 'number' ? value : Number.parseFloat(value.trim())
+  const numeric = typeof value === 'number' ? value : Number.parseFloat(value.trim())
 
   if (!Number.isFinite(numeric)) {
     throw new Error('Invalid percent value encountered in tax record')
@@ -43,9 +39,7 @@ const parsePercent = (value: string | number | null): number | null => {
   return numeric
 }
 
-const normalizeTaxRow = (
-  row: RawTaxRow
-): z.input<typeof taxSchema> => {
+const normalizeTaxRow = (row: RawTaxRow): z.input<typeof taxSchema> => {
   if (!row.id || !row.trainerId) {
     throw new Error('Tax row missing required identifiers')
   }
@@ -79,13 +73,10 @@ const normalizeTaxRow = (
 
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/taxes'>
 
-export async function GET(
-  request: NextRequest,
-  context: HandlerContext
-) {
+export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsParse = paramsSchema.safeParse(await context.params)
   if (!paramsParse.success) {
-    const detail = paramsParse.error.issues.map(issue => issue.message).join('; ')
+    const detail = paramsParse.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -100,8 +91,7 @@ export async function GET(
   const { trainerId } = paramsParse.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching taxes',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching taxes',
   })
 
   if (!authorization.ok) {

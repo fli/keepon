@@ -23,14 +23,8 @@ const parseOptionalNumber = (value: string | undefined) => {
   return Number.isNaN(parsed) ? undefined : parsed
 }
 
-const buildPoolConfig = (
-  connectionStringFromConfig?: string,
-  overrides?: PoolConfig
-): PoolConfig => {
-  const connectionString =
-    overrides?.connectionString ??
-    connectionStringFromConfig ??
-    process.env.DATABASE_URL
+const buildPoolConfig = (connectionStringFromConfig?: string, overrides?: PoolConfig): PoolConfig => {
+  const connectionString = overrides?.connectionString ?? connectionStringFromConfig ?? process.env.DATABASE_URL
 
   if (!connectionString) {
     throw new Error(
@@ -43,9 +37,7 @@ const buildPoolConfig = (
     connectionString,
     max: overrides?.max ?? parseOptionalNumber(process.env.DB_POOL_MAX),
     min: overrides?.min ?? parseOptionalNumber(process.env.DB_POOL_MIN),
-    idleTimeoutMillis:
-      overrides?.idleTimeoutMillis ??
-      parseOptionalNumber(process.env.DB_POOL_IDLE_TIMEOUT),
+    idleTimeoutMillis: overrides?.idleTimeoutMillis ?? parseOptionalNumber(process.env.DB_POOL_IDLE_TIMEOUT),
     ssl: overrides?.ssl ?? (process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined),
   }
 }

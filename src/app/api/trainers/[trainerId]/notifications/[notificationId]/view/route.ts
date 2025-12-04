@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../../../_lib/accessToken'
 
 const paramsSchema = z.object({
   trainerId: z.string().min(1, 'Trainer id is required'),
@@ -31,7 +28,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -46,8 +43,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const { trainerId, notificationId } = paramsResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while marking notification as viewed',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while marking notification as viewed',
   })
 
   if (!authorization.ok) {
@@ -81,8 +77,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Notification not found',
-          detail:
-            'No notification exists with the specified identifier for the authenticated trainer.',
+          detail: 'No notification exists with the specified identifier for the authenticated trainer.',
           type: '/notification-not-found',
         }),
         { status: 404 }
@@ -91,12 +86,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
     return new Response(null, { status: 204 })
   } catch (error) {
-    console.error(
-      'Failed to mark notification as viewed for trainer',
-      trainerId,
-      notificationId,
-      error
-    )
+    console.error('Failed to mark notification as viewed for trainer', trainerId, notificationId, error)
     return NextResponse.json(
       buildErrorResponse({
         status: 500,

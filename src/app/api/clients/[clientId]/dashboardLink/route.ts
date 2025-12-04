@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../_lib/constants'
 
 const paramsSchema = z.object({
-  clientId: z
-    .string()
-    .trim()
-    .min(1, 'Client id is required')
-    .uuid({ message: 'Client id must be a valid UUID' }),
+  clientId: z.string().trim().min(1, 'Client id is required').uuid({ message: 'Client id must be a valid UUID' }),
 })
 
 const clientDetailsSchema = z.object({
@@ -45,8 +38,7 @@ const tailwind600: Record<string, string> = {
   yellow: '#ca8a04',
 }
 
-const resolveBrandColor = (value?: string | null) =>
-  (value && tailwind600[value]) ?? tailwind600.blue
+const resolveBrandColor = (value?: string | null) => (value && tailwind600[value]) ?? tailwind600.blue
 
 const escapeHtml = (value: string) =>
   value
@@ -62,8 +54,7 @@ const buildDashboardLinkEmail = (options: {
   businessLogoUrl?: string | null
   link: URL
 }) => {
-  const serviceProvider =
-    options.serviceProviderName.trim() || `${APP_NAME} Team`
+  const serviceProvider = options.serviceProviderName.trim() || `${APP_NAME} Team`
   const buttonColor = resolveBrandColor(options.brandColor)
   const logo = options.businessLogoUrl
     ? `<img src="${options.businessLogoUrl}" alt="${escapeHtml(
@@ -91,12 +82,8 @@ const buildDashboardLinkEmail = (options: {
             </tr>
             <tr>
               <td style="font-size:16px;line-height:1.6;color:#1f2937;padding-bottom:16px;text-align:center;">
-                A ${escapeHtml(
-                  APP_NAME
-                )} dashboard login link was requested for this email address.
-                Click the button below to start managing your ${escapeHtml(
-                  APP_NAME
-                )} client profile.
+                A ${escapeHtml(APP_NAME)} dashboard login link was requested for this email address.
+                Click the button below to start managing your ${escapeHtml(APP_NAME)} client profile.
               </td>
             </tr>
             <tr>
@@ -108,9 +95,7 @@ const buildDashboardLinkEmail = (options: {
             </tr>
             <tr>
               <td style="font-size:13px;line-height:1.5;color:#6b7280;text-align:center;">
-                You received this email because ${escapeHtml(
-                  serviceProvider
-                )} requested a client dashboard link.
+                You received this email because ${escapeHtml(serviceProvider)} requested a client dashboard link.
               </td>
             </tr>
           </table>
@@ -149,17 +134,13 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid client identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected client identifier schema.',
+        detail: detail || 'Request parameters did not match the expected client identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -169,8 +150,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const { clientId } = paramsResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while sending client dashboard link',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while sending client dashboard link',
   })
 
   if (!authorization.ok) {
@@ -180,7 +160,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3001'
 
   try {
-    await db.transaction().execute(async trx => {
+    await db.transaction().execute(async (trx) => {
       const row = await trx
         .selectFrom('client')
         .innerJoin('trainer', 'trainer.id', 'client.trainer_id')
@@ -235,9 +215,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       }
 
       const link = new URL(baseUrl)
-      link.hash = `/client/${details.clientId}/${tokenRow.id}?email=${encodeURIComponent(
-        details.email
-      )}`
+      link.hash = `/client/${details.clientId}/${tokenRow.id}?email=${encodeURIComponent(details.email)}`
 
       const html = buildDashboardLinkEmail({
         serviceProviderName: details.serviceProviderName,
@@ -246,8 +224,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         link,
       })
 
-      const senderName =
-        details.serviceProviderName.trim() || `${APP_NAME} Team`
+      const senderName = details.serviceProviderName.trim() || `${APP_NAME} Team`
       const subject = `${senderName}: Client Dashboard Link`
 
       await trx
@@ -273,8 +250,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail:
-            'We could not find a client with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
           type: '/client-not-found',
         }),
         { status: 404 }
@@ -286,8 +262,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 409,
           title: 'Client has no email',
-          detail:
-            'A client email address is required to send a dashboard link.',
+          detail: 'A client email address is required to send a dashboard link.',
           type: '/client-has-no-email',
         }),
         { status: 409 }
@@ -299,8 +274,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to validate dashboard link data',
-          detail:
-            'Client dashboard link data did not match the expected response schema.',
+          detail: 'Client dashboard link data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

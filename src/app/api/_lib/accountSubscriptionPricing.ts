@@ -75,10 +75,7 @@ const accountSubscriptionPricingByCountry = {
     yearlyPrice: '2195.00',
     currency: 'SEK',
   },
-} as const satisfies Record<
-  string,
-  AccountSubscriptionPricing
->
+} as const satisfies Record<string, AccountSubscriptionPricing>
 
 export type AccountSubscriptionCountryCode = keyof typeof accountSubscriptionPricingByCountry
 
@@ -86,9 +83,7 @@ export const getAccountSubscriptionPricingForCountry = (
   countryCode: string
 ): AccountSubscriptionPricing | undefined => {
   const normalized = countryCode.trim().toUpperCase()
-  return accountSubscriptionPricingByCountry[
-    normalized as AccountSubscriptionCountryCode
-  ]
+  return accountSubscriptionPricingByCountry[normalized as AccountSubscriptionCountryCode]
 }
 
 export const supportedAccountSubscriptionCountries = Object.freeze(

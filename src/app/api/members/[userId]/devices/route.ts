@@ -1,24 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 
 const paramsSchema = z.object({
-  userId: z
-    .string()
-    .trim()
-    .min(1, 'Member id is required')
-    .uuid({ message: 'Member id must be a valid UUID' }),
+  userId: z.string().trim().min(1, 'Member id is required').uuid({ message: 'Member id must be a valid UUID' }),
 })
 
 const requestSchema = z.object({
-  deviceToken: z
-    .string()
-    .trim()
-    .min(1, 'Device token is required'),
+  deviceToken: z.string().trim().min(1, 'Device token is required'),
   deviceType: z.literal('ios'),
 })
 
@@ -27,9 +17,7 @@ const createInvalidParamsResponse = (detail?: string) =>
     buildErrorResponse({
       status: 400,
       title: 'Invalid member identifier',
-      detail:
-        detail ??
-        'Request parameters did not match the expected member identifier schema.',
+      detail: detail ?? 'Request parameters did not match the expected member identifier schema.',
       type: '/invalid-parameter',
     }),
     { status: 400 }
@@ -72,9 +60,7 @@ type HandlerContext = RouteContext<'/api/members/[userId]/devices'>
 export async function POST(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return createInvalidParamsResponse(detail || undefined)
   }
@@ -86,9 +72,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     const rawBody = (await request.json()) as unknown
     const validation = requestSchema.safeParse(rawBody)
     if (!validation.success) {
-      const detail = validation.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
       return createInvalidBodyResponse(detail || undefined)
     }
@@ -100,8 +84,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while registering device',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while registering device',
   })
 
   if (!authorization.ok) {
@@ -109,17 +92,14 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   if (memberId !== authorization.userId) {
-    console.warn(
-      'Authenticated user does not match member parameter for device registration',
-      {
-        memberId,
-        authenticatedUserId: authorization.userId,
-      }
-    )
+    console.warn('Authenticated user does not match member parameter for device registration', {
+      memberId,
+      authenticatedUserId: authorization.userId,
+    })
   }
 
   try {
-    await db.transaction().execute(async trx => {
+    await db.transaction().execute(async (trx) => {
       await sql`
         INSERT INTO installation (user_id, user_type, device_token, device_type)
         VALUES (${authorization.userId}, 'trainer', ${parsedBody.deviceToken}, ${parsedBody.deviceType})
@@ -153,9 +133,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
       const notificationPayload = {
         title: "You've enabled notifications! 🎉",
-        body: rewardRow
-          ? 'Claim your reward for completing a mission! 🎁'
-          : "Nice, you've completed a mission!",
+        body: rewardRow ? 'Claim your reward for completing a mission! 🎁' : "Nice, you've completed a mission!",
         userId: authorization.userId,
         messageType: 'success',
         notificationType: 'general',

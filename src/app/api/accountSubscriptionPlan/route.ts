@@ -1,17 +1,14 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { getAccountSubscriptionPricingForCountry } from '../_lib/accountSubscriptionPricing'
 
 const trainerPricingRowSchema = z.object({
   country: z
     .string()
     .min(2, 'Country code must be at least 2 characters long')
-    .transform(value => value.toUpperCase()),
+    .transform((value) => value.toUpperCase()),
   monthlyPriceOverride: z.union([z.string(), z.number(), z.null()]),
   yearlyPriceOverride: z.union([z.string(), z.number(), z.null()]),
 })
@@ -41,9 +38,7 @@ const normalizeDecimalString = (rawValue: string): string => {
   const integerPart = integerPartRaw
   const fractionalPart = fractionalPartRaw.replace(/0+$/, '')
 
-  return fractionalPart.length > 0
-    ? `${integerPart}.${fractionalPart}`
-    : integerPart
+  return fractionalPart.length > 0 ? `${integerPart}.${fractionalPart}` : integerPart
 }
 
 const coerceOverride = (value: string | number | null) => {
@@ -58,8 +53,7 @@ const coerceOverride = (value: string | number | null) => {
 
 export async function GET(request: Request) {
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching account subscription plan',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching account subscription plan',
   })
 
   if (!authorization.ok) {
@@ -83,8 +77,7 @@ export async function GET(request: Request) {
         buildErrorResponse({
           status: 404,
           title: 'Trainer not found',
-          detail:
-            'No trainer record was found for the authenticated access token.',
+          detail: 'No trainer record was found for the authenticated access token.',
           type: '/trainer-not-found',
         }),
         { status: 404 }
@@ -95,27 +88,20 @@ export async function GET(request: Request) {
     try {
       trainerPricingRow = trainerPricingRowSchema.parse(row)
     } catch (error) {
-      const message =
-        error instanceof z.ZodError
-          ? error.issues.map(issue => issue.message).join('; ')
-          : undefined
+      const message = error instanceof z.ZodError ? error.issues.map((issue) => issue.message).join('; ') : undefined
 
       return NextResponse.json(
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse trainer pricing details',
-          detail:
-            message ??
-            'Trainer pricing details did not match the expected schema.',
+          detail: message ?? 'Trainer pricing details did not match the expected schema.',
           type: '/invalid-database-response',
         }),
         { status: 500 }
       )
     }
 
-    const pricing = getAccountSubscriptionPricingForCountry(
-      trainerPricingRow.country
-    )
+    const pricing = getAccountSubscriptionPricingForCountry(trainerPricingRow.country)
 
     if (!pricing) {
       return NextResponse.json(
@@ -135,12 +121,8 @@ export async function GET(request: Request) {
     const pricingForCountry = pricing
 
     try {
-      const overrideMonthly = coerceOverride(
-        trainerPricingRow.monthlyPriceOverride
-      )
-      const overrideYearly = coerceOverride(
-        trainerPricingRow.yearlyPriceOverride
-      )
+      const overrideMonthly = coerceOverride(trainerPricingRow.monthlyPriceOverride)
+      const overrideYearly = coerceOverride(trainerPricingRow.yearlyPriceOverride)
 
       monthlyPrice = normalizeDecimalString(pricingForCountry.monthlyPrice)
       if (overrideMonthly !== null) {
@@ -156,10 +138,7 @@ export async function GET(request: Request) {
         buildErrorResponse({
           status: 500,
           title: 'Invalid subscription pricing override',
-          detail:
-            error instanceof Error
-              ? error.message
-              : 'Trainer subscription pricing override values are invalid.',
+          detail: error instanceof Error ? error.message : 'Trainer subscription pricing override values are invalid.',
           type: '/invalid-pricing-override',
         }),
         { status: 500 }
@@ -175,18 +154,13 @@ export async function GET(request: Request) {
 
       return NextResponse.json(response)
     } catch (error) {
-      const detail =
-        error instanceof z.ZodError
-          ? error.issues.map(issue => issue.message).join('; ')
-          : undefined
+      const detail = error instanceof z.ZodError ? error.issues.map((issue) => issue.message).join('; ') : undefined
 
       return NextResponse.json(
         buildErrorResponse({
           status: 500,
           title: 'Failed to validate account subscription plan response',
-          detail:
-            detail ??
-            'Account subscription plan response did not match the expected schema.',
+          detail: detail ?? 'Account subscription plan response did not match the expected schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

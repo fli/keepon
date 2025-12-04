@@ -4,10 +4,7 @@ import { z } from 'zod'
 import { buildErrorResponse } from '../../../_lib/accessToken'
 
 const paramsSchema = z.object({
-  bookingId: z
-    .string()
-    .trim()
-    .min(1, 'Booking identifier must not be empty'),
+  bookingId: z.string().trim().min(1, 'Booking identifier must not be empty'),
 })
 
 const bookingSchema = z.object({
@@ -32,14 +29,7 @@ const bookingSchema = z.object({
   name: z.string().nullable(),
   canClientsCancel: z.boolean(),
   cancellationAdvanceNoticeDuration: z.string(),
-  state: z.enum([
-    'maybe',
-    'cancelled',
-    'invited',
-    'confirmed',
-    'accepted',
-    'declined',
-  ]),
+  state: z.enum(['maybe', 'cancelled', 'invited', 'confirmed', 'accepted', 'declined']),
 })
 
 type BookingRow = z.infer<typeof bookingSchema>
@@ -50,17 +40,13 @@ export async function GET(_request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid booking identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected booking identifier schema.',
+        detail: detail || 'Request parameters did not match the expected booking identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -136,11 +122,7 @@ export async function GET(_request: NextRequest, context: HandlerContext) {
       )
     }
 
-    console.error(
-      'Failed to fetch online booking by bookingId',
-      bookingId,
-      error
-    )
+    console.error('Failed to fetch online booking by bookingId', bookingId, error)
 
     return NextResponse.json(
       buildErrorResponse({

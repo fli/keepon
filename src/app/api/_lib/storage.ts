@@ -27,11 +27,7 @@ export class PublicBucketNotConfiguredError extends Error {
   }
 }
 
-export const uploadToPublicBucket = async ({
-  buffer,
-  filename,
-  contentType,
-}: UploadToPublicBucketArgs) => {
+export const uploadToPublicBucket = async ({ buffer, filename, contentType }: UploadToPublicBucketArgs) => {
   const bucketName = getPublicBucketName()
   const publicBucketUrl = getPublicBucketUrl()
 

@@ -35,10 +35,7 @@ export function DayView({ date }: DayViewProps) {
         {dayEvents.map((event, index) => (
           <li
             key={event.id}
-            className={cn(
-              'flex flex-col gap-1 px-6 py-4',
-              index % 2 === 0 ? 'bg-card' : 'bg-background'
-            )}
+            className={cn('flex flex-col gap-1 px-6 py-4', index % 2 === 0 ? 'bg-card' : 'bg-background')}
           >
             <p className="text-sm font-semibold leading-tight">{event.name}</p>
             <p className="flex items-center gap-2 text-xs text-muted-foreground">

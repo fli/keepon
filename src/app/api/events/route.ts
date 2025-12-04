@@ -8,11 +8,7 @@ const querySchema = z.object({
   providerUrlSlug: z.string().trim().min(1, 'providerUrlSlug must not be empty'),
 })
 
-const bookingPaymentTypeSchema = z.enum([
-  'hidePrice',
-  'noPrepayment',
-  'fullPrepayment',
-])
+const bookingPaymentTypeSchema = z.enum(['hidePrice', 'noPrepayment', 'fullPrepayment'])
 
 const requestClientAddressOnlineSchema = z.enum(['optional', 'required'])
 
@@ -78,10 +74,7 @@ const toIsoString = (value: Date | string | null, label: string) => {
   return date.toISOString()
 }
 
-const ensureNonEmptyString = (
-  value: string | null | undefined,
-  label: string
-) => {
+const ensureNonEmptyString = (value: string | null | undefined, label: string) => {
   if (value === null || value === undefined) {
     throw new Error(`Missing ${label} in event record`)
   }
@@ -92,16 +85,11 @@ const ensureNonEmptyString = (
   return trimmed
 }
 
-const parseInteger = (
-  value: number | string | null,
-  label: string,
-  options: { minimum?: number } = {}
-) => {
+const parseInteger = (value: number | string | null, label: string, options: { minimum?: number } = {}) => {
   if (value === null || value === undefined) {
     throw new Error(`Missing ${label} in event record`)
   }
-  const numeric =
-    typeof value === 'number' ? value : Number.parseFloat(String(value))
+  const numeric = typeof value === 'number' ? value : Number.parseFloat(String(value))
   if (!Number.isFinite(numeric)) {
     throw new Error(`Invalid ${label} value encountered in event record`)
   }
@@ -110,18 +98,12 @@ const parseInteger = (
     throw new Error(`Invalid ${label} value encountered in event record`)
   }
   if (options.minimum !== undefined && rounded < options.minimum) {
-    throw new Error(
-      `${label} must be at least ${options.minimum} but was ${rounded}`
-    )
+    throw new Error(`${label} must be at least ${options.minimum} but was ${rounded}`)
   }
   return rounded
 }
 
-const parseOptionalInteger = (
-  value: number | string | null,
-  label: string,
-  options: { minimum?: number } = {}
-) => {
+const parseOptionalInteger = (value: number | string | null, label: string, options: { minimum?: number } = {}) => {
   if (value === null || value === undefined) {
     return null
   }
@@ -134,9 +116,7 @@ const parseBookingPaymentType = (value: string | null) => {
   }
   const parsed = bookingPaymentTypeSchema.safeParse(value.trim())
   if (!parsed.success) {
-    throw new Error(
-      `Invalid bookingPaymentType encountered in event record: ${value}`
-    )
+    throw new Error(`Invalid bookingPaymentType encountered in event record: ${value}`)
   }
   return parsed.data
 }
@@ -151,9 +131,7 @@ const parseRequestClientAddressOnline = (value: string | null) => {
   }
   const parsed = requestClientAddressOnlineSchema.safeParse(trimmed)
   if (!parsed.success) {
-    throw new Error(
-      `Invalid requestClientAddressOnline encountered in event record: ${value}`
-    )
+    throw new Error(`Invalid requestClientAddressOnline encountered in event record: ${value}`)
   }
   return parsed.data
 }
@@ -168,9 +146,7 @@ const parseBookingQuestionState = (value: string | null) => {
   }
   const parsed = bookingQuestionStateSchema.safeParse(trimmed)
   if (!parsed.success) {
-    throw new Error(
-      `Invalid bookingQuestionState encountered in event record: ${value}`
-    )
+    throw new Error(`Invalid bookingQuestionState encountered in event record: ${value}`)
   }
   return parsed.data
 }
@@ -196,9 +172,7 @@ const formatPrice = (value: string | number | null): string | null => {
   return parsed.toFixed(2)
 }
 
-const normalizeGeo = (
-  value: RawEventRow['geo']
-): z.infer<typeof geoSchema> | null => {
+const normalizeGeo = (value: RawEventRow['geo']): z.infer<typeof geoSchema> | null => {
   if (!value) {
     return null
   }
@@ -207,24 +181,11 @@ const normalizeGeo = (
   const lngValue = 'y' in value ? value.y : undefined
 
   const lat =
-    typeof latValue === 'number'
-      ? latValue
-      : typeof latValue === 'string'
-        ? Number.parseFloat(latValue)
-        : undefined
+    typeof latValue === 'number' ? latValue : typeof latValue === 'string' ? Number.parseFloat(latValue) : undefined
   const lng =
-    typeof lngValue === 'number'
-      ? lngValue
-      : typeof lngValue === 'string'
-        ? Number.parseFloat(lngValue)
-        : undefined
+    typeof lngValue === 'number' ? lngValue : typeof lngValue === 'string' ? Number.parseFloat(lngValue) : undefined
 
-  if (
-    lat === undefined ||
-    lng === undefined ||
-    Number.isNaN(lat) ||
-    Number.isNaN(lng)
-  ) {
+  if (lat === undefined || lng === undefined || Number.isNaN(lat) || Number.isNaN(lng)) {
     throw new Error('Invalid geo coordinates encountered in event record')
   }
 
@@ -239,28 +200,17 @@ const mapRowToEvent = (row: RawEventRow) => {
   })
   const timezone = ensureNonEmptyString(row.timezone, 'timezone')
   const currency = ensureNonEmptyString(row.currency, 'currency')
-  const currentAttendance = parseInteger(
-    row.currentAttendance,
-    'currentAttendance',
-    { minimum: 0 }
-  )
-  const maximumAttendance = parseOptionalInteger(
-    row.maximumAttendance,
-    'maximumAttendance',
-    { minimum: 0 }
-  )
+  const currentAttendance = parseInteger(row.currentAttendance, 'currentAttendance', {
+    minimum: 0,
+  })
+  const maximumAttendance = parseOptionalInteger(row.maximumAttendance, 'maximumAttendance', {
+    minimum: 0,
+  })
   const bookingPaymentType = parseBookingPaymentType(row.bookingPaymentType)
-  const requestClientAddressOnline = parseRequestClientAddressOnline(
-    row.requestClientAddressOnline
-  )
-  const bookingQuestionState = parseBookingQuestionState(
-    row.bookingQuestionState
-  )
+  const requestClientAddressOnline = parseRequestClientAddressOnline(row.requestClientAddressOnline)
+  const bookingQuestionState = parseBookingQuestionState(row.bookingQuestionState)
 
-  const price =
-    bookingPaymentType === 'hidePrice'
-      ? null
-      : formatPrice(parseAmount(row.price, 'price'))
+  const price = bookingPaymentType === 'hidePrice' ? null : formatPrice(parseAmount(row.price, 'price'))
 
   const geo = row.geo ? normalizeGeo(row.geo) : null
 
@@ -290,23 +240,16 @@ export async function GET(request: Request) {
   const rawProviderUrlSlug = url.searchParams.get('providerUrlSlug')
 
   const queryParse = querySchema.safeParse({
-    providerUrlSlug:
-      rawProviderUrlSlug && rawProviderUrlSlug.trim().length > 0
-        ? rawProviderUrlSlug.trim()
-        : undefined,
+    providerUrlSlug: rawProviderUrlSlug && rawProviderUrlSlug.trim().length > 0 ? rawProviderUrlSlug.trim() : undefined,
   })
 
   if (!queryParse.success) {
-    const detail = queryParse.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = queryParse.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid query parameters',
-        detail:
-          detail ||
-          'Request query parameters did not match the expected schema.',
+        detail: detail || 'Request query parameters did not match the expected schema.',
         type: '/invalid-query',
       }),
       { status: 400 }
@@ -317,11 +260,7 @@ export async function GET(request: Request) {
     const provider = await db
       .selectFrom('trainer as trainer')
       .select('trainer.id')
-      .where(
-        'trainer.online_bookings_page_url_slug',
-        '=',
-        queryParse.data.providerUrlSlug
-      )
+      .where('trainer.online_bookings_page_url_slug', '=', queryParse.data.providerUrlSlug)
       .limit(1)
       .executeTakeFirst()
 
@@ -330,8 +269,7 @@ export async function GET(request: Request) {
         buildErrorResponse({
           status: 404,
           title: 'Service provider not found',
-          detail:
-            'No service provider matches the provided providerUrlSlug value.',
+          detail: 'No service provider matches the provided providerUrlSlug value.',
           type: '/service-provider-not-found',
         }),
         { status: 404 }
@@ -342,11 +280,7 @@ export async function GET(request: Request) {
       .selectFrom('session as s')
       .innerJoin('session_series as series', 'series.id', 's.session_series_id')
       .innerJoin('trainer', 'trainer.id', 'series.trainer_id')
-      .innerJoin(
-        'supported_country_currency as scc',
-        'scc.country_id',
-        'trainer.country_id'
-      )
+      .innerJoin('supported_country_currency as scc', 'scc.country_id', 'trainer.country_id')
       .innerJoin('currency', 'currency.id', 'scc.currency_id')
       .select(({ ref }) => [
         ref('s.id').as('id'),
@@ -366,9 +300,7 @@ export async function GET(request: Request) {
           )::int
         `.as('currentAttendance'),
         ref('s.booking_payment_type').as('bookingPaymentType'),
-        ref('s.request_client_address_online').as(
-          'requestClientAddressOnline'
-        ),
+        ref('s.request_client_address_online').as('requestClientAddressOnline'),
         ref('s.booking_question').as('bookingQuestion'),
         ref('s.booking_question_state').as('bookingQuestionState'),
         ref('s.maximum_attendance').as('maximumAttendance'),
@@ -385,18 +317,14 @@ export async function GET(request: Request) {
         eb(
           's.start',
           '<',
-          sql<Date>`NOW() + ${sql.ref(
-            'trainer.online_bookings_duration_until_booking_window_closes'
-          )}`
+          sql<Date>`NOW() + ${sql.ref('trainer.online_bookings_duration_until_booking_window_closes')}`
         )
       )
       .where(({ eb }) =>
         eb(
           's.start',
           '>=',
-          sql<Date>`NOW() + ${sql.ref(
-            'trainer.online_bookings_duration_until_booking_window_opens'
-          )}`
+          sql<Date>`NOW() + ${sql.ref('trainer.online_bookings_duration_until_booking_window_opens')}`
         )
       )
       .orderBy('s.start', 'asc')

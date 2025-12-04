@@ -1,19 +1,9 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import {
-  authenticateClientRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateClientRequest, buildErrorResponse } from '../_lib/accessToken'
 
-const paymentPlanPaymentStatusSchema = z.enum([
-  'paid',
-  'cancelled',
-  'refunded',
-  'paused',
-  'pending',
-  'rejected',
-])
+const paymentPlanPaymentStatusSchema = z.enum(['paid', 'cancelled', 'refunded', 'paused', 'pending', 'rejected'])
 
 const isoDateTimeString = z.string().datetime({ offset: true })
 
@@ -59,12 +49,7 @@ const toIsoDateTime = (value: Date | string | null, label: string): string => {
     throw new Error(`Missing ${label} value in payment plan payment record`)
   }
 
-  const date =
-    value instanceof Date
-      ? value
-      : typeof value === 'string'
-        ? new Date(value)
-        : null
+  const date = value instanceof Date ? value : typeof value === 'string' ? new Date(value) : null
 
   if (!date || Number.isNaN(date.getTime())) {
     throw new Error(`Invalid ${label} value in payment plan payment record`)
@@ -73,20 +58,12 @@ const toIsoDateTime = (value: Date | string | null, label: string): string => {
   return date.toISOString()
 }
 
-const toOptionalIsoDateTime = (
-  value: Date | string | null,
-  label: string
-): string | null => {
+const toOptionalIsoDateTime = (value: Date | string | null, label: string): string | null => {
   if (value === null) {
     return null
   }
 
-  const date =
-    value instanceof Date
-      ? value
-      : typeof value === 'string'
-        ? new Date(value)
-        : null
+  const date = value instanceof Date ? value : typeof value === 'string' ? new Date(value) : null
 
   if (!date || Number.isNaN(date.getTime())) {
     throw new Error(`Invalid ${label} value in payment plan payment record`)
@@ -95,10 +72,7 @@ const toOptionalIsoDateTime = (
   return date.toISOString()
 }
 
-const toAmountString = (
-  value: string | number | null,
-  label: string
-): string => {
+const toAmountString = (value: string | number | null, label: string): string => {
   if (value === null || value === undefined) {
     throw new Error(`Missing ${label} value in payment plan payment record`)
   }
@@ -155,9 +129,7 @@ const normalizeStatus = (status: string | null): PaymentPlanPayment['status'] =>
   return parsed.data
 }
 
-const adaptRowToPaymentPlanPayment = (
-  row: PaymentPlanPaymentRow
-): z.input<typeof paymentPlanPaymentSchema> => {
+const adaptRowToPaymentPlanPayment = (row: PaymentPlanPaymentRow): z.input<typeof paymentPlanPaymentSchema> => {
   if (!row.id || !row.paymentPlanId || !row.currency) {
     throw new Error('Payment plan payment row is missing required fields')
   }
@@ -182,14 +154,9 @@ export async function GET(request: Request) {
   const rawStatus = url.searchParams.get('status')
   const rawPaymentPlanId = url.searchParams.get('paymentPlanId')
 
-  const normalizedStatus =
-    rawStatus && rawStatus.trim().length > 0
-      ? rawStatus.trim().toLowerCase()
-      : undefined
+  const normalizedStatus = rawStatus && rawStatus.trim().length > 0 ? rawStatus.trim().toLowerCase() : undefined
   const normalizedPaymentPlanId =
-    rawPaymentPlanId && rawPaymentPlanId.trim().length > 0
-      ? rawPaymentPlanId.trim()
-      : undefined
+    rawPaymentPlanId && rawPaymentPlanId.trim().length > 0 ? rawPaymentPlanId.trim() : undefined
 
   const queryParse = querySchema.safeParse({
     status: normalizedStatus,
@@ -197,14 +164,12 @@ export async function GET(request: Request) {
   })
 
   if (!queryParse.success) {
-    const detail = queryParse.error.issues.map(issue => issue.message).join('; ')
+    const detail = queryParse.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid query parameters',
-        detail:
-          detail ||
-          'Request query parameters did not match the expected schema.',
+        detail: detail || 'Request query parameters did not match the expected schema.',
         type: '/invalid-query',
       }),
       { status: 400 }
@@ -212,8 +177,7 @@ export async function GET(request: Request) {
   }
 
   const authorization = await authenticateClientRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching payment plan payments',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching payment plan payments',
   })
 
   if (!authorization.ok) {
@@ -223,22 +187,10 @@ export async function GET(request: Request) {
   try {
     let query = db
       .selectFrom('payment_plan_payment')
-      .innerJoin(
-        'payment_plan',
-        'payment_plan.id',
-        'payment_plan_payment.payment_plan_id'
-      )
+      .innerJoin('payment_plan', 'payment_plan.id', 'payment_plan_payment.payment_plan_id')
       .innerJoin('trainer', 'trainer.id', 'payment_plan.trainer_id')
-      .innerJoin(
-        'supported_country_currency',
-        'supported_country_currency.country_id',
-        'trainer.country_id'
-      )
-      .innerJoin(
-        'currency',
-        'currency.id',
-        'supported_country_currency.currency_id'
-      )
+      .innerJoin('supported_country_currency', 'supported_country_currency.country_id', 'trainer.country_id')
+      .innerJoin('currency', 'currency.id', 'supported_country_currency.currency_id')
       .select(({ ref }) => [
         ref('payment_plan_payment.created_at').as('createdAt'),
         ref('payment_plan_payment.updated_at').as('updatedAt'),
@@ -262,20 +214,12 @@ export async function GET(request: Request) {
     }
 
     if (paymentPlanId) {
-      query = query.where(
-        'payment_plan_payment.payment_plan_id',
-        '=',
-        paymentPlanId
-      )
+      query = query.where('payment_plan_payment.payment_plan_id', '=', paymentPlanId)
     }
 
-    const rows = (await query
-      .orderBy('payment_plan_payment.created_at', 'desc')
-      .execute()) as PaymentPlanPaymentRow[]
+    const rows = (await query.orderBy('payment_plan_payment.created_at', 'desc').execute()) as PaymentPlanPaymentRow[]
 
-    const payments = paymentPlanPaymentListSchema.parse(
-      rows.map(row => adaptRowToPaymentPlanPayment(row))
-    )
+    const payments = paymentPlanPaymentListSchema.parse(rows.map((row) => adaptRowToPaymentPlanPayment(row)))
 
     return NextResponse.json(payments)
   } catch (error) {
@@ -284,8 +228,7 @@ export async function GET(request: Request) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse payment plan payment data from database',
-          detail:
-            'Payment plan payment data did not match the expected response schema.',
+          detail: 'Payment plan payment data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

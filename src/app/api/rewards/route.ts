@@ -1,21 +1,13 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
-import {
-  adaptRewardRow,
-  rewardListSchema,
-  rewardRowSchema,
-} from './shared'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { adaptRewardRow, rewardListSchema, rewardRowSchema } from './shared'
 
 export async function GET(request: Request) {
   try {
     const authorization = await authenticateTrainerRequest(request, {
-      extensionFailureLogMessage:
-        'Failed to extend access token expiry while fetching rewards',
+      extensionFailureLogMessage: 'Failed to extend access token expiry while fetching rewards',
     })
     if (!authorization.ok) {
       return authorization.response
@@ -37,7 +29,7 @@ export async function GET(request: Request) {
       .orderBy('reward.created_at', 'desc')
       .execute()
 
-    const rewardRows = rows.map(row =>
+    const rewardRows = rows.map((row) =>
       rewardRowSchema.parse({
         id: row.id,
         type: row.type,
@@ -47,9 +39,7 @@ export async function GET(request: Request) {
       })
     )
 
-    const rewards = rewardListSchema.parse(
-      rewardRows.map(rewardRow => adaptRewardRow(rewardRow))
-    )
+    const rewards = rewardListSchema.parse(rewardRows.map((rewardRow) => adaptRewardRow(rewardRow)))
 
     return NextResponse.json(rewards)
   } catch (error) {

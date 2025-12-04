@@ -1,11 +1,9 @@
 import { z } from 'zod'
 
-const numericString = z
-  .union([z.string(), z.number()])
-  .transform((value) => {
-    const parsed = typeof value === 'number' ? value : Number.parseFloat(value)
-    return Number.isFinite(parsed) ? parsed : 0
-  })
+const numericString = z.union([z.string(), z.number()]).transform((value) => {
+  const parsed = typeof value === 'number' ? value : Number.parseFloat(value)
+  return Number.isFinite(parsed) ? parsed : 0
+})
 
 const dateOrString = z.union([z.string(), z.date()]).transform((value) => {
   if (value instanceof Date) return value
@@ -109,9 +107,7 @@ export const clientSessionSchema = z.object({
   clientId: z.string(),
   sessionId: z.string(),
   price: numericString.nullish(),
-  state: z
-    .enum(['maybe', 'cancelled', 'invited', 'confirmed', 'accepted', 'declined'])
-    .optional(),
+  state: z.enum(['maybe', 'cancelled', 'invited', 'confirmed', 'accepted', 'declined']).optional(),
   attended: z.boolean().nullable().optional(),
   createdAt: dateOrString.optional(),
   saleId: z.string().nullable().optional(),

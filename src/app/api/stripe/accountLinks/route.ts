@@ -2,21 +2,12 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import Stripe from 'stripe'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { getStripeClient } from '../../_lib/stripeClient'
 
 const requestBodySchema = z.object({
-  refresh_url: z
-    .string({ message: 'refresh_url is required' })
-    .trim()
-    .url('refresh_url must be a valid URL'),
-  return_url: z
-    .string({ message: 'return_url is required' })
-    .trim()
-    .url('return_url must be a valid URL'),
+  refresh_url: z.string({ message: 'refresh_url is required' }).trim().url('refresh_url must be a valid URL'),
+  return_url: z.string({ message: 'return_url is required' }).trim().url('return_url must be a valid URL'),
   type: z.enum(['account_onboarding', 'account_update'], {
     message: "type must be either 'account_onboarding' or 'account_update'",
   }),
@@ -61,14 +52,13 @@ export async function POST(request: Request) {
     const result = requestBodySchema.safeParse(rawBody)
 
     if (!result.success) {
-      const detail = result.error.issues.map(issue => issue.message).join('; ')
+      const detail = result.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
           status: 400,
           title: 'Invalid request body',
-          detail:
-            detail || 'Request body did not match the expected schema.',
+          detail: detail || 'Request body did not match the expected schema.',
           type: '/invalid-body',
         }),
         { status: 400 }
@@ -91,8 +81,7 @@ export async function POST(request: Request) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while creating Stripe account link',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while creating Stripe account link',
   })
 
   if (!authorization.ok) {
@@ -102,7 +91,7 @@ export async function POST(request: Request) {
   if (isProductionEnvironment()) {
     const urlsToValidate = [parsedBody.return_url, parsedBody.refresh_url]
 
-    const hasInvalidUrl = urlsToValidate.some(value => {
+    const hasInvalidUrl = urlsToValidate.some((value) => {
       try {
         const parsedUrl = new URL(value)
         return !isGetKeeponHostname(parsedUrl)
@@ -116,8 +105,7 @@ export async function POST(request: Request) {
         buildErrorResponse({
           status: 400,
           title: 'Invalid return url.',
-          detail:
-            'In production, return_url and refresh_url must point to a getkeepon domain.',
+          detail: 'In production, return_url and refresh_url must point to a getkeepon domain.',
           type: '/invalid-return-url',
         }),
         { status: 400 }
@@ -128,9 +116,7 @@ export async function POST(request: Request) {
   try {
     const row = await db
       .selectFrom('trainer')
-      .select(({ ref }) => [
-        ref('trainer.stripe_account_id').as('stripeAccountId'),
-      ])
+      .select(({ ref }) => [ref('trainer.stripe_account_id').as('stripeAccountId')])
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()
 
@@ -139,8 +125,7 @@ export async function POST(request: Request) {
         buildErrorResponse({
           status: 404,
           title: 'Trainer not found',
-          detail:
-            'No trainer record was found for the authenticated access token.',
+          detail: 'No trainer record was found for the authenticated access token.',
           type: '/trainer-not-found',
         }),
         { status: 404 }
@@ -167,8 +152,7 @@ export async function POST(request: Request) {
         buildErrorResponse({
           status: 500,
           title: 'Stripe configuration missing',
-          detail:
-            'STRIPE_SECRET_KEY is not configured, so Stripe account links cannot be created.',
+          detail: 'STRIPE_SECRET_KEY is not configured, so Stripe account links cannot be created.',
           type: '/missing-stripe-configuration',
         }),
         { status: 500 }
@@ -187,22 +171,16 @@ export async function POST(request: Request) {
       const response = await stripeClient.accountLinks.create(stripeParams)
       const { lastResponse: _ignored, ...accountLinkData } = response
 
-      const parsedResponse = accountLinkResponseSchema.safeParse(
-        accountLinkData
-      )
+      const parsedResponse = accountLinkResponseSchema.safeParse(accountLinkData)
 
       if (!parsedResponse.success) {
-        const detail = parsedResponse.error.issues
-          .map(issue => issue.message)
-          .join('; ')
+        const detail = parsedResponse.error.issues.map((issue) => issue.message).join('; ')
 
         return NextResponse.json(
           buildErrorResponse({
             status: 500,
             title: 'Failed to validate Stripe account link response',
-            detail:
-              detail ||
-              'Stripe account link response did not match the expected schema.',
+            detail: detail || 'Stripe account link response did not match the expected schema.',
             type: '/invalid-response',
           }),
           { status: 500 }
@@ -236,8 +214,7 @@ export async function POST(request: Request) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse trainer data',
-          detail:
-            'Trainer data did not match the expected schema.',
+          detail: 'Trainer data did not match the expected schema.',
           type: '/invalid-database-response',
         }),
         { status: 500 }

@@ -11,10 +11,7 @@ export const orpcClient = createORPCClient<AppRouterClient>(
 )
 
 function resolveBaseUrl() {
-  const envBase =
-    process.env.NEXT_PUBLIC_ORPC_BASE_URL ??
-    process.env.ORPC_BASE_URL ??
-    ''
+  const envBase = process.env.NEXT_PUBLIC_ORPC_BASE_URL ?? process.env.ORPC_BASE_URL ?? ''
 
   if (envBase) {
     return envBase.replace(/\/$/, '')

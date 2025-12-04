@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
-import {
-  adaptClientNoteRow,
-  clientNoteSchema,
-  type ClientNoteRow,
-} from '../shared'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { adaptClientNoteRow, clientNoteSchema, type ClientNoteRow } from '../shared'
 
 const paramsSchema = z.object({
   clientNoteId: z
@@ -46,17 +39,13 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid client note identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected client note identifier schema.',
+        detail: detail || 'Request parameters did not match the expected client note identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -64,8 +53,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching client note',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching client note',
   })
 
   if (!authorization.ok) {
@@ -87,8 +75,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client note not found',
-          detail:
-            'We could not find a client note with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client note with the specified identifier for the authenticated trainer.',
           type: '/client-note-not-found',
         }),
         { status: 404 }
@@ -104,20 +91,14 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse client note data from database',
-          detail:
-            'Client note data did not match the expected response schema.',
+          detail: 'Client note data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
       )
     }
 
-    console.error(
-      'Failed to fetch client note',
-      authorization.trainerId,
-      clientNoteId,
-      error
-    )
+    console.error('Failed to fetch client note', authorization.trainerId, clientNoteId, error)
 
     return NextResponse.json(
       buildErrorResponse({
@@ -134,17 +115,13 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid client note identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected client note identifier schema.',
+        detail: detail || 'Request parameters did not match the expected client note identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -152,8 +129,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while deleting client note',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while deleting client note',
   })
 
   if (!authorization.ok) {
@@ -169,17 +145,14 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
       .where('client_note.id', '=', clientNoteId)
       .executeTakeFirst()
 
-    const deletedCount = normalizeDeletedCount(
-      deleteResult?.numDeletedRows ?? 0
-    )
+    const deletedCount = normalizeDeletedCount(deleteResult?.numDeletedRows ?? 0)
 
     if (deletedCount === 0) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
           title: 'Client note not found',
-          detail:
-            'We could not find a client note with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client note with the specified identifier for the authenticated trainer.',
           type: '/client-note-not-found',
         }),
         { status: 404 }
@@ -208,17 +181,13 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid client note identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected client note identifier schema.',
+        detail: detail || 'Request parameters did not match the expected client note identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -231,16 +200,13 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
     const bodyResult = patchRequestBodySchema.safeParse(rawBody)
 
     if (!bodyResult.success) {
-      const detail = bodyResult.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
           status: 400,
           title: 'Invalid request body',
-          detail:
-            detail || 'Request body did not match the expected schema.',
+          detail: detail || 'Request body did not match the expected schema.',
           type: '/invalid-body',
         }),
         { status: 400 }
@@ -262,8 +228,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating client note',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating client note',
   })
 
   if (!authorization.ok) {
@@ -314,8 +279,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client note not found',
-          detail:
-            'We could not find a client note with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client note with the specified identifier for the authenticated trainer.',
           type: '/client-note-not-found',
         }),
         { status: 404 }
@@ -331,8 +295,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse updated client note',
-          detail:
-            'Client note data did not match the expected response schema.',
+          detail: 'Client note data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

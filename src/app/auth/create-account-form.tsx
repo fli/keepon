@@ -18,9 +18,7 @@ type CreateAccountFormProps = {
 
 export function CreateAccountForm({ defaultCountry }: CreateAccountFormProps) {
   const initialCountry =
-    defaultCountry && supportedCountryCodes.has(defaultCountry)
-      ? defaultCountry
-      : supportedCountries[0]?.code ?? 'US'
+    defaultCountry && supportedCountryCodes.has(defaultCountry) ? defaultCountry : (supportedCountries[0]?.code ?? 'US')
 
   const [state, formAction, pending] = useActionState(createAccountAction, {
     error: null as string | null,
@@ -75,36 +73,18 @@ export function CreateAccountForm({ defaultCountry }: CreateAccountFormProps) {
 
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            required
-            autoComplete="new-password"
-          />
+          <Input id="password" name="password" type="password" required autoComplete="new-password" />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="confirmPassword">Confirm password</Label>
-          <Input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            required
-            autoComplete="new-password"
-          />
+          <Input id="confirmPassword" name="confirmPassword" type="password" required autoComplete="new-password" />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="country">Country</Label>
-          <NativeSelect
-            id="country"
-            name="country"
-            defaultValue={selectedCountry}
-            autoComplete="country"
-            required
-          >
-            {supportedCountries.map(country => (
+          <NativeSelect id="country" name="country" defaultValue={selectedCountry} autoComplete="country" required>
+            {supportedCountries.map((country) => (
               <option key={country.code} value={country.code}>
                 {country.flag} {country.name}
               </option>
@@ -112,9 +92,7 @@ export function CreateAccountForm({ defaultCountry }: CreateAccountFormProps) {
           </NativeSelect>
         </div>
 
-        {state.error ? (
-          <p className="text-sm text-destructive">{state.error}</p>
-        ) : null}
+        {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? 'Creating…' : 'Sign up'}

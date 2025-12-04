@@ -1,6 +1,9 @@
 {
   "$schema": "https://oxc.rs/schema/oxfmtrc.json",
-  "printWidth": 100,
+  "printWidth": 120,
+  "semi": false,
+  "trailingComma": "es5",
+  "singleQuote": true,
   "ignorePatterns": [
     "**/node_modules/**",
     "**/.next/**",

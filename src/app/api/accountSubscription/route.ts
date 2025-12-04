@@ -4,10 +4,7 @@ import BigNumber from 'bignumber.js'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import Stripe from 'stripe'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { getAccountSubscriptionPricingForCountry } from '../_lib/accountSubscriptionPricing'
 import { currencyChargeLimits } from '../_lib/transactionFees'
 import { getStripeClient, STRIPE_API_VERSION } from '../_lib/stripeClient'
@@ -21,7 +18,7 @@ const addressSchema = z.object({
     .string()
     .trim()
     .min(2, 'country is required')
-    .transform(value => value.toUpperCase()),
+    .transform((value) => value.toUpperCase()),
   line1: z.string().trim().min(1, 'line1 is required'),
   city: z.string().trim().min(1).optional(),
   line2: z.string().trim().min(1).optional(),
@@ -35,14 +32,7 @@ const putRequestBodySchema = z.object({
 })
 
 const accountSubscriptionSchema = z.object({
-  status: z.enum([
-    'limited',
-    'grandfathered',
-    'lapsed',
-    'cancelled',
-    'subscribed',
-    'trialling',
-  ]),
+  status: z.enum(['limited', 'grandfathered', 'lapsed', 'cancelled', 'subscribed', 'trialling']),
   platform: z.enum(['stripe', 'apple']).optional(),
 })
 
@@ -58,7 +48,7 @@ const trainerSubscriptionRowSchema = z.object({
   country: z
     .string()
     .min(2, 'Country code must contain at least 2 characters.')
-    .transform(value => value.toUpperCase()),
+    .transform((value) => value.toUpperCase()),
   subscription: z.unknown().nullable(),
   monthlyPriceOverride: z.union([z.string(), z.number(), z.null()]),
   yearlyPriceOverride: z.union([z.string(), z.number(), z.null()]),
@@ -70,11 +60,7 @@ const subscriptionClientSecretSchema = z.object({
 
 const stripeApiVersionDate = STRIPE_API_VERSION.split('.')[0]
 
-const alreadySubscribedStripeStatuses = new Set([
-  'active',
-  'past_due',
-  'trialing',
-])
+const alreadySubscribedStripeStatuses = new Set(['active', 'past_due', 'trialing'])
 
 const extractClientIp = async () => {
   const headerStore = await headers()
@@ -109,14 +95,13 @@ export async function PATCH(request: Request) {
     const parsed = patchRequestBodySchema.safeParse(rawBody)
 
     if (!parsed.success) {
-      const detail = parsed.error.issues.map(issue => issue.message).join('; ')
+      const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
           status: 400,
           title: 'Invalid request body',
-          detail:
-            detail || 'Request body did not match the expected schema.',
+          detail: detail || 'Request body did not match the expected schema.',
           type: '/invalid-body',
         }),
         { status: 400 }
@@ -139,8 +124,7 @@ export async function PATCH(request: Request) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating account subscription',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating account subscription',
   })
 
   if (!authorization.ok) {
@@ -180,8 +164,7 @@ export async function PATCH(request: Request) {
       buildErrorResponse({
         status: 404,
         title: 'Trainer not found',
-        detail:
-          'No trainer record was found for the authenticated access token.',
+        detail: 'No trainer record was found for the authenticated access token.',
         type: '/trainer-not-found',
       }),
       { status: 404 }
@@ -191,9 +174,7 @@ export async function PATCH(request: Request) {
   const parsedRow = subscriptionRowSchema.safeParse(subscriptionRow)
 
   if (!parsedRow.success) {
-    const detail = parsedRow.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = parsedRow.error.issues.map((issue) => issue.message).join('; ')
 
     console.error('Failed to parse subscription row', {
       trainerId: authorization.trainerId,
@@ -204,17 +185,14 @@ export async function PATCH(request: Request) {
       buildErrorResponse({
         status: 500,
         title: 'Failed to parse subscription data from database',
-        detail:
-          detail || 'Subscription data did not match the expected schema.',
+        detail: detail || 'Subscription data did not match the expected schema.',
         type: '/invalid-database-response',
       }),
       { status: 500 }
     )
   }
 
-  const parsedSubscription = accountSubscriptionSchema.safeParse(
-    parsedRow.data.subscription
-  )
+  const parsedSubscription = accountSubscriptionSchema.safeParse(parsedRow.data.subscription)
 
   if (
     !parsedSubscription.success ||
@@ -238,8 +216,7 @@ export async function PATCH(request: Request) {
       buildErrorResponse({
         status: 500,
         title: 'Stripe configuration missing',
-        detail:
-          'STRIPE_SECRET_KEY is not configured, so Stripe subscriptions cannot be updated.',
+        detail: 'STRIPE_SECRET_KEY is not configured, so Stripe subscriptions cannot be updated.',
         type: '/missing-stripe-configuration',
       }),
       { status: 500 }
@@ -247,12 +224,9 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const stripeSubscription = (await stripeClient.subscriptions.update(
-      parsedRow.data.stripeSubscriptionId,
-      {
-        cancel_at_period_end: body.cancelAtPeriodEnd,
-      }
-    )) as Stripe.Subscription
+    const stripeSubscription = (await stripeClient.subscriptions.update(parsedRow.data.stripeSubscriptionId, {
+      cancel_at_period_end: body.cancelAtPeriodEnd,
+    })) as Stripe.Subscription
 
     try {
       await db
@@ -262,7 +236,7 @@ export async function PATCH(request: Request) {
           api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
           object: JSON.stringify(stripeSubscription),
         })
-        .onConflict(oc =>
+        .onConflict((oc) =>
           oc.column('id').doUpdateSet({
             api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
             object: JSON.stringify(stripeSubscription),
@@ -290,9 +264,7 @@ export async function PATCH(request: Request) {
       status: normalizedSubscription.status,
       cancelAtPeriodEnd: normalizedSubscription.cancel_at_period_end ?? null,
       currentPeriodEnd: normalizedSubscription.current_period_end
-        ? new Date(
-            normalizedSubscription.current_period_end * 1000
-          ).toISOString()
+        ? new Date(normalizedSubscription.current_period_end * 1000).toISOString()
         : null,
     })
   } catch (error) {
@@ -337,9 +309,7 @@ export async function PUT(request: Request) {
     const bodyResult = putRequestBodySchema.safeParse(rawBody)
 
     if (!bodyResult.success) {
-      const detail = bodyResult.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
@@ -368,17 +338,14 @@ export async function PUT(request: Request) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while creating account subscription',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while creating account subscription',
   })
 
   if (!authorization.ok) {
     return authorization.response
   }
 
-  let trainerRow:
-    | z.infer<typeof trainerSubscriptionRowSchema>
-    | undefined
+  let trainerRow: z.infer<typeof trainerSubscriptionRowSchema> | undefined
 
   try {
     trainerRow = await db
@@ -397,13 +364,10 @@ export async function PUT(request: Request) {
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()
   } catch (error) {
-    console.error(
-      'Failed to fetch trainer data for account subscription creation',
-      {
-        trainerId: authorization.trainerId,
-        error,
-      }
-    )
+    console.error('Failed to fetch trainer data for account subscription creation', {
+      trainerId: authorization.trainerId,
+      error,
+    })
 
     return NextResponse.json(
       buildErrorResponse({
@@ -420,8 +384,7 @@ export async function PUT(request: Request) {
       buildErrorResponse({
         status: 404,
         title: 'Trainer not found',
-        detail:
-          'No trainer record was found for the authenticated access token.',
+        detail: 'No trainer record was found for the authenticated access token.',
         type: '/trainer-not-found',
       }),
       { status: 404 }
@@ -432,38 +395,29 @@ export async function PUT(request: Request) {
   try {
     parsedTrainerRow = trainerSubscriptionRowSchema.parse(trainerRow)
   } catch (error) {
-    const detail =
-      error instanceof z.ZodError
-        ? error.issues.map(issue => issue.message).join('; ')
-        : undefined
+    const detail = error instanceof z.ZodError ? error.issues.map((issue) => issue.message).join('; ') : undefined
 
     return NextResponse.json(
       buildErrorResponse({
         status: 500,
         title: 'Failed to parse trainer data',
-        detail:
-          detail || 'Trainer data did not match the expected schema.',
+        detail: detail || 'Trainer data did not match the expected schema.',
         type: '/invalid-database-response',
       }),
       { status: 500 }
     )
   }
 
-  const currentAccountSubscription = accountSubscriptionSchema.safeParse(
-    parsedTrainerRow.subscription
-  )
+  const currentAccountSubscription = accountSubscriptionSchema.safeParse(parsedTrainerRow.subscription)
 
   if (
     currentAccountSubscription.success &&
-    (currentAccountSubscription.data.status === 'subscribed' ||
-      currentAccountSubscription.data.status === 'trialling')
+    (currentAccountSubscription.data.status === 'subscribed' || currentAccountSubscription.data.status === 'trialling')
   ) {
     return buildAlreadySubscribedResponse()
   }
 
-  const pricing = getAccountSubscriptionPricingForCountry(
-    parsedTrainerRow.country
-  )
+  const pricing = getAccountSubscriptionPricingForCountry(parsedTrainerRow.country)
 
   if (!pricing) {
     return NextResponse.json(
@@ -478,8 +432,7 @@ export async function PUT(request: Request) {
   }
 
   const currency = pricing.currency.toUpperCase()
-  const limits =
-    currencyChargeLimits[currency as keyof typeof currencyChargeLimits]
+  const limits = currencyChargeLimits[currency as keyof typeof currencyChargeLimits]
 
   if (!limits) {
     return NextResponse.json(
@@ -496,12 +449,8 @@ export async function PUT(request: Request) {
   let yearlyPrice: BigNumber
 
   try {
-    monthlyPrice = new BigNumber(
-      parsedTrainerRow.monthlyPriceOverride ?? pricing.monthlyPrice
-    )
-    yearlyPrice = new BigNumber(
-      parsedTrainerRow.yearlyPriceOverride ?? pricing.yearlyPrice
-    )
+    monthlyPrice = new BigNumber(parsedTrainerRow.monthlyPriceOverride ?? pricing.monthlyPrice)
+    yearlyPrice = new BigNumber(parsedTrainerRow.yearlyPriceOverride ?? pricing.yearlyPrice)
 
     if (!monthlyPrice.isFinite() || monthlyPrice.lt(0)) {
       throw new Error('Monthly price override is invalid')
@@ -515,18 +464,14 @@ export async function PUT(request: Request) {
       buildErrorResponse({
         status: 500,
         title: 'Invalid subscription pricing override',
-        detail:
-          error instanceof Error
-            ? error.message
-            : 'Trainer subscription pricing override values are invalid.',
+        detail: error instanceof Error ? error.message : 'Trainer subscription pricing override values are invalid.',
         type: '/invalid-pricing-override',
       }),
       { status: 500 }
     )
   }
 
-  const price =
-    parsedBody.interval === 'month' ? monthlyPrice : yearlyPrice
+  const price = parsedBody.interval === 'month' ? monthlyPrice : yearlyPrice
   const unitAmount = price.shiftedBy(limits.smallestUnitDecimals)
 
   if (!unitAmount.isInteger()) {
@@ -534,8 +479,7 @@ export async function PUT(request: Request) {
       buildErrorResponse({
         status: 500,
         title: 'Invalid subscription price',
-        detail:
-          'Subscription price could not be represented in the smallest currency unit.',
+        detail: 'Subscription price could not be represented in the smallest currency unit.',
         type: '/invalid-price',
       }),
       { status: 500 }
@@ -549,8 +493,7 @@ export async function PUT(request: Request) {
       buildErrorResponse({
         status: 500,
         title: 'Stripe configuration missing',
-        detail:
-          'STRIPE_SECRET_KEY is not configured, so Stripe subscriptions cannot be created.',
+        detail: 'STRIPE_SECRET_KEY is not configured, so Stripe subscriptions cannot be created.',
         type: '/missing-stripe-configuration',
       }),
       { status: 500 }
@@ -559,19 +502,13 @@ export async function PUT(request: Request) {
 
   if (parsedTrainerRow.stripeSubscriptionId) {
     try {
-      const existingSubscription =
-        await stripeClient.subscriptions.retrieve(
-          parsedTrainerRow.stripeSubscriptionId
-        )
+      const existingSubscription = await stripeClient.subscriptions.retrieve(parsedTrainerRow.stripeSubscriptionId)
 
       if (alreadySubscribedStripeStatuses.has(existingSubscription.status)) {
         return buildAlreadySubscribedResponse()
       }
     } catch (error) {
-      if (
-        error instanceof Stripe.errors.StripeError &&
-        error.statusCode === 404
-      ) {
+      if (error instanceof Stripe.errors.StripeError && error.statusCode === 404) {
         // Treat missing subscription as not subscribed.
       } else if (error instanceof Stripe.errors.StripeError) {
         console.error('Stripe API error while checking subscription status', {
@@ -612,19 +549,13 @@ export async function PUT(request: Request) {
   try {
     if (parsedTrainerRow.stripeCustomerId) {
       try {
-        stripeCustomer = await stripeClient.customers.update(
-          parsedTrainerRow.stripeCustomerId,
-          {
-            email: parsedTrainerRow.email,
-            address: stripeAddress,
-            tax: ipAddress ? { ip_address: ipAddress } : undefined,
-          }
-        )
+        stripeCustomer = await stripeClient.customers.update(parsedTrainerRow.stripeCustomerId, {
+          email: parsedTrainerRow.email,
+          address: stripeAddress,
+          tax: ipAddress ? { ip_address: ipAddress } : undefined,
+        })
       } catch (error) {
-        if (
-          error instanceof Stripe.errors.StripeError &&
-          error.statusCode === 404
-        ) {
+        if (error instanceof Stripe.errors.StripeError && error.statusCode === 404) {
           stripeCustomer = await stripeClient.customers.create({
             description: 'Service provider',
             email: parsedTrainerRow.email,
@@ -685,18 +616,13 @@ export async function PUT(request: Request) {
       limit: 100,
       collection_method: 'charge_automatically',
     })) {
-      await stripeClient.subscriptions
-        .cancel(incomplete.id)
-        .catch((cancelError: unknown) => {
-          console.warn(
-            'Failed to delete incomplete subscription before creating new one',
-            {
-              trainerId: authorization.trainerId,
-              subscriptionId: incomplete.id,
-              error: cancelError,
-            }
-          )
+      await stripeClient.subscriptions.cancel(incomplete.id).catch((cancelError: unknown) => {
+        console.warn('Failed to delete incomplete subscription before creating new one', {
+          trainerId: authorization.trainerId,
+          subscriptionId: incomplete.id,
+          error: cancelError,
         })
+      })
     }
   } catch (error) {
     console.warn('Failed to clean up incomplete Stripe subscriptions', {
@@ -761,32 +687,28 @@ export async function PUT(request: Request) {
     )
   }
 
-  const latestInvoice = (stripeSubscription as {
-    latest_invoice?: Stripe.Invoice | string | null
-  }).latest_invoice
+  const latestInvoice = (
+    stripeSubscription as {
+      latest_invoice?: Stripe.Invoice | string | null
+    }
+  ).latest_invoice
   const paymentIntent =
     latestInvoice && typeof latestInvoice !== 'string'
       ? (
-          (
-            latestInvoice as Stripe.Invoice & {
-              payment_intent?: Stripe.PaymentIntent | string | null
-            }
-          ).payment_intent
-        )
+          latestInvoice as Stripe.Invoice & {
+            payment_intent?: Stripe.PaymentIntent | string | null
+          }
+        ).payment_intent
       : null
 
-  const clientSecret =
-    paymentIntent && typeof paymentIntent !== 'string'
-      ? paymentIntent.client_secret
-      : null
+  const clientSecret = paymentIntent && typeof paymentIntent !== 'string' ? paymentIntent.client_secret : null
 
   if (!clientSecret) {
     return NextResponse.json(
       buildErrorResponse({
         status: 500,
         title: 'Failed to retrieve Stripe payment intent',
-        detail:
-          'Stripe did not return a payment intent client secret for the subscription.',
+        detail: 'Stripe did not return a payment intent client secret for the subscription.',
         type: '/invalid-stripe-response',
       }),
       { status: 500 }
@@ -794,7 +716,7 @@ export async function PUT(request: Request) {
   }
 
   try {
-    await db.transaction().execute(async trx => {
+    await db.transaction().execute(async (trx) => {
       await trx
         .insertInto('stripe.customer')
         .values({
@@ -802,13 +724,11 @@ export async function PUT(request: Request) {
           api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
           object: JSON.stringify(stripeCustomer),
         })
-        .onConflict(oc =>
-          oc
-            .column('id')
-            .doUpdateSet({
-              api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
-              object: JSON.stringify(stripeCustomer),
-            })
+        .onConflict((oc) =>
+          oc.column('id').doUpdateSet({
+            api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+            object: JSON.stringify(stripeCustomer),
+          })
         )
         .execute()
 
@@ -819,13 +739,11 @@ export async function PUT(request: Request) {
           api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
           object: JSON.stringify(stripeSubscription),
         })
-        .onConflict(oc =>
-          oc
-            .column('id')
-            .doUpdateSet({
-              api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
-              object: JSON.stringify(stripeSubscription),
-            })
+        .onConflict((oc) =>
+          oc.column('id').doUpdateSet({
+            api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+            object: JSON.stringify(stripeSubscription),
+          })
         )
         .execute()
 

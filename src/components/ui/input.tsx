@@ -19,10 +19,7 @@ function Input({
 }: InputProps) {
   return (
     <div
-      className={cn(
-        'group relative w-full data-[disabled]:pointer-events-none',
-        inputContainerClassName
-      )}
+      className={cn('group relative w-full data-[disabled]:pointer-events-none', inputContainerClassName)}
       data-disabled={disabled ? '' : undefined}
       data-slot="input-container"
     >

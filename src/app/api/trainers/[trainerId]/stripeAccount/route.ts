@@ -2,17 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { getStripeClient } from '../../../_lib/stripeClient'
 
 const paramsSchema = z.object({
-  trainerId: z
-    .string()
-    .trim()
-    .min(1, 'Trainer id is required'),
+  trainerId: z.string().trim().min(1, 'Trainer id is required'),
 })
 
 const trainerStripeRowSchema = z.object({
@@ -20,10 +14,7 @@ const trainerStripeRowSchema = z.object({
   account: z.unknown().nullable(),
   balance: z.unknown().nullable(),
   persons: z.unknown(),
-  firstCardPaymentProcessed: z
-    .union([z.date(), z.string(), z.number(), z.null()])
-    .nullable()
-    .optional(),
+  firstCardPaymentProcessed: z.union([z.date(), z.string(), z.number(), z.null()]).nullable().optional(),
   stripeAccountType: z.string().nullable(),
 })
 
@@ -87,12 +78,7 @@ const stripePersonSchema = z
   })
   .passthrough()
 
-const verificationStatusSchema = z.enum([
-  'verified',
-  'unverified',
-  'pending',
-  'error',
-])
+const verificationStatusSchema = z.enum(['verified', 'unverified', 'pending', 'error'])
 
 const emptyResponse = {
   id: null,
@@ -125,8 +111,7 @@ const parseTimestamp = (value: unknown, label: string) => {
 }
 
 const parseStripeAmount = (value: string | number, label: string) => {
-  const numeric =
-    typeof value === 'number' ? value : Number.parseFloat(value.trim())
+  const numeric = typeof value === 'number' ? value : Number.parseFloat(value.trim())
 
   if (!Number.isFinite(numeric)) {
     throw new Error(`Invalid ${label} amount encountered in Stripe data`)
@@ -154,8 +139,7 @@ const normalizeDetailsCode = (code: string | null | undefined) => {
   }
 }
 
-const ensureArray = (value: unknown): unknown[] =>
-  Array.isArray(value) ? value : []
+const ensureArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : [])
 
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/stripeAccount'>
 
@@ -163,9 +147,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
@@ -181,8 +163,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const { trainerId } = paramsResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching trainer Stripe account',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching trainer Stripe account',
   })
 
   if (!authorization.ok) {
@@ -257,22 +238,14 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     }
 
     const accountParseResult = stripeAccountSchema.safeParse(parsedRow.account)
-    let account = accountParseResult.success
-      ? accountParseResult.data
-      : undefined
+    let account = accountParseResult.success ? accountParseResult.data : undefined
 
     const balanceParseResult = stripeBalanceSchema.safeParse(parsedRow.balance)
-    let balance = balanceParseResult.success
-      ? balanceParseResult.data
-      : undefined
+    let balance = balanceParseResult.success ? balanceParseResult.data : undefined
 
-    const persons = ensureArray(parsedRow.persons).map(person =>
-      stripePersonSchema.parse(person)
-    )
+    const persons = ensureArray(parsedRow.persons).map((person) => stripePersonSchema.parse(person))
 
-    const accountTypeResult = stripeAccountTypeSchema.safeParse(
-      account?.type ?? stripeAccountTypeRaw
-    )
+    const accountTypeResult = stripeAccountTypeSchema.safeParse(account?.type ?? stripeAccountTypeRaw)
 
     if (!accountTypeResult.success) {
       return NextResponse.json(
@@ -289,10 +262,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     const accountType = accountTypeResult.data
 
     if (accountType === 'express') {
-      console.error(
-        'Encountered unsupported Stripe express account',
-        stripeAccountId
-      )
+      console.error('Encountered unsupported Stripe express account', stripeAccountId)
       return NextResponse.json(
         buildErrorResponse({
           status: 422,
@@ -304,9 +274,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       )
     }
 
-    let representative = persons.find(
-      person => person.relationship?.representative === true
-    )
+    let representative = persons.find((person) => person.relationship?.representative === true)
 
     const requiresAccountRefresh =
       !account ||
@@ -314,19 +282,11 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       typeof account.payouts_enabled !== 'boolean' ||
       typeof account.default_currency !== 'string'
 
-    const requiresBalanceRefresh =
-      !balance ||
-      !Array.isArray(balance.available) ||
-      !Array.isArray(balance.pending)
+    const requiresBalanceRefresh = !balance || !Array.isArray(balance.available) || !Array.isArray(balance.pending)
 
-    const requiresPersonsRefresh =
-      accountType === 'custom' && !representative && persons.length === 0
+    const requiresPersonsRefresh = accountType === 'custom' && !representative && persons.length === 0
 
-    if (
-      requiresAccountRefresh ||
-      requiresBalanceRefresh ||
-      requiresPersonsRefresh
-    ) {
+    if (requiresAccountRefresh || requiresBalanceRefresh || requiresPersonsRefresh) {
       const stripeClient = getStripeClient()
 
       if (!stripeClient) {
@@ -334,8 +294,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
           buildErrorResponse({
             status: 500,
             title: 'Stripe configuration missing',
-            detail:
-              'STRIPE_SECRET_KEY is not configured, so Stripe account data cannot be refreshed.',
+            detail: 'STRIPE_SECRET_KEY is not configured, so Stripe account data cannot be refreshed.',
             type: '/missing-stripe-configuration',
           }),
           { status: 500 }
@@ -343,9 +302,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       }
 
       if (requiresAccountRefresh) {
-        const freshAccount = await stripeClient.accounts.retrieve(
-          stripeAccountId
-        )
+        const freshAccount = await stripeClient.accounts.retrieve(stripeAccountId)
         const { lastResponse: _ignore, ...rest } = freshAccount
         account = stripeAccountSchema.parse(rest)
       }
@@ -359,31 +316,21 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       }
 
       if (requiresPersonsRefresh && accountType === 'custom') {
-        const freshPersons = await stripeClient.accounts.listPersons(
-          stripeAccountId,
-          {
-            relationship: { representative: true },
-          }
-        )
-        persons.splice(
-          0,
-          persons.length,
-          ...freshPersons.data.map(person => stripePersonSchema.parse(person))
-        )
+        const freshPersons = await stripeClient.accounts.listPersons(stripeAccountId, {
+          relationship: { representative: true },
+        })
+        persons.splice(0, persons.length, ...freshPersons.data.map((person) => stripePersonSchema.parse(person)))
       }
     }
 
-    representative = persons.find(
-      person => person.relationship?.representative === true
-    )
+    representative = persons.find((person) => person.relationship?.representative === true)
 
     if (!account) {
       return NextResponse.json(
         buildErrorResponse({
           status: 500,
           title: 'Stripe account unavailable',
-          detail:
-            'Unable to load Stripe account details for the requested trainer.',
+          detail: 'Unable to load Stripe account details for the requested trainer.',
           type: '/stripe-account-unavailable',
         }),
         { status: 500 }
@@ -395,8 +342,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Stripe balance unavailable',
-          detail:
-            'Unable to load Stripe balance information for the requested trainer.',
+          detail: 'Unable to load Stripe balance information for the requested trainer.',
           type: '/stripe-balance-unavailable',
         }),
         { status: 500 }
@@ -406,28 +352,19 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     const defaultCurrency = account.default_currency
 
     const available = balance.available
-      .filter(entry => entry.currency === defaultCurrency)
-      .reduce(
-        (total, entry) =>
-          total + parseStripeAmount(entry.amount, 'available balance entry'),
-        0
-      )
+      .filter((entry) => entry.currency === defaultCurrency)
+      .reduce((total, entry) => total + parseStripeAmount(entry.amount, 'available balance entry'), 0)
 
     const pending = balance.pending
-      .filter(entry => entry.currency === defaultCurrency)
-      .reduce(
-        (total, entry) =>
-          total + parseStripeAmount(entry.amount, 'pending balance entry'),
-        0
-      )
+      .filter((entry) => entry.currency === defaultCurrency)
+      .reduce((total, entry) => total + parseStripeAmount(entry.amount, 'pending balance entry'), 0)
 
     const firstCardPaymentProcessed = parseTimestamp(
       parsedRow.firstCardPaymentProcessed ?? null,
       'firstCardPaymentProcessed'
     )
 
-    let verificationStatus: z.infer<typeof verificationStatusSchema> =
-      'unverified'
+    let verificationStatus: z.infer<typeof verificationStatusSchema> = 'unverified'
     let verificationDetails: string | null = null
     let verificationDetailsCode: string | null = null
 
@@ -435,8 +372,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       const requirements = account.requirements ?? {}
       const currentlyDue = ensureArray(requirements.currently_due).length > 0
       const pastDue = ensureArray(requirements.past_due).length > 0
-      const pendingVerification =
-        ensureArray(requirements.pending_verification).length > 0
+      const pendingVerification = ensureArray(requirements.pending_verification).length > 0
 
       if (currentlyDue || pastDue) {
         verificationStatus = 'unverified'
@@ -449,29 +385,18 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       const personVerification = representative?.verification
 
       if (personVerification?.status) {
-        const parsedStatus = verificationStatusSchema.safeParse(
-          personVerification.status
-        )
-        verificationStatus = parsedStatus.success
-          ? parsedStatus.data
-          : 'error'
+        const parsedStatus = verificationStatusSchema.safeParse(personVerification.status)
+        verificationStatus = parsedStatus.success ? parsedStatus.data : 'error'
       } else {
         verificationStatus = 'unverified'
       }
 
-      verificationDetails =
-        typeof personVerification?.details === 'string'
-          ? personVerification.details
-          : null
+      verificationDetails = typeof personVerification?.details === 'string' ? personVerification.details : null
 
-      verificationDetails = verificationDetails?.trim()
-        ? verificationDetails
-        : null
+      verificationDetails = verificationDetails?.trim() ? verificationDetails : null
 
       verificationDetailsCode = normalizeDetailsCode(
-        typeof personVerification?.details_code === 'string'
-          ? personVerification.details_code
-          : null
+        typeof personVerification?.details_code === 'string' ? personVerification.details_code : null
       )
     }
 
@@ -489,9 +414,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
           },
         ],
       },
-      firstCardPaymentProcessed: firstCardPaymentProcessed
-        ? firstCardPaymentProcessed.toISOString()
-        : null,
+      firstCardPaymentProcessed: firstCardPaymentProcessed ? firstCardPaymentProcessed.toISOString() : null,
       verification: {
         status: verificationStatus,
         details: verificationDetails,
@@ -506,8 +429,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse Stripe account data',
-          detail:
-            'Stripe account data did not match the expected schema.',
+          detail: 'Stripe account data did not match the expected schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
@@ -531,11 +453,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       )
     }
 
-    console.error(
-      'Failed to fetch trainer Stripe account data',
-      trainerId,
-      error
-    )
+    console.error('Failed to fetch trainer Stripe account data', trainerId, error)
 
     return NextResponse.json(
       buildErrorResponse({

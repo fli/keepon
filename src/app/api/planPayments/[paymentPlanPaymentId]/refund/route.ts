@@ -2,21 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import BigNumber from 'bignumber.js'
 import Stripe from 'stripe'
 import { z, ZodError } from 'zod'
-import {
-  db,
-  sql,
-  type Selectable,
-  type VwLegacyPlanPayment,
-} from '@/lib/db'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { db, sql, type Selectable, type VwLegacyPlanPayment } from '@/lib/db'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { getStripeClient, STRIPE_API_VERSION } from '../../../_lib/stripeClient'
-import {
-  planPaymentSchema,
-  planPaymentStatusSchema,
-} from '../../../plans/shared'
+import { planPaymentSchema, planPaymentStatusSchema } from '../../../plans/shared'
 
 const paramsSchema = z.object({
   paymentPlanPaymentId: z
@@ -83,24 +72,18 @@ const stripeDetailsSchema = z
   })
   .superRefine((value, ctx) => {
     const hasCharge = value.stripeChargeId !== null && value.stripeChargeId !== undefined
-    const hasPaymentIntent =
-      value.stripePaymentIntentId !== null &&
-      value.stripePaymentIntentId !== undefined
+    const hasPaymentIntent = value.stripePaymentIntentId !== null && value.stripePaymentIntentId !== undefined
 
     if (hasCharge === hasPaymentIntent) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message:
-          'Plan payment must have either a Stripe charge id or payment intent id',
+        message: 'Plan payment must have either a Stripe charge id or payment intent id',
         path: ['stripeChargeId'],
       })
     }
   })
 
-const toBigNumber = (
-  value: string | number | null | undefined,
-  label: string
-) => {
+const toBigNumber = (value: string | number | null | undefined, label: string) => {
   if (value === null || value === undefined) {
     throw new Error(`${label} is required`)
   }
@@ -114,10 +97,7 @@ const toBigNumber = (
   return big
 }
 
-const toBigNumberOrZero = (
-  value: string | number | null | undefined,
-  label: string
-) => {
+const toBigNumberOrZero = (value: string | number | null | undefined, label: string) => {
   if (value === null || value === undefined) {
     return new BigNumber(0)
   }
@@ -125,20 +105,12 @@ const toBigNumberOrZero = (
   return toBigNumber(value, label)
 }
 
-const sumStripeBalanceEntries = (
-  entries: Array<{ amount: number; currency: string }>
-) =>
-  entries.reduce(
-    (total, entry) => total.plus(new BigNumber(entry.amount).shiftedBy(-2)),
-    new BigNumber(0)
-  )
+const sumStripeBalanceEntries = (entries: Array<{ amount: number; currency: string }>) =>
+  entries.reduce((total, entry) => total.plus(new BigNumber(entry.amount).shiftedBy(-2)), new BigNumber(0))
 
 type RawPlanPayment = Selectable<VwLegacyPlanPayment>
 
-const ensureNumber = (
-  value: number | string | null | undefined,
-  label: string
-): number => {
+const ensureNumber = (value: number | string | null | undefined, label: string): number => {
   if (value === null || value === undefined) {
     throw new Error(`Missing ${label}`)
   }
@@ -163,10 +135,7 @@ const ensureNumber = (
   return parsed
 }
 
-const ensureDate = (
-  value: Date | string | null | undefined,
-  label: string
-): Date => {
+const ensureDate = (value: Date | string | null | undefined, label: string): Date => {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
       throw new Error(`Invalid ${label}`)
@@ -204,10 +173,7 @@ const adaptPlanPaymentRow = (row: RawPlanPayment) => {
     currency: row.currency,
     status: statusParse.data,
     amount: ensureNumber(row.amount, 'amount'),
-    outstandingAmount: ensureNumber(
-      row.outstandingAmount,
-      'outstanding amount'
-    ),
+    outstandingAmount: ensureNumber(row.outstandingAmount, 'outstanding amount'),
     date: ensureDate(row.date, 'date').toISOString(),
   })
 }
@@ -216,16 +182,13 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail || 'Request parameters did not match the expected schema.',
+        detail: detail || 'Request parameters did not match the expected schema.',
         type: '/invalid-path',
       }),
       { status: 400 }
@@ -233,8 +196,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while refunding plan payment',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while refunding plan payment',
   })
 
   if (!authorization.ok) {
@@ -244,42 +206,26 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const { paymentPlanPaymentId } = paramsResult.data
 
   try {
-    const planPayment = await db.transaction().execute(async trx => {
+    const planPayment = await db.transaction().execute(async (trx) => {
       const rawDetails = await trx
         .selectFrom('payment_plan_payment as paymentPlanPayment')
-        .innerJoin(
-          'payment_plan',
-          'payment_plan.id',
-          'paymentPlanPayment.payment_plan_id'
-        )
-        .innerJoin(
-          'trainer',
-          'trainer.id',
-          'payment_plan.trainer_id'
-        )
+        .innerJoin('payment_plan', 'payment_plan.id', 'paymentPlanPayment.payment_plan_id')
+        .innerJoin('trainer', 'trainer.id', 'payment_plan.trainer_id')
         .innerJoin(
           'payment_plan_charge as paymentPlanCharge',
           'paymentPlanCharge.payment_plan_payment_id',
           'paymentPlanPayment.id'
         )
-        .leftJoin(
-          'stripe.account as stripeAccount',
-          'stripeAccount.id',
-          'trainer.stripe_account_id'
-        )
+        .leftJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
         .select(({ ref }) => [
           ref('paymentPlanPayment.status').as('status'),
           ref('paymentPlanPayment.amount').as('amount'),
           ref('paymentPlanPayment.fee').as('applicationFeeAmount'),
           ref('paymentPlanCharge.stripe_charge_id').as('stripeChargeId'),
-          ref('paymentPlanCharge.stripe_payment_intent_id').as(
-            'stripePaymentIntentId'
-          ),
+          ref('paymentPlanCharge.stripe_payment_intent_id').as('stripePaymentIntentId'),
           ref('trainer.stripe_account_id').as('stripeAccountId'),
           ref('trainer.minimum_balance').as('minimumBalance'),
-          sql<string | null>`stripeAccount.object ->> 'type'`.as(
-            'stripeAccountType'
-          ),
+          sql<string | null>`stripeAccount.object ->> 'type'`.as('stripeAccountType'),
         ])
         .where('paymentPlanPayment.id', '=', paymentPlanPaymentId)
         .where('paymentPlanPayment.trainer_id', '=', authorization.trainerId)
@@ -310,22 +256,12 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         .where('trainer_id', '=', authorization.trainerId)
         .execute()
 
-      const stripeChargeId =
-        details.stripeChargeId === null ? undefined : details.stripeChargeId
-      const stripePaymentIntentId =
-        details.stripePaymentIntentId === null
-          ? undefined
-          : details.stripePaymentIntentId
+      const stripeChargeId = details.stripeChargeId === null ? undefined : details.stripeChargeId
+      const stripePaymentIntentId = details.stripePaymentIntentId === null ? undefined : details.stripePaymentIntentId
 
       const refundAmount = toBigNumber(details.amount, 'payment amount')
-      const applicationFeeAmount = toBigNumberOrZero(
-        details.applicationFeeAmount,
-        'application fee amount'
-      )
-      const minimumBalanceAmount = toBigNumberOrZero(
-        details.minimumBalance,
-        'minimum balance'
-      )
+      const applicationFeeAmount = toBigNumberOrZero(details.applicationFeeAmount, 'application fee amount')
+      const minimumBalanceAmount = toBigNumberOrZero(details.minimumBalance, 'minimum balance')
 
       if (stripeChargeId || stripePaymentIntentId) {
         const stripeClient = getStripeClient()
@@ -337,11 +273,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         const stripeAccountId = details.stripeAccountId
         const stripeAccountType = details.stripeAccountType
 
-        if (
-          !stripeAccountId ||
-          !stripeAccountType ||
-          stripeAccountType === 'express'
-        ) {
+        if (!stripeAccountId || !stripeAccountType || stripeAccountType === 'express') {
           throw new StripePaymentsDisabledError()
         }
 
@@ -349,18 +281,13 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           stripeAccount: stripeAccountId,
         })
 
-        const totalBalance = sumStripeBalanceEntries(
-          stripeBalance.available
-        ).plus(sumStripeBalanceEntries(stripeBalance.pending))
+        const totalBalance = sumStripeBalanceEntries(stripeBalance.available).plus(
+          sumStripeBalanceEntries(stripeBalance.pending)
+        )
 
-        const balanceAfterRefund = totalBalance
-          .minus(refundAmount)
-          .plus(applicationFeeAmount)
+        const balanceAfterRefund = totalBalance.minus(refundAmount).plus(applicationFeeAmount)
 
-        if (
-          balanceAfterRefund.isLessThan(minimumBalanceAmount) &&
-          stripeAccountType === 'custom'
-        ) {
+        if (balanceAfterRefund.isLessThan(minimumBalanceAmount) && stripeAccountType === 'custom') {
           throw new StripeBalanceTooLowError()
         }
 
@@ -375,9 +302,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
         const refund = await stripeClient.refunds.create(
           refundOptions,
-          stripeAccountType === 'standard'
-            ? { stripeAccount: stripeAccountId }
-            : undefined
+          stripeAccountType === 'standard' ? { stripeAccount: stripeAccountId } : undefined
         )
 
         try {
@@ -390,14 +315,11 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
             })
             .execute()
         } catch (insertionError) {
-          console.error(
-            'Refund processed but failed to persist Stripe resource',
-            {
-              paymentPlanPaymentId,
-              trainerId: authorization.trainerId,
-              error: insertionError,
-            }
-          )
+          console.error('Refund processed but failed to persist Stripe resource', {
+            paymentPlanPaymentId,
+            trainerId: authorization.trainerId,
+            error: insertionError,
+          })
         }
       }
 
@@ -421,8 +343,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Plan payment not found',
-          detail:
-            'We could not find a plan payment with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a plan payment with the specified identifier for the authenticated trainer.',
           type: '/plan-payment-not-found',
         }),
         { status: 404 }
@@ -458,8 +379,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Stripe configuration missing',
-          detail:
-            'Stripe is not configured for this environment. Refunds cannot be processed.',
+          detail: 'Stripe is not configured for this environment. Refunds cannot be processed.',
           type: '/stripe-configuration-missing',
         }),
         { status: 500 }
@@ -471,8 +391,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 409,
           title: 'Stripe payments not enabled',
-          detail:
-            'Stripe payments are not enabled for this trainer, so the refund cannot be processed.',
+          detail: 'Stripe payments are not enabled for this trainer, so the refund cannot be processed.',
           type: '/stripe-account-pending-creation',
         }),
         { status: 409 }
@@ -484,8 +403,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 503,
           title: 'Balance too low to process refund',
-          detail:
-            'Your balance is too low to process this refund. Contact support for options.',
+          detail: 'Your balance is too low to process this refund. Contact support for options.',
           type: '/balance-too-low-for-refund',
         }),
         { status: 503 }
@@ -503,8 +421,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 502,
           title: 'Stripe API error',
-          detail:
-            'Stripe reported an error while processing the refund. Try again later.',
+          detail: 'Stripe reported an error while processing the refund. Try again later.',
           type: '/stripe-api-error',
         }),
         { status: 502 }
@@ -516,8 +433,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse plan payment data from database',
-          detail:
-            'Plan payment data did not match the expected response schema.',
+          detail: 'Plan payment data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

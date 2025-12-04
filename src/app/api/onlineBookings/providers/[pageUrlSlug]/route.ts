@@ -5,9 +5,7 @@ import { buildErrorResponse } from '../../../_lib/accessToken'
 
 const ISO_DURATION_PATTERN = /^-?P/
 
-const timeStringSchema = z
-  .string()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Time must be in HH:MM format')
+const timeStringSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Time must be in HH:MM format')
 
 const availabilityIntervalSchema = z.tuple([timeStringSchema, timeStringSchema])
 
@@ -41,11 +39,7 @@ const serviceSchema = z.object({
   geo: geoSchema,
   googlePlaceId: z.string().nullable(),
   description: z.string().nullable(),
-  bookingPaymentType: z.union([
-    z.literal('hidePrice'),
-    z.literal('noPrepayment'),
-    z.literal('fullPrepayment'),
-  ]),
+  bookingPaymentType: z.union([z.literal('hidePrice'), z.literal('noPrepayment'), z.literal('fullPrepayment')]),
   coverImageUrl: z.string().nullable(),
   iconUrl: z.string().nullable(),
   image0Url: z.string().nullable(),
@@ -58,13 +52,9 @@ const serviceSchema = z.object({
   bufferMinutesAfter: z.number(),
   timeSlotFrequencyMinutes: z.number(),
   displayOrder: z.number().nullable(),
-  requestClientAddressOnline: z
-    .union([z.literal('optional'), z.literal('required'), z.null()])
-    .nullable(),
+  requestClientAddressOnline: z.union([z.literal('optional'), z.literal('required'), z.null()]).nullable(),
   bookingQuestion: z.string().nullable(),
-  bookingQuestionState: z
-    .union([z.literal('optional'), z.literal('required'), z.null()])
-    .nullable(),
+  bookingQuestionState: z.union([z.literal('optional'), z.literal('required'), z.null()]).nullable(),
 })
 
 const providerSchema = z.object({
@@ -77,12 +67,8 @@ const providerSchema = z.object({
   pageUrlSlug: z.string(),
   contactEmail: z.string(),
   contactNumber: z.string().nullable(),
-  durationUntilBookingWindowOpens: z
-    .string()
-    .regex(ISO_DURATION_PATTERN, 'Duration must be an ISO 8601 string'),
-  durationUntilBookingWindowCloses: z
-    .string()
-    .regex(ISO_DURATION_PATTERN, 'Duration must be an ISO 8601 string'),
+  durationUntilBookingWindowOpens: z.string().regex(ISO_DURATION_PATTERN, 'Duration must be an ISO 8601 string'),
+  durationUntilBookingWindowCloses: z.string().regex(ISO_DURATION_PATTERN, 'Duration must be an ISO 8601 string'),
   bookingNote: z.string().nullable(),
   availability: z.object({
     defaults: z.object({
@@ -97,9 +83,7 @@ const providerSchema = z.object({
     overrides: availabilityOverridesSchema,
   }),
   services: z.array(serviceSchema),
-  unavailability: z.array(
-    z.tuple([z.union([z.string(), z.date()]), z.union([z.string(), z.date()])])
-  ),
+  unavailability: z.array(z.tuple([z.union([z.string(), z.date()]), z.union([z.string(), z.date()])])),
   brandColor: z.string(),
   brandDarkMode: z.boolean(),
   businessLogoUrl: z.string().nullable(),
@@ -107,9 +91,7 @@ const providerSchema = z.object({
   termsAndConditions: z.string().nullable(),
   cancellationPolicy: z.string().nullable(),
   stripeAccountId: z.string().nullable(),
-  stripeAccountType: z
-    .union([z.literal('standard'), z.literal('custom'), z.null()])
-    .nullable(),
+  stripeAccountType: z.union([z.literal('standard'), z.literal('custom'), z.null()]).nullable(),
 })
 
 type Provider = z.infer<typeof providerSchema>
@@ -124,8 +106,7 @@ const paramsSchema = z.object({
   pageUrlSlug: z.string().trim().min(1, 'Page URL slug must not be empty'),
 })
 
-const removeTrailingSlash = (value: string) =>
-  value.endsWith('/') ? value.slice(0, -1) : value
+const removeTrailingSlash = (value: string) => (value.endsWith('/') ? value.slice(0, -1) : value)
 
 const buildBookingsPageUrl = (slug: string) => {
   const trimmedSlug = slug.trim()
@@ -134,10 +115,7 @@ const buildBookingsPageUrl = (slug: string) => {
   }
 
   const explicitBase =
-    process.env.BOOKINGS_BASE_URL ??
-    process.env.BOOKINGS_URL ??
-    process.env.NEXT_PUBLIC_BOOKINGS_URL ??
-    null
+    process.env.BOOKINGS_BASE_URL ?? process.env.BOOKINGS_URL ?? process.env.NEXT_PUBLIC_BOOKINGS_URL ?? null
 
   if (explicitBase) {
     const explicit = new URL(explicitBase)
@@ -165,16 +143,13 @@ export async function GET(_request: Request, context: HandlerContext) {
   const parsedParams = paramsSchema.safeParse(await context.params)
 
   if (!parsedParams.success) {
-    const detail = parsedParams.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = parsedParams.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail || 'Request path parameters did not match the expected schema.',
+        detail: detail || 'Request path parameters did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -532,7 +507,7 @@ export async function GET(_request: Request, context: HandlerContext) {
 
     const normalizedUnavailability = Array.isArray(row.unavailability)
       ? row.unavailability
-          .map(interval => {
+          .map((interval) => {
             if (!Array.isArray(interval) || interval.length < 2) return null
             const [start, end] = interval
 
@@ -568,11 +543,7 @@ export async function GET(_request: Request, context: HandlerContext) {
       )
     }
 
-    console.error(
-      'Failed to fetch online bookings provider by slug',
-      pageUrlSlug,
-      error
-    )
+    console.error('Failed to fetch online bookings provider by slug', pageUrlSlug, error)
 
     return NextResponse.json(
       buildErrorResponse({

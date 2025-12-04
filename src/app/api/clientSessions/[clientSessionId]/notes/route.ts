@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { noteSchema } from '../../../_lib/clientSessionsSchema'
 
 const paramsSchema = z.object({
@@ -18,15 +15,13 @@ const paramsSchema = z.object({
 const requestBodySchema = z.object({
   content: z
     .union([
-      z
-        .string({ message: 'content must be a string or null.' })
-        .transform(value => {
-          const trimmed = value.trim()
-          return trimmed.length > 0 ? trimmed : null
-        }),
+      z.string({ message: 'content must be a string or null.' }).transform((value) => {
+        const trimmed = value.trim()
+        return trimmed.length > 0 ? trimmed : null
+      }),
       z.null({ message: 'content must be a string or null.' }),
     ])
-    .transform(value => {
+    .transform((value) => {
       if (typeof value === 'string') {
         const trimmed = value.trim()
         return trimmed.length > 0 ? trimmed : null
@@ -48,17 +43,13 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Client session id parameter did not match the expected schema.',
+        detail: detail || 'Client session id parameter did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -73,16 +64,13 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     const rawBody = (await request.json()) as unknown
     const bodyResult = requestBodySchema.safeParse(rawBody)
     if (!bodyResult.success) {
-      const detail = bodyResult.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
           status: 400,
           title: 'Invalid request body',
-          detail:
-            detail || 'Request body did not match the expected schema.',
+          detail: detail || 'Request body did not match the expected schema.',
           type: '/invalid-body',
         }),
         { status: 400 }
@@ -90,11 +78,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     }
     parsedBody = bodyResult.data
   } catch (error) {
-    console.error(
-      'Failed to parse client session note request body',
-      clientSessionId,
-      error
-    )
+    console.error('Failed to parse client session note request body', clientSessionId, error)
 
     return NextResponse.json(
       buildErrorResponse({
@@ -108,8 +92,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating client session notes',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating client session notes',
   })
 
   if (!authorization.ok) {
@@ -117,7 +100,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   try {
-    const noteRecord = await db.transaction().execute(async trx => {
+    const noteRecord = await db.transaction().execute(async (trx) => {
       const updated = await trx
         .updateTable('client_session')
         .set({
@@ -153,8 +136,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client session not found',
-          detail:
-            'We could not find a client session with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client session with the specified identifier for the authenticated trainer.',
           type: '/client-session-not-found',
         }),
         { status: 404 }
@@ -166,8 +148,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to validate client session note response',
-          detail:
-            'Client session note response did not match the expected schema.',
+          detail: 'Client session note response did not match the expected schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

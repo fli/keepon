@@ -14,19 +14,9 @@ import {
 import { parseAmount } from '../paymentPlans/shared'
 
 export const sessionTypeSchema = z.enum(['single', 'group', 'event'])
-export const bookingPaymentTypeSchema = z.enum([
-  'hidePrice',
-  'noPrepayment',
-  'fullPrepayment',
-])
-export const requestClientAddressOnlineValueSchema = z.enum([
-  'optional',
-  'required',
-])
-export const bookingQuestionStateValueSchema = z.enum([
-  'optional',
-  'required',
-])
+export const bookingPaymentTypeSchema = z.enum(['hidePrice', 'noPrepayment', 'fullPrepayment'])
+export const requestClientAddressOnlineValueSchema = z.enum(['optional', 'required'])
+export const bookingQuestionStateValueSchema = z.enum(['optional', 'required'])
 
 export const serviceProviderReminderSchema = z.object({
   type: z.enum(['email', 'notification', 'emailAndNotification']),
@@ -84,9 +74,7 @@ export const sessionSchema = z.object({
   bufferMinutesAfter: z.number(),
   canClientsCancel: z.boolean(),
   cancellationAdvanceNoticeDuration: z.string().nullable(),
-  requestClientAddressOnline: requestClientAddressOnlineValueSchema
-    .nullable()
-    .default(null),
+  requestClientAddressOnline: requestClientAddressOnlineValueSchema.nullable().default(null),
   bookingQuestion: z.string().nullable(),
   bookingQuestionState: bookingQuestionStateValueSchema.nullable(),
 })
@@ -243,9 +231,7 @@ const parseRequestClientAddressOnline = (value: unknown) => {
   }
   const parsed = requestClientAddressOnlineValueSchema.safeParse(trimmed)
   if (!parsed.success) {
-    throw new Error(
-      `Unexpected requestClientAddressOnline value: ${value}`
-    )
+    throw new Error(`Unexpected requestClientAddressOnline value: ${value}`)
   }
   return parsed.data
 }
@@ -288,10 +274,7 @@ const parseInvitations = (value: unknown) => {
   return z.array(invitationSchema).parse(value)
 }
 
-const parseReminder = <TSchema extends z.ZodTypeAny>(
-  value: unknown,
-  schema: TSchema
-): z.infer<TSchema> | null => {
+const parseReminder = <TSchema extends z.ZodTypeAny>(value: unknown, schema: TSchema): z.infer<TSchema> | null => {
   if (value === null || value === undefined) {
     return null
   }
@@ -309,7 +292,7 @@ const adaptClientSessions = (value: unknown) => {
     throw new Error('Session row has invalid clientSessions value')
   }
 
-  const sessions = value.map(item => {
+  const sessions = value.map((item) => {
     if (typeof item !== 'object' || item === null) {
       throw new Error('Client session entry was not an object')
     }
@@ -317,11 +300,7 @@ const adaptClientSessions = (value: unknown) => {
     const id = record.id
     const clientId = record.clientId
     const sessionId = record.sessionId
-    if (
-      typeof id !== 'string' ||
-      typeof clientId !== 'string' ||
-      typeof sessionId !== 'string'
-    ) {
+    if (typeof id !== 'string' || typeof clientId !== 'string' || typeof sessionId !== 'string') {
       throw new Error('Client session entry was missing identifiers')
     }
     if (record.createdAt === null || record.createdAt === undefined) {
@@ -334,9 +313,7 @@ const adaptClientSessions = (value: unknown) => {
       createdAt: isoDateTimeString.parse(record.createdAt),
       state: normalizeClientSessionState(record.state),
       bookingQuestion: parseNullableString(record.bookingQuestion),
-      bookingQuestionResponse: parseNullableString(
-        record.bookingQuestionResponse
-      ),
+      bookingQuestionResponse: parseNullableString(record.bookingQuestionResponse),
       price: nullableNumber.parse(record.price ?? null),
       attended: parseNullableBoolean(record.attended, 'attended'),
       payment: adaptPayment(record.payment ?? null),
@@ -389,39 +366,17 @@ export const adaptSessionRow = (row: RawSessionRow) => {
     bookableOnline: parseRequiredBoolean(row.bookableOnline, 'bookableOnline'),
     description: parseNullableString(row.description),
     bookingPaymentType: parseBookingPaymentType(row.bookingPaymentType),
-    maximumAttendance: parseNullableNumber(
-      row.maximumAttendance,
-      'maximum attendance'
-    ),
+    maximumAttendance: parseNullableNumber(row.maximumAttendance, 'maximum attendance'),
     invitations: parseInvitations(row.invitations),
-    serviceProviderReminder1: parseReminder(
-      row.serviceProviderReminder1,
-      serviceProviderReminderSchema
-    ),
-    serviceProviderReminder2: parseReminder(
-      row.serviceProviderReminder2,
-      serviceProviderReminderSchema
-    ),
+    serviceProviderReminder1: parseReminder(row.serviceProviderReminder1, serviceProviderReminderSchema),
+    serviceProviderReminder2: parseReminder(row.serviceProviderReminder2, serviceProviderReminderSchema),
     clientReminder1: parseReminder(row.clientReminder1, clientReminderSchema),
     clientReminder2: parseReminder(row.clientReminder2, clientReminderSchema),
-    bufferMinutesBefore: parseBufferMinutes(
-      row.bufferMinutesBefore,
-      'bufferMinutesBefore'
-    ),
-    bufferMinutesAfter: parseBufferMinutes(
-      row.bufferMinutesAfter,
-      'bufferMinutesAfter'
-    ),
-    canClientsCancel: parseRequiredBoolean(
-      row.canClientsCancel,
-      'canClientsCancel'
-    ),
-    cancellationAdvanceNoticeDuration: parseNullableString(
-      row.cancellationAdvanceNoticeDuration
-    ),
-    requestClientAddressOnline: parseRequestClientAddressOnline(
-      row.requestClientAddressOnline
-    ),
+    bufferMinutesBefore: parseBufferMinutes(row.bufferMinutesBefore, 'bufferMinutesBefore'),
+    bufferMinutesAfter: parseBufferMinutes(row.bufferMinutesAfter, 'bufferMinutesAfter'),
+    canClientsCancel: parseRequiredBoolean(row.canClientsCancel, 'canClientsCancel'),
+    cancellationAdvanceNoticeDuration: parseNullableString(row.cancellationAdvanceNoticeDuration),
+    requestClientAddressOnline: parseRequestClientAddressOnline(row.requestClientAddressOnline),
     bookingQuestion: parseNullableString(row.bookingQuestion),
     bookingQuestionState: parseBookingQuestionState(row.bookingQuestionState),
   }

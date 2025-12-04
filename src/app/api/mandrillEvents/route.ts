@@ -26,10 +26,7 @@ const mandrillEventsSchema = z.array(
 type MandrillWebhook = z.infer<typeof mandrillWebhookSchema>
 type MandrillEvent = z.infer<typeof mandrillEventsSchema>[number]
 
-const webhookUrl = new URL(
-  '/api/mandrillEvents',
-  process.env.BASE_URL ?? 'http://localhost:3001'
-).toString()
+const webhookUrl = new URL('/api/mandrillEvents', process.env.BASE_URL ?? 'http://localhost:3001').toString()
 
 const createInvalidBodyResponse = (detail?: string) =>
   NextResponse.json(
@@ -62,18 +59,14 @@ const createInternalErrorResponse = () =>
     { status: 500 }
   )
 
-const sanitizeEventObject = (event: MandrillEvent): Json =>
-  JSON.parse(JSON.stringify(event)) as Json
+const sanitizeEventObject = (event: MandrillEvent): Json => JSON.parse(JSON.stringify(event)) as Json
 
 const fetchWebhooks = async (apiKey: string): Promise<MandrillWebhook[]> => {
-  const response = await fetch(
-    'https://mandrillapp.com/api/1.0/webhooks/list.json',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: apiKey }),
-    }
-  )
+  const response = await fetch('https://mandrillapp.com/api/1.0/webhooks/list.json', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: apiKey }),
+  })
 
   if (!response.ok) {
     throw new Error(`Mandrill webhook list request failed: ${response.status}`)
@@ -87,13 +80,8 @@ const fetchWebhooks = async (apiKey: string): Promise<MandrillWebhook[]> => {
   return parsed.data
 }
 
-const computeSignature = (
-  webhook: MandrillWebhook,
-  formEntries: [string, FormDataEntryValue][]
-) => {
-  const sortedEntries = [...formEntries].sort(([a], [b]) =>
-    a.localeCompare(b)
-  )
+const computeSignature = (webhook: MandrillWebhook, formEntries: [string, FormDataEntryValue][]) => {
+  const sortedEntries = [...formEntries].sort(([a], [b]) => a.localeCompare(b))
 
   const signedData =
     webhookUrl +
@@ -139,7 +127,7 @@ export async function POST(request: Request) {
   let webhook: MandrillWebhook | undefined
   try {
     const webhooks = await fetchWebhooks(mandrillApiKey)
-    webhook = webhooks.find(wh => wh.url === webhookUrl)
+    webhook = webhooks.find((wh) => wh.url === webhookUrl)
   } catch (error) {
     console.error('Failed to retrieve Mandrill webhooks', error)
     return createInternalErrorResponse()
@@ -171,9 +159,7 @@ export async function POST(request: Request) {
   try {
     const parsed = mandrillEventsSchema.safeParse(JSON.parse(eventsPayload))
     if (!parsed.success) {
-      const detail = parsed.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
       return createInvalidBodyResponse(detail || undefined)
     }
     events = parsed.data
@@ -190,14 +176,14 @@ export async function POST(request: Request) {
     await db
       .insertInto('mandrill.event')
       .values(
-        events.map(event => ({
+        events.map((event) => ({
           ts: BigInt(event.ts),
           _id: event._id,
           event: event.event,
           object: sanitizeEventObject(event),
         }))
       )
-      .onConflict(oc => oc.columns(['ts', '_id', 'event']).doNothing())
+      .onConflict((oc) => oc.columns(['ts', '_id', 'event']).doNothing())
       .execute()
   } catch (error) {
     console.error('Failed to record Mandrill events', { error, count: events.length })

@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z, ZodError } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../_lib/constants'
-import {
-  adaptClientSessionRow,
-  nullableNumber,
-  RawClientSessionRow,
-} from '../../../_lib/clientSessionsSchema'
+import { adaptClientSessionRow, nullableNumber, RawClientSessionRow } from '../../../_lib/clientSessionsSchema'
 
 const paramsSchema = z.object({
   clientSessionId: z
@@ -20,27 +13,25 @@ const paramsSchema = z.object({
     .uuid({ message: 'Client session id must be a valid UUID.' }),
 })
 
-const nullableCount = z
-  .union([z.number(), z.string(), z.null()])
-  .transform(value => {
-    if (value === null || value === undefined) return null
-    if (typeof value === 'number') {
-      if (!Number.isFinite(value)) {
-        throw new Error('Invalid numeric value')
-      }
-      return value
-    }
-
-    const trimmed = value.trim()
-    if (trimmed.length === 0) return null
-
-    const parsed = Number(trimmed)
-    if (!Number.isFinite(parsed)) {
+const nullableCount = z.union([z.number(), z.string(), z.null()]).transform((value) => {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
       throw new Error('Invalid numeric value')
     }
+    return value
+  }
 
-    return parsed
-  })
+  const trimmed = value.trim()
+  if (trimmed.length === 0) return null
+
+  const parsed = Number(trimmed)
+  if (!Number.isFinite(parsed)) {
+    throw new Error('Invalid numeric value')
+  }
+
+  return parsed
+})
 
 const detailsSchema = z.object({
   sessionName: z.string().nullable(),
@@ -135,9 +126,7 @@ const buildInvitationEmail = (options: {
       ? `<p style="margin:16px 0;color:#4b5563;font-size:15px;line-height:1.5;">There's a max of ${options.maximumAttendance.toString()} clients that can attend this appointment, please reply so you don't miss out.</p>`
       : ''
 
-  const eventTitle = options.eventName?.trim().length
-    ? escapeHtml(options.eventName.trim())
-    : 'an appointment'
+  const eventTitle = options.eventName?.trim().length ? escapeHtml(options.eventName.trim()) : 'an appointment'
 
   return `
 <!doctype html>
@@ -195,11 +184,7 @@ const buildInvitationEmail = (options: {
 `
 }
 
-const formatEventPrice = (
-  price: number | null,
-  locale: string,
-  currency?: string | null
-) => {
+const formatEventPrice = (price: number | null, locale: string, currency?: string | null) => {
   if (price === null) return null
   if (price === 0) return 'Free'
 
@@ -221,14 +206,12 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Client session id parameter did not match the expected schema.',
+        detail: detail || 'Client session id parameter did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -238,8 +221,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const { clientSessionId } = paramsResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while inviting client session',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while inviting client session',
   })
 
   if (!authorization.ok) {
@@ -247,7 +229,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   try {
-    const rawRow = await db.transaction().execute(async trx => {
+    const rawRow = await db.transaction().execute(async (trx) => {
       const detailsRow = await trx
         .selectFrom('client_session as cs')
         .innerJoin('session as s', 's.id', 'cs.session_id')
@@ -255,11 +237,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         .innerJoin('client', 'client.id', 'cs.client_id')
         .innerJoin('trainer', 'trainer.id', 'cs.trainer_id')
         .innerJoin('country', 'country.id', 'trainer.country_id')
-        .leftJoin(
-          'supported_country_currency as scc',
-          'scc.country_id',
-          'trainer.country_id'
-        )
+        .leftJoin('supported_country_currency as scc', 'scc.country_id', 'trainer.country_id')
         .leftJoin('currency', 'currency.id', 'scc.currency_id')
         .select(({ ref }) => [
           ref('ss.name').as('sessionName'),
@@ -272,9 +250,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
           ref('client.email').as('email'),
           ref('client.first_name').as('firstName'),
           ref('client.last_name').as('lastName'),
-          sql<string>`COALESCE(trainer.online_bookings_contact_email, trainer.email)`.as(
-            'serviceProviderEmail'
-          ),
+          sql<string>`COALESCE(trainer.online_bookings_contact_email, trainer.email)`.as('serviceProviderEmail'),
           sql<string>`COALESCE(trainer.business_name, trainer.first_name || COALESCE(' ' || trainer.last_name, ''))`.as(
             'serviceProviderBusinessName'
           ),
@@ -326,23 +302,12 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         timeZone: details.timezone,
       }).formatRange(details.start, details.end)
 
-      const eventPrice = formatEventPrice(
-        details.price,
-        details.locale,
-        details.currency
-      )
+      const eventPrice = formatEventPrice(details.price, details.locale, details.currency)
 
-      const acceptLink = new URL(
-        `/api/sessionInvitationLinks/${clientSessionId}?action=accept`,
-        baseUrl
-      )
-      const declineLink = new URL(
-        `/api/sessionInvitationLinks/${clientSessionId}?action=decline`,
-        baseUrl
-      )
+      const acceptLink = new URL(`/api/sessionInvitationLinks/${clientSessionId}?action=accept`, baseUrl)
+      const declineLink = new URL(`/api/sessionInvitationLinks/${clientSessionId}?action=decline`, baseUrl)
 
-      const senderName =
-        details.serviceProviderBusinessName.trim() || `${APP_NAME} Team`
+      const senderName = details.serviceProviderBusinessName.trim() || `${APP_NAME} Team`
 
       const html = buildInvitationEmail({
         businessName: details.serviceProviderBusinessName,
@@ -416,8 +381,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client session not found',
-          detail:
-            'We could not find a client session with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client session with the specified identifier for the authenticated trainer.',
           type: '/client-session-not-found',
         }),
         { status: 404 }
@@ -441,8 +405,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 409,
           title: 'Appointment has already started',
-          detail:
-            'This appointment has already started and invitations can no longer be sent.',
+          detail: 'This appointment has already started and invitations can no longer be sent.',
           type: '/appointment-has-already-started',
         }),
         { status: 409 }
@@ -454,8 +417,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse client session data from database',
-          detail:
-            'Client session data did not match the expected response schema.',
+          detail: 'Client session data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

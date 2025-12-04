@@ -64,25 +64,13 @@ export function AccountDetailsForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="lastName">Last name</Label>
-          <Input
-            id="lastName"
-            name="lastName"
-            defaultValue={initialValues.lastName ?? ''}
-            autoComplete="family-name"
-          />
+          <Input id="lastName" name="lastName" defaultValue={initialValues.lastName ?? ''} autoComplete="family-name" />
         </div>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          defaultValue={initialValues.email}
-          autoComplete="email"
-          required
-        />
+        <Input id="email" name="email" type="email" defaultValue={initialValues.email} autoComplete="email" required />
       </div>
 
       <div className="space-y-2">
@@ -129,25 +117,12 @@ export function ChangePasswordForm({ onSubmit }: { onSubmit: FormAction }) {
     >
       <div className="space-y-2">
         <Label htmlFor="currentPassword">Current password</Label>
-        <Input
-          id="currentPassword"
-          name="currentPassword"
-          type="password"
-          autoComplete="current-password"
-          required
-        />
+        <Input id="currentPassword" name="currentPassword" type="password" autoComplete="current-password" required />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="newPassword">New password</Label>
-        <Input
-          id="newPassword"
-          name="newPassword"
-          type="password"
-          minLength={5}
-          autoComplete="new-password"
-          required
-        />
+        <Input id="newPassword" name="newPassword" type="password" minLength={5} autoComplete="new-password" required />
       </div>
 
       <div className="flex items-center justify-between gap-3">

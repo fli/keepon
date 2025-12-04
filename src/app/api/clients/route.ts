@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { adaptClientRow, clientListSchema } from './shared'
 
 const querySchema = z.object({
@@ -20,7 +17,7 @@ export async function GET(request: Request) {
   })
 
   if (!queryParse.success) {
-    const detail = queryParse.error.issues.map(issue => issue.message).join('; ')
+    const detail = queryParse.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -34,8 +31,7 @@ export async function GET(request: Request) {
 
   try {
     const authorization = await authenticateTrainerRequest(request, {
-      extensionFailureLogMessage:
-        'Failed to extend access token expiry while fetching clients',
+      extensionFailureLogMessage: 'Failed to extend access token expiry while fetching clients',
     })
     if (!authorization.ok) {
       return authorization.response
@@ -56,11 +52,7 @@ export async function GET(request: Request) {
         .where('client_session.session_id', '=', sessionId)
         .as('session_clients')
 
-      clientQuery = clientQuery.innerJoin(
-        sessionClients,
-        'session_clients.client_id',
-        'client.id'
-      )
+      clientQuery = clientQuery.innerJoin(sessionClients, 'session_clients.client_id', 'client.id')
     }
 
     const clientRows = await clientQuery.execute()

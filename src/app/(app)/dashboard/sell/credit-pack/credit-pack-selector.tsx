@@ -34,9 +34,11 @@ export function CreditPackSelector({ clientId, creditPacks, backQuery }: Props) 
         </Card>
       ) : (
         creditPacks.map((pack) => {
-          const href = (backQuery
-            ? `/dashboard/sell/credit-pack/${clientId}/pack/${pack.id}?${backQuery}`
-            : `/dashboard/sell/credit-pack/${clientId}/pack/${pack.id}`) as Route
+          const href = (
+            backQuery
+              ? `/dashboard/sell/credit-pack/${clientId}/pack/${pack.id}?${backQuery}`
+              : `/dashboard/sell/credit-pack/${clientId}/pack/${pack.id}`
+          ) as Route
 
           return (
             <Card

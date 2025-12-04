@@ -5,10 +5,7 @@ import { buildErrorResponse } from '../app/api/_lib/accessToken'
 
 export const moneyString = z
   .string()
-  .regex(
-    /^-?\d+(?:\.\d{2})$/,
-    'Money values must be formatted with two decimal places'
-  )
+  .regex(/^-?\d+(?:\.\d{2})$/, 'Money values must be formatted with two decimal places')
 
 const isoDateTimeString = z.string().datetime({ offset: true })
 
@@ -46,17 +43,9 @@ const serviceProductSchema = baseProductSchema.extend({
   bufferMinutesBefore: z.number().int(),
   bufferMinutesAfter: z.number().int(),
   timeSlotFrequencyMinutes: z.number().int(),
-  requestClientAddressOnline: z.union([
-    z.literal('optional'),
-    z.literal('required'),
-    z.null(),
-  ]),
+  requestClientAddressOnline: z.union([z.literal('optional'), z.literal('required'), z.null()]),
   bookingQuestion: z.string().nullable(),
-  bookingQuestionState: z.union([
-    z.literal('optional'),
-    z.literal('required'),
-    z.null(),
-  ]),
+  bookingQuestionState: z.union([z.literal('optional'), z.literal('required'), z.null()]),
   location: z.string().nullable(),
   address: z.string().nullable(),
   geo: geoSchema.nullable(),
@@ -71,11 +60,7 @@ const serviceProductSchema = baseProductSchema.extend({
   image5Url: z.string().nullable(),
 })
 
-export const productSchema = z.union([
-  creditPackProductSchema,
-  itemProductSchema,
-  serviceProductSchema,
-])
+export const productSchema = z.union([creditPackProductSchema, itemProductSchema, serviceProductSchema])
 
 export const productListSchema = z.array(productSchema)
 export type ProductList = z.infer<typeof productListSchema>
@@ -87,7 +72,7 @@ export const querySchema = z.object({
   type: productTypeSchema.optional(),
   updatedAfter: z
     .string()
-    .transform(value => {
+    .transform((value) => {
       const parsed = new Date(value)
       if (Number.isNaN(parsed.getTime())) {
         throw new Error('updatedAfter must be a valid ISO 8601 datetime string')
@@ -147,8 +132,7 @@ const ensureDate = (value: Date | string, label: string) => {
   return date
 }
 
-const formatIso = (value: Date | string, label: string) =>
-  ensureDate(value, label).toISOString()
+const formatIso = (value: Date | string, label: string) => ensureDate(value, label).toISOString()
 
 const formatMoney = (value: string, label: string) => {
   const numeric = Number.parseFloat(value)
@@ -158,16 +142,11 @@ const formatMoney = (value: string, label: string) => {
   return numeric.toFixed(2)
 }
 
-const parseInteger = (
-  value: number | string | null,
-  label: string,
-  options: { minimum?: number } = {}
-) => {
+const parseInteger = (value: number | string | null, label: string, options: { minimum?: number } = {}) => {
   if (value === null || value === undefined) {
     throw new Error(`Missing ${label} in product record`)
   }
-  const numeric =
-    typeof value === 'number' ? value : Number.parseFloat(String(value))
+  const numeric = typeof value === 'number' ? value : Number.parseFloat(String(value))
   if (!Number.isFinite(numeric)) {
     throw new Error(`Invalid ${label} value encountered in product record`)
   }
@@ -176,9 +155,7 @@ const parseInteger = (
     throw new Error(`Invalid ${label} value encountered in product record`)
   }
   if (options.minimum !== undefined && rounded < options.minimum) {
-    throw new Error(
-      `${label} must be at least ${options.minimum} but was ${rounded}`
-    )
+    throw new Error(`${label} must be at least ${options.minimum} but was ${rounded}`)
   }
   return rounded
 }
@@ -216,24 +193,17 @@ export const sanitizeProductQuery = (request: Request): QueryParams | NextRespon
   const rawUpdatedAfter = url.searchParams.get('updatedAfter')
 
   const queryParse = querySchema.safeParse({
-    type:
-      rawType && rawType.trim().length > 0
-        ? (rawType.trim() as ProductType)
-        : undefined,
-    updatedAfter:
-      rawUpdatedAfter && rawUpdatedAfter.trim().length > 0
-        ? rawUpdatedAfter.trim()
-        : undefined,
+    type: rawType && rawType.trim().length > 0 ? (rawType.trim() as ProductType) : undefined,
+    updatedAfter: rawUpdatedAfter && rawUpdatedAfter.trim().length > 0 ? rawUpdatedAfter.trim() : undefined,
   })
 
   if (!queryParse.success) {
-    const detail = queryParse.error.issues.map(issue => issue.message).join('; ')
+    const detail = queryParse.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid query parameters',
-        detail:
-          detail || 'Request query parameters did not match the expected schema.',
+        detail: detail || 'Request query parameters did not match the expected schema.',
         type: '/invalid-query',
       }),
       { status: 400 }
@@ -292,21 +262,11 @@ const mapRowToProduct = (row: RawProductRow) => {
     bookableOnline,
     showPriceOnline: bookingPaymentType !== 'hidePrice',
     bookingPaymentType,
-    bufferMinutesBefore: parseInteger(
-      row.bufferMinutesBefore,
-      'bufferMinutesBefore',
-      { minimum: 0 }
-    ),
-    bufferMinutesAfter: parseInteger(
-      row.bufferMinutesAfter,
-      'bufferMinutesAfter',
-      { minimum: 0 }
-    ),
-    timeSlotFrequencyMinutes: parseInteger(
-      row.timeSlotFrequencyMinutes,
-      'timeSlotFrequencyMinutes',
-      { minimum: 0 }
-    ),
+    bufferMinutesBefore: parseInteger(row.bufferMinutesBefore, 'bufferMinutesBefore', {
+      minimum: 0,
+    }),
+    bufferMinutesAfter: parseInteger(row.bufferMinutesAfter, 'bufferMinutesAfter', { minimum: 0 }),
+    timeSlotFrequencyMinutes: parseInteger(row.timeSlotFrequencyMinutes, 'timeSlotFrequencyMinutes', { minimum: 0 }),
     requestClientAddressOnline: row.requestClientAddressOnline ?? null,
     bookingQuestion: row.bookingQuestion ?? null,
     bookingQuestionState: row.bookingQuestionState ?? null,
@@ -325,10 +285,7 @@ const mapRowToProduct = (row: RawProductRow) => {
   }
 }
 
-export const fetchProductsForTrainer = async (
-  trainerId: string,
-  filters: ProductFilters
-): Promise<RawProductRow[]> => {
+export const fetchProductsForTrainer = async (trainerId: string, filters: ProductFilters): Promise<RawProductRow[]> => {
   const greatestUpdatedAt = sql<Date>`
     GREATEST(
       ${sql.ref('product.updated_at')},
@@ -379,9 +336,7 @@ export const fetchProductsForTrainer = async (
       ref('service.buffer_minutes_before').as('bufferMinutesBefore'),
       ref('service.buffer_minutes_after').as('bufferMinutesAfter'),
       ref('service.time_slot_frequency_minutes').as('timeSlotFrequencyMinutes'),
-      ref('service.request_client_address_online').as(
-        'requestClientAddressOnline'
-      ),
+      ref('service.request_client_address_online').as('requestClientAddressOnline'),
       ref('service.booking_question').as('bookingQuestion'),
       ref('service.booking_question_state').as('bookingQuestionState'),
     ])
@@ -418,9 +373,7 @@ export const fetchProductsForTrainer = async (
     )
   }
 
-  return query.orderBy('product.created_at', 'desc').execute() as Promise<
-    RawProductRow[]
-  >
+  return query.orderBy('product.created_at', 'desc').execute() as Promise<RawProductRow[]>
 }
 
 export async function listProducts(trainerId: string, filters: QueryParams): Promise<ProductList> {
@@ -428,10 +381,7 @@ export async function listProducts(trainerId: string, filters: QueryParams): Pro
   return productListSchema.parse(rows.map(mapRowToProduct))
 }
 
-export async function getProductById(
-  trainerId: string,
-  productId: string
-): Promise<Product | null> {
+export async function getProductById(trainerId: string, productId: string): Promise<Product | null> {
   const rows = await fetchProductsForTrainer(trainerId, { productId })
   const row = rows[0]
 

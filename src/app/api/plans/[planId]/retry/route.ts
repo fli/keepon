@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db, sql } from '@/lib/db'
-import {
-  authenticateClientRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateClientRequest, buildErrorResponse } from '../../../_lib/accessToken'
 
 const paramsSchema = z.object({
-  planId: z
-    .string()
-    .trim()
-    .min(1, 'planId must not be empty')
-    .uuid({ message: 'planId must be a valid UUID' }),
+  planId: z.string().trim().min(1, 'planId must not be empty').uuid({ message: 'planId must be a valid UUID' }),
 })
 
 type HandlerContext = { params: Promise<Record<string, string>> }
@@ -34,17 +27,13 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Request path parameters did not match the expected schema.',
+        detail: detail || 'Request path parameters did not match the expected schema.',
         type: '/invalid-path',
       }),
       { status: 400 }
@@ -52,8 +41,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateClientRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while retrying subscription payments',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while retrying subscription payments',
   })
 
   if (!authorization.ok) {
@@ -63,7 +51,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const { planId } = paramsResult.data
 
   try {
-    const { attempted } = await db.transaction().execute(async trx => {
+    const { attempted } = await db.transaction().execute(async (trx) => {
       const plan = await trx
         .selectFrom('payment_plan as plan')
         .innerJoin('client', 'client.id', 'plan.client_id')
@@ -87,11 +75,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
       const outstandingPayments = await trx
         .selectFrom('payment_plan_payment as paymentPlanPayment')
-        .innerJoin(
-          'payment_plan as planRecord',
-          'planRecord.id',
-          'paymentPlanPayment.payment_plan_id'
-        )
+        .innerJoin('payment_plan as planRecord', 'planRecord.id', 'paymentPlanPayment.payment_plan_id')
         .select(({ ref }) => [ref('paymentPlanPayment.id').as('id')])
         .where('paymentPlanPayment.payment_plan_id', '=', planId)
         .where('planRecord.client_id', '=', authorization.clientId)
@@ -143,8 +127,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 409,
           title: 'No payment method on file',
-          detail:
-            'A saved payment method is required before retrying subscription charges.',
+          detail: 'A saved payment method is required before retrying subscription charges.',
           type: '/no-payment-method-on-file',
         }),
         { status: 409 }

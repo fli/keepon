@@ -6,11 +6,7 @@ import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
 
 const authorizationSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, 'Email is required')
-    .email('Email must be a valid email address.'),
+  email: z.string().trim().min(1, 'Email is required').email('Email must be a valid email address.'),
   code: z.string().trim().min(1, 'Code is required'),
 })
 
@@ -46,13 +42,9 @@ const createTemporaryCodeInvalidResponse = () =>
     { status: 401 }
   )
 
-type ParsedAuthorization =
-  | { ok: true; email: string; code: string }
-  | { ok: false }
+type ParsedAuthorization = { ok: true; email: string; code: string } | { ok: false }
 
-const parseBasicAuthorization = (
-  headerValue: string | null
-): ParsedAuthorization => {
+const parseBasicAuthorization = (headerValue: string | null): ParsedAuthorization => {
   if (!headerValue) {
     return { ok: false }
   }
@@ -88,19 +80,15 @@ const parseBasicAuthorization = (
 }
 
 export async function GET(_request: Request) {
-  const authorization = parseBasicAuthorization(
-    (await headers()).get('authorization')
-  )
+  const authorization = parseBasicAuthorization((await headers()).get('authorization'))
 
   if (!authorization.ok) {
     return createMissingTokenResponse()
   }
 
   try {
-    const result = await db
-      .transaction()
-      .execute(async trx => {
-        const loginRequest = await sql<{ exists: true }>`
+    const result = await db.transaction().execute(async (trx) => {
+      const loginRequest = await sql<{ exists: true }>`
           SELECT TRUE AS exists
             FROM client_login_request
            WHERE email = ${authorization.email}
@@ -111,8 +99,8 @@ export async function GET(_request: Request) {
            FOR UPDATE
         `.execute(trx)
 
-        if (loginRequest.rows.length === 0) {
-          await sql`
+      if (loginRequest.rows.length === 0) {
+        await sql`
             UPDATE client_login_request
                SET failed_authentication_count = failed_authentication_count + 1
              WHERE email = ${authorization.email}
@@ -120,16 +108,16 @@ export async function GET(_request: Request) {
                AND NOT authenticated
           `.execute(trx)
 
-          return { ok: false as const }
-        }
+        return { ok: false as const }
+      }
 
-        const clientsResult = await sql<{
-          id: string
-          first_name: string
-          last_name: string | null
-          service_provider_first_name: string
-          service_provider_last_name: string | null
-        }>`
+      const clientsResult = await sql<{
+        id: string
+        first_name: string
+        last_name: string | null
+        service_provider_first_name: string
+        service_provider_last_name: string | null
+      }>`
           SELECT
             client.id,
             client.first_name,
@@ -141,20 +129,20 @@ export async function GET(_request: Request) {
          WHERE client.email = ${authorization.email}
         `.execute(trx)
 
-        if (clientsResult.rows.length === 0) {
-          return { ok: false as const }
-        }
+      if (clientsResult.rows.length === 0) {
+        return { ok: false as const }
+      }
 
-        const clients = clientsResult.rows.map(row => ({
-          id: row.id,
-          firstName: row.first_name,
-          lastName: row.last_name,
-          serviceProviderFirstName: row.service_provider_first_name,
-          serviceProviderLastName: row.service_provider_last_name,
-        }))
+      const clients = clientsResult.rows.map((row) => ({
+        id: row.id,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        serviceProviderFirstName: row.service_provider_first_name,
+        serviceProviderLastName: row.service_provider_last_name,
+      }))
 
-        return { ok: true as const, clients }
-      })
+      return { ok: true as const, clients }
+    })
 
     if (!result.ok) {
       return createTemporaryCodeInvalidResponse()
@@ -169,8 +157,7 @@ export async function GET(_request: Request) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse client login data from database',
-          detail:
-            'Client login data did not match the expected response schema.',
+          detail: 'Client login data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

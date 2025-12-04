@@ -7,11 +7,7 @@ import { ChevronDownIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
-function NavigationMenu({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<typeof BaseNavigationMenu.Root>) {
+function NavigationMenu({ className, children, ...props }: React.ComponentProps<typeof BaseNavigationMenu.Root>) {
   return (
     <BaseNavigationMenu.Root
       data-slot="navigation-menu"
@@ -24,10 +20,7 @@ function NavigationMenu({
   )
 }
 
-function NavigationMenuList({
-  className,
-  ...props
-}: React.ComponentProps<typeof BaseNavigationMenu.List>) {
+function NavigationMenuList({ className, ...props }: React.ComponentProps<typeof BaseNavigationMenu.List>) {
   return (
     <BaseNavigationMenu.List
       data-slot="navigation-menu-list"
@@ -40,15 +33,11 @@ function NavigationMenuList({
   )
 }
 
-function NavigationMenuItem({
-  ...props
-}: React.ComponentProps<typeof BaseNavigationMenu.Item>) {
+function NavigationMenuItem({ ...props }: React.ComponentProps<typeof BaseNavigationMenu.Item>) {
   return <BaseNavigationMenu.Item data-slot="navigation-menu-item" {...props} />
 }
 
-function NavigationMenuIcon({
-  ...props
-}: React.ComponentProps<typeof BaseNavigationMenu.Icon>) {
+function NavigationMenuIcon({ ...props }: React.ComponentProps<typeof BaseNavigationMenu.Icon>) {
   return <BaseNavigationMenu.Icon data-slot="navigation-menu-icon" {...props} />
 }
 
@@ -75,10 +64,7 @@ function NavigationMenuTrigger({
   )
 }
 
-function NavigationMenuContent({
-  className,
-  ...props
-}: React.ComponentProps<typeof BaseNavigationMenu.Content>) {
+function NavigationMenuContent({ className, ...props }: React.ComponentProps<typeof BaseNavigationMenu.Content>) {
   return (
     <BaseNavigationMenu.Content
       data-slot="navigation-menu-content"
@@ -88,10 +74,7 @@ function NavigationMenuContent({
   )
 }
 
-function NavigationMenuLink({
-  className,
-  ...props
-}: React.ComponentProps<typeof BaseNavigationMenu.Link>) {
+function NavigationMenuLink({ className, ...props }: React.ComponentProps<typeof BaseNavigationMenu.Link>) {
   return (
     <BaseNavigationMenu.Link
       data-slot="navigation-menu-link"
@@ -104,10 +87,7 @@ function NavigationMenuLink({
   )
 }
 
-function NavigationMenuViewport({
-  className,
-  ...props
-}: React.ComponentProps<typeof BaseNavigationMenu.Popup>) {
+function NavigationMenuViewport({ className, ...props }: React.ComponentProps<typeof BaseNavigationMenu.Popup>) {
   return (
     <BaseNavigationMenu.Portal data-slot="navigation-menu-portal">
       <BaseNavigationMenu.Positioner
@@ -118,7 +98,7 @@ function NavigationMenuViewport({
       >
         <BaseNavigationMenu.Popup
           className={cn(
-            "bg-popover data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 text-popover-foreground h-[var(--popup-height)] w-[var(--popup-width)] origin-[var(--transform-origin)] overflow-hidden rounded-md border shadow-md duration-300",
+            'bg-popover data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 text-popover-foreground h-[var(--popup-height)] w-[var(--popup-width)] origin-[var(--transform-origin)] overflow-hidden rounded-md border shadow-md duration-300',
             className
           )}
           data-slot="navigation-menu-popup"

@@ -1,13 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { PageContainer } from '@/components/page-container'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 import { getTrainerAccount, type AccountDetails } from '@/server/account'
 import { readSessionFromCookies } from '../../../session.server'
@@ -26,10 +20,7 @@ export default async function AccountSettingsPage() {
   try {
     account = await getTrainerAccount(session.trainerId)
   } catch (error) {
-    loadError =
-      error instanceof Error
-        ? error.message
-        : 'Unable to load your account details.'
+    loadError = error instanceof Error ? error.message : 'Unable to load your account details.'
   }
 
   return (
@@ -37,9 +28,7 @@ export default async function AccountSettingsPage() {
       <div className="space-y-2">
         <p className="text-sm uppercase tracking-wide text-muted-foreground">Settings</p>
         <h1 className="text-3xl font-semibold leading-tight">My account</h1>
-        <p className="text-sm text-muted-foreground">
-          Update your profile details and keep your account secure.
-        </p>
+        <p className="text-sm text-muted-foreground">Update your profile details and keep your account secure.</p>
         {loadError ? <p className="text-sm text-destructive">{loadError}</p> : null}
       </div>
 

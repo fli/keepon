@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 
 const paramsSchema = z.object({
   clientId: z
@@ -14,20 +11,14 @@ const paramsSchema = z.object({
     .uuid({ message: 'Client id must be a valid UUID.' }),
 })
 
-const classificationSchema = z.enum([
-  'notes',
-  'goals',
-  'medication',
-  'currentInjuries',
-  'pastInjuries',
-])
+const classificationSchema = z.enum(['notes', 'goals', 'medication', 'currentInjuries', 'pastInjuries'])
 
 const contentSchema = z
   .union([
     z.string({ message: 'content must be a string or null.' }),
     z.null({ message: 'content must be a string or null.' }),
   ])
-  .transform(value => {
+  .transform((value) => {
     if (typeof value === 'string') {
       const trimmed = value.trim()
       return trimmed.length > 0 ? trimmed : null
@@ -67,17 +58,13 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid client identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected client identifier schema.',
+        detail: detail || 'Request parameters did not match the expected client identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -92,16 +79,13 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     const rawBody = (await request.json()) as unknown
     const bodyResult = requestBodySchema.safeParse(rawBody)
     if (!bodyResult.success) {
-      const detail = bodyResult.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
           status: 400,
           title: 'Invalid request body',
-          detail:
-            detail || 'Request body did not match the expected schema.',
+          detail: detail || 'Request body did not match the expected schema.',
           type: '/invalid-body',
         }),
         { status: 400 }
@@ -126,8 +110,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating client notes',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating client notes',
   })
 
   if (!authorization.ok) {
@@ -143,25 +126,15 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     const updateResult = await (() => {
       switch (parsedBody.classification) {
         case 'notes':
-          return updateBase
-            .set({ notes: parsedBody.content })
-            .executeTakeFirst()
+          return updateBase.set({ notes: parsedBody.content }).executeTakeFirst()
         case 'goals':
-          return updateBase
-            .set({ goals: parsedBody.content })
-            .executeTakeFirst()
+          return updateBase.set({ goals: parsedBody.content }).executeTakeFirst()
         case 'medication':
-          return updateBase
-            .set({ medication: parsedBody.content })
-            .executeTakeFirst()
+          return updateBase.set({ medication: parsedBody.content }).executeTakeFirst()
         case 'currentInjuries':
-          return updateBase
-            .set({ current_injuries: parsedBody.content })
-            .executeTakeFirst()
+          return updateBase.set({ current_injuries: parsedBody.content }).executeTakeFirst()
         case 'pastInjuries':
-          return updateBase
-            .set({ past_injuries: parsedBody.content })
-            .executeTakeFirst()
+          return updateBase.set({ past_injuries: parsedBody.content }).executeTakeFirst()
         default:
           return Promise.resolve({ numUpdatedRows: 0 })
       }
@@ -174,8 +147,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail:
-            'We could not find a client with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
           type: '/client-not-found',
         }),
         { status: 404 }
@@ -196,8 +168,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to validate client note response',
-          detail:
-            'Client note response did not match the expected schema.',
+          detail: 'Client note response did not match the expected schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

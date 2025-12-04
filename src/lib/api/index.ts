@@ -234,11 +234,7 @@ export async function createSaleProduct(
   }
 
   const saleProductType = payload.type
-  if (
-    saleProductType !== 'service' &&
-    saleProductType !== 'creditPack' &&
-    saleProductType !== 'item'
-  ) {
+  if (saleProductType !== 'service' && saleProductType !== 'creditPack' && saleProductType !== 'item') {
     throw new Error(`Unsupported sale product type: ${payload.type}`)
   }
 
@@ -257,12 +253,7 @@ export async function createSalePayment(
 ): Promise<SalePaymentResult> {
   const normalizedPayload = {
     ...payload,
-    type:
-      payload.type === 'manual'
-        ? 'manual'
-        : payload.type === 'paymentPlan'
-          ? 'subscription'
-          : payload.type,
+    type: payload.type === 'manual' ? 'manual' : payload.type === 'paymentPlan' ? 'subscription' : payload.type,
   }
 
   if (normalizedPayload.type !== 'manual') {
@@ -282,10 +273,7 @@ export async function createSalePayment(
   return { status: 'paid', salePaymentId: parsed.id }
 }
 
-export async function createPaymentRequest(
-  saleId: string,
-  session: KeeponSession
-): Promise<SalePaymentResult> {
+export async function createPaymentRequest(saleId: string, session: KeeponSession): Promise<SalePaymentResult> {
   if (!saleId) throw new Error('saleId is required to request payment')
 
   await orpcClient.sales.requestPayment({

@@ -2,8 +2,7 @@ import { authenticateTrainerRequest } from '../_lib/accessToken'
 
 export async function GET(request: Request) {
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while validating access token',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while validating access token',
   })
 
   if (!authorization.ok) {

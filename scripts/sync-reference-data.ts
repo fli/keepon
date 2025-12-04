@@ -31,15 +31,13 @@ async function sync() {
   const db = createDb()
 
   try {
-    await db.transaction().execute(async trx => {
+    await db.transaction().execute(async (trx) => {
       // Upsert currencies (uses numeric ISO code as PK).
       for (const row of currencies) {
         await trx
           .insertInto('currency')
           .values({ id: row.id, alpha_code: row.alphaCode, name: row.name })
-          .onConflict(oc =>
-            oc.column('alpha_code').doUpdateSet({ name: row.name })
-          )
+          .onConflict((oc) => oc.column('alpha_code').doUpdateSet({ name: row.name }))
           .execute()
       }
 
@@ -53,7 +51,7 @@ async function sync() {
             alpha_3_code: row.alpha3,
             name: row.name,
           })
-          .onConflict(oc =>
+          .onConflict((oc) =>
             oc.column('alpha_2_code').doUpdateSet({
               alpha_3_code: row.alpha3,
               name: row.name,
@@ -70,16 +68,11 @@ async function sync() {
             country_id: row.countryId,
             currency_id: row.currencyId,
           })
-          .onConflict(oc =>
-            oc.column('country_id').doUpdateSet({ currency_id: row.currencyId })
-          )
+          .onConflict((oc) => oc.column('country_id').doUpdateSet({ currency_id: row.currencyId }))
           .execute()
       }
 
-      const upsertSimple = async <
-        TTable extends keyof DB,
-        TColumn extends keyof DB[TTable] & string
-      >(
+      const upsertSimple = async <TTable extends keyof DB, TColumn extends keyof DB[TTable] & string>(
         table: TTable,
         column: TColumn,
         values: ReadonlyArray<DB[TTable][TColumn]>
@@ -88,7 +81,7 @@ async function sync() {
           await trx
             .insertInto(table)
             .values({ [column]: value } as Insertable<DB[TTable]>)
-            .onConflict(oc => oc.column(column).doNothing())
+            .onConflict((oc) => oc.column(column).doNothing())
             .execute()
         }
       }
@@ -96,26 +89,14 @@ async function sync() {
       await upsertSimple('access_token_type', 'type', accessTokenTypes)
       await upsertSimple('booking_payment_type', 'type', bookingPaymentTypes)
       await upsertSimple('booking_question_state', 'state', bookingQuestionStates)
-      await upsertSimple(
-        'client_appointment_reminder_type',
-        'type',
-        clientAppointmentReminderTypes
-      )
-      await upsertSimple(
-        'service_provider_appointment_reminder_type',
-        'type',
-        serviceProviderAppointmentReminderTypes
-      )
+      await upsertSimple('client_appointment_reminder_type', 'type', clientAppointmentReminderTypes)
+      await upsertSimple('service_provider_appointment_reminder_type', 'type', serviceProviderAppointmentReminderTypes)
       await upsertSimple('brand_color', 'id', brandColors)
       await upsertSimple('client_session_state', 'state', clientSessionStates)
       await upsertSimple('client_status', 'status', clientStatuses)
       await upsertSimple('event_type', 'type', eventTypes)
       await upsertSimple('mail_bounce_type', 'type', mailBounceTypes)
-      await upsertSimple(
-        'request_client_address_online_type',
-        'type',
-        requestClientAddressOnlineTypes
-      )
+      await upsertSimple('request_client_address_online_type', 'type', requestClientAddressOnlineTypes)
       await upsertSimple('sms_credit_source', 'source', smsCreditSources)
       await upsertSimple('user_type', 'type', userTypes)
 
@@ -128,7 +109,7 @@ async function sync() {
             description: row.description,
             action_url: row.actionUrl,
           })
-          .onConflict(oc =>
+          .onConflict((oc) =>
             oc.column('id').doUpdateSet({
               title: row.title,
               description: row.description,
@@ -146,7 +127,7 @@ async function sync() {
             title: row.title,
             description: row.description,
           })
-          .onConflict(oc =>
+          .onConflict((oc) =>
             oc.column('type').doUpdateSet({
               title: row.title,
               description: row.description,
@@ -162,7 +143,7 @@ async function sync() {
             frequency: row.frequency,
             duration: row.duration,
           })
-          .onConflict(oc =>
+          .onConflict((oc) =>
             oc.column('frequency').doUpdateSet({
               duration: row.duration,
             })
@@ -180,7 +161,7 @@ sync()
     console.log('Supported countries sync complete.')
     process.exit(0)
   })
-  .catch(error => {
+  .catch((error) => {
     console.error('Failed to sync supported countries', error)
     process.exit(1)
   })

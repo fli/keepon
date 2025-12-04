@@ -26,10 +26,7 @@ function getDayNumber(date: string) {
 }
 
 export function MonthView({ date, onDateChange }: MonthViewProps) {
-  const selectedDay = useMemo(
-    () => monthDays.find((day) => day.date === date),
-    [date]
-  )
+  const selectedDay = useMemo(() => monthDays.find((day) => day.date === date), [date])
 
   return (
     <div className="flex flex-col gap-6">
@@ -79,19 +76,13 @@ export function MonthView({ date, onDateChange }: MonthViewProps) {
                     {day.events.slice(0, 2).map((event) => (
                       <li key={event.id}>
                         <div className="flex items-center gap-2 truncate rounded-md px-2 py-1 hover:bg-accent/40">
-                          <span className="truncate text-[13px] font-medium text-foreground">
-                            {event.name}
-                          </span>
-                          <time className="ml-auto text-[11px] text-muted-foreground">
-                            {event.time}
-                          </time>
+                          <span className="truncate text-[13px] font-medium text-foreground">{event.name}</span>
+                          <time className="ml-auto text-[11px] text-muted-foreground">{event.time}</time>
                         </div>
                       </li>
                     ))}
                     {day.events.length > 2 ? (
-                      <li className="text-[11px] text-muted-foreground">
-                        + {day.events.length - 2} more
-                      </li>
+                      <li className="text-[11px] text-muted-foreground">+ {day.events.length - 2} more</li>
                     ) : null}
                   </ol>
                 ) : null}
@@ -161,9 +152,7 @@ export function MonthView({ date, onDateChange }: MonthViewProps) {
         <div className="overflow-hidden rounded-2xl border shadow-sm">
           <div className="flex flex-row items-center justify-between border-b px-6 py-4">
             <div className="space-y-0.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Upcoming highlights
-              </p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Upcoming highlights</p>
               <h3 className="text-lg font-semibold leading-tight">
                 {shortDateFormatter.format(new Date(`${date}T12:00:00`))}
               </h3>
@@ -212,26 +201,18 @@ function SelectedAgenda({
     <div className="lg:hidden">
       <div className="flex items-center justify-between rounded-t-xl border border-b-0 bg-card px-4 py-3 shadow-sm">
         <div className="space-y-0.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Selected day
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Selected day</p>
           <p className="text-base font-semibold leading-tight">
             {shortDateFormatter.format(new Date(`${selectedDate}T12:00:00`))}
           </p>
         </div>
-        <span className="text-xs text-muted-foreground">
-          {selectedDayEvents.length || 'No'} events
-        </span>
+        <span className="text-xs text-muted-foreground">{selectedDayEvents.length || 'No'} events</span>
       </div>
       <ol className="divide-y overflow-hidden rounded-b-xl border bg-card shadow-sm">
         {selectedDayEvents.length ? (
-          selectedDayEvents.map((event) => (
-            <EventRowMobile key={event.id} event={event} />
-          ))
+          selectedDayEvents.map((event) => <EventRowMobile key={event.id} event={event} />)
         ) : (
-          <li className="px-4 py-4 text-sm text-muted-foreground">
-            No events for this day yet.
-          </li>
+          <li className="px-4 py-4 text-sm text-muted-foreground">No events for this day yet.</li>
         )}
       </ol>
     </div>
@@ -243,9 +224,7 @@ function EventRowMobile({ event }: { event: CalendarEvent }) {
     <li className="flex items-center justify-between gap-4 px-4 py-3">
       <div className="space-y-1">
         <p className="text-sm font-semibold leading-tight">{event.name}</p>
-        <p className="flex items-center gap-1 text-xs text-muted-foreground">
-          {event.time}
-        </p>
+        <p className="flex items-center gap-1 text-xs text-muted-foreground">{event.time}</p>
       </div>
       <Button size="sm" variant="outline" className="px-3">
         Edit

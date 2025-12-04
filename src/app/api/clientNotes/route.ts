@@ -1,41 +1,29 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
-import {
-  adaptClientNoteRow,
-  clientNoteListSchema,
-  clientNoteSchema,
-  type ClientNoteRow,
-} from './shared'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { adaptClientNoteRow, clientNoteListSchema, clientNoteSchema, type ClientNoteRow } from './shared'
 
 const requestBodySchema = z
   .object({
     clientId: z
       .string()
       .min(1, 'clientId must not be empty')
-      .transform(value => value.trim()),
-    title: z
-      .union([z.string(), z.null(), z.undefined()])
-      .transform(value => {
-        if (value === null || value === undefined) {
-          return null
-        }
-        return value
-      }),
-    body: z
-      .union([z.string(), z.null(), z.undefined()])
-      .transform(value => {
-        if (value === null || value === undefined) {
-          return null
-        }
-        return value
-      }),
+      .transform((value) => value.trim()),
+    title: z.union([z.string(), z.null(), z.undefined()]).transform((value) => {
+      if (value === null || value === undefined) {
+        return null
+      }
+      return value
+    }),
+    body: z.union([z.string(), z.null(), z.undefined()]).transform((value) => {
+      if (value === null || value === undefined) {
+        return null
+      }
+      return value
+    }),
   })
-  .refine(data => data.clientId.length > 0, {
+  .refine((data) => data.clientId.length > 0, {
     message: 'clientId must not be empty',
     path: ['clientId'],
   })
@@ -50,12 +38,11 @@ export async function GET(request: Request) {
   const trimmedClientId = rawClientId?.trim()
 
   const queryParse = querySchema.safeParse({
-    clientId:
-      trimmedClientId && trimmedClientId.length > 0 ? trimmedClientId : undefined,
+    clientId: trimmedClientId && trimmedClientId.length > 0 ? trimmedClientId : undefined,
   })
 
   if (!queryParse.success) {
-    const detail = queryParse.error.issues.map(issue => issue.message).join('; ')
+    const detail = queryParse.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -68,8 +55,7 @@ export async function GET(request: Request) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching client notes',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching client notes',
   })
 
   if (!authorization.ok) {
@@ -90,9 +76,7 @@ export async function GET(request: Request) {
 
     const rows = (await query.execute()) as ClientNoteRow[]
 
-    const notes = clientNoteListSchema.parse(
-      rows.map(row => adaptClientNoteRow(row))
-    )
+    const notes = clientNoteListSchema.parse(rows.map((row) => adaptClientNoteRow(row)))
 
     return NextResponse.json(notes)
   } catch (error) {
@@ -128,15 +112,12 @@ export async function POST(request: Request) {
     const rawBody = (await request.json()) as unknown
     const result = requestBodySchema.safeParse(rawBody)
     if (!result.success) {
-      const detail = result.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = result.error.issues.map((issue) => issue.message).join('; ')
       return NextResponse.json(
         buildErrorResponse({
           status: 400,
           title: 'Invalid request body',
-          detail:
-            detail || 'Request body did not match the expected schema.',
+          detail: detail || 'Request body did not match the expected schema.',
           type: '/invalid-body',
         }),
         { status: 400 }
@@ -157,8 +138,7 @@ export async function POST(request: Request) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while creating client notes',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while creating client notes',
   })
 
   if (!authorization.ok) {
@@ -189,9 +169,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const responseBody = clientNoteSchema.parse(
-      adaptClientNoteRow(inserted as ClientNoteRow)
-    )
+    const responseBody = clientNoteSchema.parse(adaptClientNoteRow(inserted as ClientNoteRow))
 
     return NextResponse.json(responseBody, { status: 201 })
   } catch (error) {
@@ -200,8 +178,7 @@ export async function POST(request: Request) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse created client note',
-          detail:
-            'Client note data did not match the expected response schema.',
+          detail: 'Client note data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

@@ -1,32 +1,20 @@
 import { NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
-import {
-  sanitizeProductQuery,
-  listProducts,
-  moneyString,
-} from '@/server/products'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { sanitizeProductQuery, listProducts, moneyString } from '@/server/products'
 import type { Insertable } from 'kysely'
 import type { Service } from '@/lib/db/generated'
 
 const nonNegativeMoneyString = moneyString.refine(
-  value => Number.parseFloat(value) >= 0,
+  (value) => Number.parseFloat(value) >= 0,
   'Price must be non-negative'
 )
 
 const priceSchema = z
   .union([z.string(), z.number()])
-  .transform(value => {
-    const raw =
-      typeof value === 'number'
-        ? value.toString()
-        : typeof value === 'string'
-          ? value.trim()
-          : value
+  .transform((value) => {
+    const raw = typeof value === 'number' ? value.toString() : typeof value === 'string' ? value.trim() : value
 
     if (typeof raw !== 'string') return raw
 
@@ -40,7 +28,7 @@ const priceSchema = z
 const nullableTrimmedToNull = z
   .union([z.string(), z.null()])
   .optional()
-  .transform(value => {
+  .transform((value) => {
     if (value === undefined) return undefined
     if (value === null) return null
     const trimmed = value.trim()
@@ -50,7 +38,7 @@ const nullableTrimmedToNull = z
 const descriptionSchema = z
   .union([z.string(), z.null()])
   .optional()
-  .transform(value => {
+  .transform((value) => {
     if (value === undefined || value === null) return ''
     return value.trim()
   })
@@ -82,16 +70,10 @@ const itemProductSchema = baseProductSchema.extend({
 
 const serviceProductSchema = baseProductSchema.extend({
   type: z.literal('service'),
-  durationMinutes: z
-    .number()
-    .int()
-    .min(1, 'durationMinutes must be at least 1'),
+  durationMinutes: z.number().int().min(1, 'durationMinutes must be at least 1'),
   bookableOnline: z.boolean().optional(),
   showPriceOnline: z.boolean().nullable().optional(),
-  bookingPaymentType: z
-    .enum(['hidePrice', 'noPrepayment', 'fullPrepayment'])
-    .nullable()
-    .optional(),
+  bookingPaymentType: z.enum(['hidePrice', 'noPrepayment', 'fullPrepayment']).nullable().optional(),
   location: nullableTrimmedToNull,
   address: nullableTrimmedToNull,
   geo: geoSchema,
@@ -99,13 +81,9 @@ const serviceProductSchema = baseProductSchema.extend({
   bufferMinutesBefore: z.number().int().min(0).optional(),
   bufferMinutesAfter: z.number().int().min(0).optional(),
   timeSlotFrequencyMinutes: z.number().int().min(1).optional(),
-  requestClientAddressOnline: z
-    .union([z.literal('optional'), z.literal('required'), z.null()])
-    .optional(),
+  requestClientAddressOnline: z.union([z.literal('optional'), z.literal('required'), z.null()]).optional(),
   bookingQuestion: nullableTrimmedToNull,
-  bookingQuestionState: z
-    .union([z.literal('optional'), z.literal('required'), z.null()])
-    .optional(),
+  bookingQuestionState: z.union([z.literal('optional'), z.literal('required'), z.null()]).optional(),
 })
 
 const createProductSchema = z.discriminatedUnion('type', [
@@ -122,8 +100,7 @@ export async function GET(request: Request) {
   const params = paramsOrResponse
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching products',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching products',
   })
 
   if (!authorization.ok) {
@@ -178,7 +155,7 @@ export async function POST(request: Request) {
 
   const parsed = createProductSchema.safeParse(body)
   if (!parsed.success) {
-    const detail = parsed.error.issues.map(issue => issue.message).join('; ')
+    const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -191,8 +168,7 @@ export async function POST(request: Request) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while creating product',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while creating product',
   })
 
   if (!authorization.ok) {
@@ -225,20 +201,17 @@ export async function POST(request: Request) {
       )
     }
 
-    const resolveBookingPaymentType = (
-      service: z.infer<typeof serviceProductSchema>
-    ) => {
+    const resolveBookingPaymentType = (service: z.infer<typeof serviceProductSchema>) => {
       if (service.bookingPaymentType) {
         return service.bookingPaymentType
       }
 
-      const showPrice =
-        service.showPriceOnline === true || service.showPriceOnline === null
+      const showPrice = service.showPriceOnline === true || service.showPriceOnline === null
 
       return showPrice ? 'noPrepayment' : 'hidePrice'
     }
 
-    const productId = await db.transaction().execute(async trx => {
+    const productId = await db.transaction().execute(async (trx) => {
       const productRow = await trx
         .insertInto('product')
         .values({
@@ -280,9 +253,7 @@ export async function POST(request: Request) {
           location: data.location ?? null,
           address: data.address ?? null,
           google_place_id: data.googlePlaceId ?? null,
-          geo: data.geo
-            ? sql`point(${data.geo.lat}, ${data.geo.lng})`
-            : null,
+          geo: data.geo ? sql`point(${data.geo.lat}, ${data.geo.lng})` : null,
           bookable_online: data.bookableOnline ?? false,
           booking_payment_type: bookingPaymentType,
           is_service: true,
@@ -301,8 +272,7 @@ export async function POST(request: Request) {
         }
 
         if (data.requestClientAddressOnline !== undefined) {
-          serviceValues.request_client_address_online =
-            data.requestClientAddressOnline
+          serviceValues.request_client_address_online = data.requestClientAddressOnline
         }
 
         if (data.bookingQuestion !== undefined) {
@@ -326,7 +296,7 @@ export async function POST(request: Request) {
       type: data.type,
     })
 
-    const product = products.find(product => product.id === productId)
+    const product = products.find((product) => product.id === productId)
 
     if (!product) {
       return NextResponse.json(

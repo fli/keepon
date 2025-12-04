@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 
 const paramsSchema = z.object({
   trainerId: z.string().min(1, 'Trainer id is required'),
@@ -20,7 +17,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -35,8 +32,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const { trainerId } = paramsResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while marking notifications as viewed',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while marking notifications as viewed',
   })
 
   if (!authorization.ok) {
@@ -65,9 +61,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       .executeTakeFirst()
 
     const updatedCount =
-      typeof result?.numUpdatedRows === 'bigint'
-        ? Number(result.numUpdatedRows)
-        : Number(result?.numUpdatedRows ?? 0)
+      typeof result?.numUpdatedRows === 'bigint' ? Number(result.numUpdatedRows) : Number(result?.numUpdatedRows ?? 0)
 
     const responseBody = responseSchema.parse({ count: updatedCount })
 
@@ -78,19 +72,14 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to build notification response',
-          detail:
-            'Notification update result did not match the expected response schema.',
+          detail: 'Notification update result did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
       )
     }
 
-    console.error(
-      'Failed to mark trainer notifications as viewed for trainer',
-      trainerId,
-      error
-    )
+    console.error('Failed to mark trainer notifications as viewed for trainer', trainerId, error)
 
     return NextResponse.json(
       buildErrorResponse({

@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useCallback, useMemo, useState, useTransition, type FormEvent } from 'react'
 import type { Route } from 'next'
@@ -54,9 +54,7 @@ export function PaymentForm({ client, pack }: Props) {
   const creditsParam = searchParams.get('packCredits') ?? String(pack.totalCredits)
 
   const [pending, startTransition] = useTransition()
-  const [result, setResult] = useState<null | { status: 'paid' | 'requested'; saleId: string }>(
-    null
-  )
+  const [result, setResult] = useState<null | { status: 'paid' | 'requested'; saleId: string }>(null)
   const [error, setError] = useState<string | null>(null)
 
   const paymentKind: PaymentKind = paymentParam === 'request' ? 'request' : 'record'
@@ -107,11 +105,7 @@ export function PaymentForm({ client, pack }: Props) {
           setResult(outcome)
         } catch (err) {
           const message =
-            err instanceof Error
-              ? err.message
-              : typeof err === 'string'
-                ? err
-                : 'Unable to complete the sale.'
+            err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unable to complete the sale.'
           setError(message)
         }
       })
@@ -155,8 +149,8 @@ export function PaymentForm({ client, pack }: Props) {
           <h2 className="text-2xl font-semibold">Collect payment</h2>
           <p className="text-sm text-muted-foreground">
             You&apos;re selling <strong>{packName}</strong> to{' '}
-            <strong>{`${client.firstName ?? ''} ${client.lastName ?? ''}`.trim() || 'this client'}</strong>{' '}
-            for {formatPrice(packPrice, pack.currency)}.
+            <strong>{`${client.firstName ?? ''} ${client.lastName ?? ''}`.trim() || 'this client'}</strong> for{' '}
+            {formatPrice(packPrice, pack.currency)}.
           </p>
         </div>
 
@@ -236,9 +230,7 @@ export function PaymentForm({ client, pack }: Props) {
                 type="button"
                 onClick={() => setParam('payment', 'record')}
                 className={`flex items-center gap-2 rounded-md border px-3 py-3 text-left transition ${
-                  paymentKind === 'record'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/40'
+                  paymentKind === 'record' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
                 }`}
               >
                 <Wallet className="size-4" aria-hidden />
@@ -252,9 +244,7 @@ export function PaymentForm({ client, pack }: Props) {
                 type="button"
                 onClick={() => setParam('payment', 'request')}
                 className={`flex items-center gap-2 rounded-md border px-3 py-3 text-left transition ${
-                  paymentKind === 'request'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/40'
+                  paymentKind === 'request' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
                 }`}
               >
                 <Send className="size-4" aria-hidden />
@@ -317,8 +307,7 @@ export function PaymentForm({ client, pack }: Props) {
                     onChange={(event) => setParam('due', event.target.value)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    We store the due date in the URL as <code>due</code> so you can refresh without
-                    losing it.
+                    We store the due date in the URL as <code>due</code> so you can refresh without losing it.
                   </p>
                 </div>
 
@@ -358,12 +347,7 @@ export function PaymentForm({ client, pack }: Props) {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              type="submit"
-              size="sm"
-              disabled={pending}
-              className="min-w-[140px]"
-            >
+            <Button type="submit" size="sm" disabled={pending} className="min-w-[140px]">
               {pending ? 'Working...' : paymentLabel}
             </Button>
           </div>

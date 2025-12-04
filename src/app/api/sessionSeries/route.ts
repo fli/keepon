@@ -1,14 +1,8 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
-import {
-  normalizeSessionSeriesRow,
-  type RawSessionSeriesRow,
-} from './shared'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { normalizeSessionSeriesRow, type RawSessionSeriesRow } from './shared'
 
 const querySchema = z.object({
   createdAfter: z
@@ -16,13 +10,11 @@ const querySchema = z.object({
     .trim()
     .min(1, 'createdAfter must not be empty')
     .pipe(
-      z
-        .string()
-        .datetime({
-          message: 'createdAfter must be a valid ISO 8601 date-time string',
-        })
+      z.string().datetime({
+        message: 'createdAfter must be a valid ISO 8601 date-time string',
+      })
     )
-    .transform(value => new Date(value))
+    .transform((value) => new Date(value))
     .optional(),
 })
 
@@ -31,22 +23,16 @@ export async function GET(request: Request) {
   const rawCreatedAfter = url.searchParams.get('createdAfter')
   const trimmedCreatedAfter = rawCreatedAfter?.trim()
   const parsedQuery = querySchema.safeParse({
-    createdAfter:
-      trimmedCreatedAfter && trimmedCreatedAfter.length > 0
-        ? trimmedCreatedAfter
-        : undefined,
+    createdAfter: trimmedCreatedAfter && trimmedCreatedAfter.length > 0 ? trimmedCreatedAfter : undefined,
   })
 
   if (!parsedQuery.success) {
-    const detail = parsedQuery.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = parsedQuery.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid query parameters',
-        detail:
-          detail || 'Request query parameters did not match the expected schema.',
+        detail: detail || 'Request query parameters did not match the expected schema.',
         type: '/invalid-query',
       }),
       { status: 400 }
@@ -54,8 +40,7 @@ export async function GET(request: Request) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching session series',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching session series',
   })
 
   if (!authorization.ok) {
@@ -69,18 +54,12 @@ export async function GET(request: Request) {
       .where('series.trainerId', '=', authorization.trainerId)
 
     if (parsedQuery.data.createdAfter) {
-      query = query.where(
-        'series.createdAt',
-        '>',
-        parsedQuery.data.createdAfter
-      )
+      query = query.where('series.createdAt', '>', parsedQuery.data.createdAfter)
     }
 
     const rows = (await query.execute()) as RawSessionSeriesRow[]
 
-    const series = rows.map((row, index) =>
-      normalizeSessionSeriesRow(row, index)
-    )
+    const series = rows.map((row, index) => normalizeSessionSeriesRow(row, index))
 
     return NextResponse.json(series)
   } catch (error) {

@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db, type Json } from '@/lib/db'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 
 const APP_STORE_PROD_URL = 'https://buy.itunes.apple.com/verifyReceipt'
 const APP_STORE_SANDBOX_URL = 'https://sandbox.itunes.apple.com/verifyReceipt'
@@ -69,11 +66,7 @@ type AppStoreTransactionInsert = {
 
 class AppStoreReceiptError extends Error {
   constructor(
-    public readonly kind:
-      | 'user-conflict'
-      | 'temporary'
-      | 'unexpected'
-      | 'invalid-parameters',
+    public readonly kind: 'user-conflict' | 'temporary' | 'unexpected' | 'invalid-parameters',
     message?: string
   ) {
     super(message)
@@ -84,10 +77,7 @@ class AppStoreReceiptError extends Error {
 type PgError = { code?: string; constraint?: string }
 
 const isPgError = (error: unknown): error is PgError =>
-  typeof error === 'object' &&
-  error !== null &&
-  'code' in error &&
-  typeof (error as PgError).code === 'string'
+  typeof error === 'object' && error !== null && 'code' in error && typeof (error as PgError).code === 'string'
 
 const createInvalidJsonResponse = () =>
   NextResponse.json(
@@ -116,8 +106,7 @@ const createMissingSecretResponse = () =>
     buildErrorResponse({
       status: 500,
       title: 'App Store shared secret is not configured',
-      detail:
-        'Set APP_STORE_SHARED_SECRET in the environment to verify receipts.',
+      detail: 'Set APP_STORE_SHARED_SECRET in the environment to verify receipts.',
       type: '/app-store-receipt-misconfigured',
     }),
     { status: 500 }
@@ -148,8 +137,7 @@ const createTemporaryServerProblemResponse = (detail?: string) =>
   NextResponse.json(
     buildErrorResponse({
       status: 503,
-      title:
-        'Something went wrong while verifying your receipt with Apple. Try again.',
+      title: 'Something went wrong while verifying your receipt with Apple. Try again.',
       detail,
       type: '/app-store-receipt-temporary-server-problem',
     }),
@@ -170,18 +158,12 @@ const createUnexpectedServerIssueResponse = (detail?: string) =>
 const toDateFromMillis = (value: string, label: string) => {
   const ms = Number(value)
   if (!Number.isFinite(ms)) {
-    throw new AppStoreReceiptError(
-      'unexpected',
-      `${label} was not a valid millisecond timestamp.`
-    )
+    throw new AppStoreReceiptError('unexpected', `${label} was not a valid millisecond timestamp.`)
   }
 
   const date = new Date(ms)
   if (Number.isNaN(date.getTime())) {
-    throw new AppStoreReceiptError(
-      'unexpected',
-      `${label} was not a valid millisecond timestamp.`
-    )
+    throw new AppStoreReceiptError('unexpected', `${label} was not a valid millisecond timestamp.`)
   }
 
   return date
@@ -195,10 +177,7 @@ const normalizeInAppReceipt = (
   transaction_id: receipt.transaction_id,
   original_transaction_id: receipt.original_transaction_id,
   product_id: receipt.product_id,
-  purchase_date: toDateFromMillis(
-    receipt.purchase_date_ms,
-    'purchase_date_ms'
-  ),
+  purchase_date: toDateFromMillis(receipt.purchase_date_ms, 'purchase_date_ms'),
   expires_date: toDateFromMillis(receipt.expires_date_ms, 'expires_date_ms'),
   web_order_line_item_id: receipt.web_order_line_item_id,
   is_trial_period: receipt.is_trial_period === 'true',
@@ -216,12 +195,12 @@ const insertReceiptData = async ({
   receipts: AppStoreTransactionInsert[]
   pendingRenewalInfo?: PendingRenewalInfo[]
 }) => {
-  await db.transaction().execute(async trx => {
+  await db.transaction().execute(async (trx) => {
     try {
       await trx
         .insertInto('app_store_transaction')
         .values(receipts)
-        .onConflict(oc =>
+        .onConflict((oc) =>
           oc.columns(['transaction_id', 'trainer_id']).doUpdateSet(({ ref }) => ({
             original_transaction_id: ref('excluded.original_transaction_id'),
             product_id: ref('excluded.product_id'),
@@ -229,42 +208,30 @@ const insertReceiptData = async ({
             expires_date: ref('excluded.expires_date'),
             web_order_line_item_id: ref('excluded.web_order_line_item_id'),
             is_trial_period: ref('excluded.is_trial_period'),
-            is_in_intro_offer_period: ref(
-              'excluded.is_in_intro_offer_period'
-            ),
+            is_in_intro_offer_period: ref('excluded.is_in_intro_offer_period'),
             encoded_receipt: ref('excluded.encoded_receipt'),
           }))
         )
         .execute()
     } catch (error: unknown) {
-      if (
-        isPgError(error) &&
-        error.code === '23505' &&
-        error.constraint === 'app_store_transaction_pkey'
-      ) {
+      if (isPgError(error) && error.code === '23505' && error.constraint === 'app_store_transaction_pkey') {
         throw new AppStoreReceiptError('user-conflict')
       }
       throw error
     }
 
-    if (
-      pendingRenewalInfo &&
-      pendingRenewalInfo.length > 0 &&
-      pendingRenewalInfo.every(info => info.product_id)
-    ) {
+    if (pendingRenewalInfo && pendingRenewalInfo.length > 0 && pendingRenewalInfo.every((info) => info.product_id)) {
       await trx
         .insertInto('app_store_pending_renewal_info')
         .values(
-          pendingRenewalInfo.map(info => ({
+          pendingRenewalInfo.map((info) => ({
             trainer_id: trainerId,
             product_id: info.product_id,
             data: info as unknown as Json,
           }))
         )
-        .onConflict(oc =>
-          oc
-            .columns(['trainer_id', 'product_id'])
-            .doUpdateSet(({ ref }) => ({ data: ref('excluded.data') }))
+        .onConflict((oc) =>
+          oc.columns(['trainer_id', 'product_id']).doUpdateSet(({ ref }) => ({ data: ref('excluded.data') }))
         )
         .execute()
     }
@@ -272,24 +239,14 @@ const insertReceiptData = async ({
 }
 
 const parseApplePayload = (value: unknown): AppleReceiptPayload => {
-  if (
-    typeof value === 'object' &&
-    value !== null &&
-    'status' in value
-  ) {
+  if (typeof value === 'object' && value !== null && 'status' in value) {
     return value as AppleReceiptPayload
   }
 
-  throw new AppStoreReceiptError(
-    'unexpected',
-    'Apple response did not include a status code.'
-  )
+  throw new AppStoreReceiptError('unexpected', 'Apple response did not include a status code.')
 }
 
-const fetchReceiptPayload = async (
-  encodedReceipt: string,
-  sharedSecret: string
-): Promise<AppleReceiptPayload> => {
+const fetchReceiptPayload = async (encodedReceipt: string, sharedSecret: string): Promise<AppleReceiptPayload> => {
   const requestInit: RequestInit = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -344,20 +301,16 @@ const processReceipt = async ({
         console.error('Unexpected receipt payload shape from Apple', {
           issues: parsed.error.issues,
         })
-        throw new AppStoreReceiptError(
-          'unexpected',
-          'Receipt payload missing expected fields.'
-        )
+        throw new AppStoreReceiptError('unexpected', 'Receipt payload missing expected fields.')
       }
 
-      const { latest_receipt_info, latest_receipt, pending_renewal_info } =
-        parsed.data
+      const { latest_receipt_info, latest_receipt, pending_renewal_info } = parsed.data
 
       const sortedReceipts = [...latest_receipt_info].sort(
         (a, b) => Number(a.purchase_date_ms) - Number(b.purchase_date_ms)
       )
 
-      const normalizedReceipts = sortedReceipts.map(receipt =>
+      const normalizedReceipts = sortedReceipts.map((receipt) =>
         normalizeInAppReceipt(receipt, latest_receipt, trainerId)
       )
 
@@ -370,63 +323,30 @@ const processReceipt = async ({
       return parsed.data
     }
     case 21000:
-      throw new AppStoreReceiptError(
-        'unexpected',
-        'The App Store could not read the JSON object you provided.'
-      )
+      throw new AppStoreReceiptError('unexpected', 'The App Store could not read the JSON object you provided.')
     case 21002:
-      throw new AppStoreReceiptError(
-        'invalid-parameters',
-        'The receiptData was malformed or missing.'
-      )
+      throw new AppStoreReceiptError('invalid-parameters', 'The receiptData was malformed or missing.')
     case 21003:
-      throw new AppStoreReceiptError(
-        'unexpected',
-        'The receipt could not be authenticated.'
-      )
+      throw new AppStoreReceiptError('unexpected', 'The receipt could not be authenticated.')
     case 21004:
-      throw new AppStoreReceiptError(
-        'unexpected',
-        'The shared secret does not match the expected value.'
-      )
+      throw new AppStoreReceiptError('unexpected', 'The shared secret does not match the expected value.')
     case 21005:
-      throw new AppStoreReceiptError(
-        'temporary',
-        'The receipt server is not currently available.'
-      )
+      throw new AppStoreReceiptError('temporary', 'The receipt server is not currently available.')
     case 21007:
-      throw new AppStoreReceiptError(
-        'unexpected',
-        'Test receipt was sent to the production environment.'
-      )
+      throw new AppStoreReceiptError('unexpected', 'Test receipt was sent to the production environment.')
     case 21008:
-      throw new AppStoreReceiptError(
-        'unexpected',
-        'Production receipt was sent to the sandbox environment.'
-      )
+      throw new AppStoreReceiptError('unexpected', 'Production receipt was sent to the sandbox environment.')
     case 21010:
-      throw new AppStoreReceiptError(
-        'unexpected',
-        'This receipt could not be authorized.'
-      )
+      throw new AppStoreReceiptError('unexpected', 'This receipt could not be authorized.')
     default: {
       if (status >= 21100 && status <= 21199) {
         if (payload?.['is-retryable'] === true) {
-          throw new AppStoreReceiptError(
-            'temporary',
-            'App Store internal data access error. Try again.'
-          )
+          throw new AppStoreReceiptError('temporary', 'App Store internal data access error. Try again.')
         }
-        throw new AppStoreReceiptError(
-          'unexpected',
-          'App Store internal data access error.'
-        )
+        throw new AppStoreReceiptError('unexpected', 'App Store internal data access error.')
       }
 
-      throw new AppStoreReceiptError(
-        'unexpected',
-        'Payload has invalid status code.'
-      )
+      throw new AppStoreReceiptError('unexpected', 'Payload has invalid status code.')
     }
   }
 }
@@ -443,13 +363,12 @@ export async function POST(request: Request) {
 
   const parsedBody = requestSchema.safeParse(body)
   if (!parsedBody.success) {
-    const detail = parsedBody.error.issues.map(issue => issue.message).join('; ')
+    const detail = parsedBody.error.issues.map((issue) => issue.message).join('; ')
     return createInvalidBodyResponse(detail || undefined)
   }
 
   const auth = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while verifying App Store receipt',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while verifying App Store receipt',
   })
 
   if (!auth.ok) {

@@ -4,20 +4,9 @@ import type { Trainer } from '@/lib/db'
 import { z } from 'zod'
 import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
 import type { CountryCode } from 'libphonenumber-js'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 
-const weekdays = [
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday',
-  'sunday',
-] as const
+const weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
 
 type Weekday = (typeof weekdays)[number]
 type AcceptingKey = `${Weekday}AcceptingBookings`
@@ -26,9 +15,7 @@ type IntervalsKey = `${Weekday}AvailableIntervals`
 const ISO_DURATION_PATTERN = /^-?P/
 const SENTINEL_RANGE = '[01:23:45,01:23:46]'
 
-const timeStringSchema = z
-  .string()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$|^24:00$/, 'Time must be in HH:MM format')
+const timeStringSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$|^24:00$/, 'Time must be in HH:MM format')
 
 const availabilityIntervalSchema = z.tuple([timeStringSchema, timeStringSchema])
 
@@ -43,11 +30,7 @@ const availabilitySchema = z.object({
   availableIntervals: z
     .array(availabilityIntervalSchema)
     .refine(
-      intervals =>
-        intervals.every(
-          ([start, end]) =>
-            start !== end && timeToMinutes(start) < timeToMinutes(end)
-        ),
+      (intervals) => intervals.every(([start, end]) => start !== end && timeToMinutes(start) < timeToMinutes(end)),
       'Intervals must represent non-zero durations'
     ),
 })
@@ -57,11 +40,7 @@ const overrideAvailabilitySchema = z.object({
   availableIntervals: z
     .array(availabilityIntervalSchema)
     .refine(
-      intervals =>
-        intervals.every(
-          ([start, end]) =>
-            start !== end && timeToMinutes(start) < timeToMinutes(end)
-        ),
+      (intervals) => intervals.every(([start, end]) => start !== end && timeToMinutes(start) < timeToMinutes(end)),
       'Intervals must represent non-zero durations'
     )
     .nullable(),
@@ -75,12 +54,8 @@ const onlineBookingsSettingsSchema = z.object({
   contactNumber: z.string().nullable(),
   businessName: z.string().nullable(),
   showContactNumber: z.boolean(),
-  durationUntilBookingWindowOpens: z
-    .string()
-    .regex(ISO_DURATION_PATTERN, 'Duration must be an ISO 8601 string'),
-  durationUntilBookingWindowCloses: z
-    .string()
-    .regex(ISO_DURATION_PATTERN, 'Duration must be an ISO 8601 string'),
+  durationUntilBookingWindowOpens: z.string().regex(ISO_DURATION_PATTERN, 'Duration must be an ISO 8601 string'),
+  durationUntilBookingWindowCloses: z.string().regex(ISO_DURATION_PATTERN, 'Duration must be an ISO 8601 string'),
   availability: z.object({
     defaults: z.object({
       monday: availabilitySchema,
@@ -104,11 +79,7 @@ const patchAvailabilitySchema = z
     availableIntervals: z
       .array(availabilityIntervalSchema)
       .refine(
-        intervals =>
-          intervals.every(
-            ([start, end]) =>
-              start !== end && timeToMinutes(start) < timeToMinutes(end)
-          ),
+        (intervals) => intervals.every(([start, end]) => start !== end && timeToMinutes(start) < timeToMinutes(end)),
         'Intervals must represent non-zero durations'
       )
       .optional(),
@@ -121,11 +92,7 @@ const patchOverrideAvailabilitySchema = z
     availableIntervals: z
       .array(availabilityIntervalSchema)
       .refine(
-        intervals =>
-          intervals.every(
-            ([start, end]) =>
-              start !== end && timeToMinutes(start) < timeToMinutes(end)
-          ),
+        (intervals) => intervals.every(([start, end]) => start !== end && timeToMinutes(start) < timeToMinutes(end)),
         'Intervals must represent non-zero durations'
       )
       .nullable()
@@ -136,11 +103,7 @@ const patchOverrideAvailabilitySchema = z
 const patchRequestSchema = z
   .object({
     enabled: z.boolean().optional(),
-    pageUrlSlug: z
-      .string()
-      .trim()
-      .min(4, 'Page slug must be at least 4 characters long')
-      .optional(),
+    pageUrlSlug: z.string().trim().min(4, 'Page slug must be at least 4 characters long').optional(),
     contactEmail: z.string().email().nullable().optional(),
     contactNumber: z.string().nullable().optional(),
     businessName: z.string().trim().nullable().optional(),
@@ -167,9 +130,7 @@ const patchRequestSchema = z
           })
           .partial()
           .optional(),
-        overrides: z
-          .record(z.string(), patchOverrideAvailabilitySchema.nullable())
-          .optional(),
+        overrides: z.record(z.string(), patchOverrideAvailabilitySchema.nullable()).optional(),
       })
       .optional(),
     bookingNote: z.string().trim().nullable().optional(),
@@ -208,14 +169,13 @@ const dayFieldMap: Array<{
   day: Weekday
   acceptingKey: AcceptingKey
   intervalsKey: IntervalsKey
-}> = weekdays.map(day => ({
+}> = weekdays.map((day) => ({
   day,
   acceptingKey: `${day}AcceptingBookings`,
   intervalsKey: `${day}AvailableIntervals`,
 }))
 
-const removeTrailingSlash = (value: string) =>
-  value.endsWith('/') ? value.slice(0, -1) : value
+const removeTrailingSlash = (value: string) => (value.endsWith('/') ? value.slice(0, -1) : value)
 
 const buildBookingsPageUrl = (slug: string) => {
   const trimmedSlug = slug.trim()
@@ -224,10 +184,7 @@ const buildBookingsPageUrl = (slug: string) => {
   }
 
   const explicitBase =
-    process.env.BOOKINGS_BASE_URL ??
-    process.env.BOOKINGS_URL ??
-    process.env.NEXT_PUBLIC_BOOKINGS_URL ??
-    null
+    process.env.BOOKINGS_BASE_URL ?? process.env.BOOKINGS_URL ?? process.env.NEXT_PUBLIC_BOOKINGS_URL ?? null
 
   if (explicitBase) {
     const explicit = new URL(explicitBase)
@@ -259,12 +216,7 @@ const normalizeTimeComponent = (raw: string, isEnd: boolean) => {
   const hours = Number.parseInt(hoursPart, 10)
   const minutes = Number.parseInt(minutesPart, 10)
 
-  if (
-    Number.isNaN(hours) ||
-    Number.isNaN(minutes) ||
-    minutes < 0 ||
-    minutes > 59
-  ) {
+  if (Number.isNaN(hours) || Number.isNaN(minutes) || minutes < 0 || minutes > 59) {
     return null
   }
 
@@ -326,36 +278,24 @@ const parseTimerange = (value: string): [string, string] | null => {
   return [start, end]
 }
 
-const parseTimerangeList = (
-  values: readonly string[] | null | undefined
-): Array<[string, string]> => {
+const parseTimerangeList = (values: readonly string[] | null | undefined): Array<[string, string]> => {
   if (!values || values.length === 0) {
     return []
   }
 
-  const intervals = values
-    .map(parseTimerange)
-    .filter((interval): interval is [string, string] => interval !== null)
+  const intervals = values.map(parseTimerange).filter((interval): interval is [string, string] => interval !== null)
 
   return intervals
     .slice()
-    .sort(
-      (a, b) =>
-        timeToMinutes(a[0]) - timeToMinutes(b[0]) ||
-        timeToMinutes(a[1]) - timeToMinutes(b[1])
-    )
+    .sort((a, b) => timeToMinutes(a[0]) - timeToMinutes(b[0]) || timeToMinutes(a[1]) - timeToMinutes(b[1]))
 }
 
 const toTimerangeArray = (intervals: Array<[string, string]>) =>
   intervals
-    .filter(
-      ([start, end]) => start !== end && timeToMinutes(start) < timeToMinutes(end)
-    )
+    .filter(([start, end]) => start !== end && timeToMinutes(start) < timeToMinutes(end))
     .map(([start, end]) => `[${start},${end})`)
 
-const normalizeNullableTrimmed = (
-  value: string | null | undefined
-): string | null | undefined => {
+const normalizeNullableTrimmed = (value: string | null | undefined): string | null | undefined => {
   if (value === undefined) {
     return undefined
   }
@@ -387,10 +327,7 @@ const formatContactNumber = (value: string, countryCode?: string | null) => {
       : undefined
 
   const parsed = parsePhoneNumberFromString(value, normalizedCountry)
-  const finalParsed =
-    parsed && parsed.isValid()
-      ? parsed
-      : parsePhoneNumberFromString(value, normalizedCountry)
+  const finalParsed = parsed && parsed.isValid() ? parsed : parsePhoneNumberFromString(value, normalizedCountry)
 
   if (!finalParsed || !finalParsed.isValid()) {
     throw new Error('Invalid phone number')
@@ -449,8 +386,7 @@ const formatDateKey = (value: Date | string) => {
 
 export async function GET(request: Request) {
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching online bookings settings',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching online bookings settings',
   })
 
   if (!authorization.ok) {
@@ -466,64 +402,26 @@ export async function GET(request: Request) {
         ref('trainer.online_bookings_contact_email').as('contactEmail'),
         ref('trainer.online_bookings_contact_number').as('contactNumber'),
         ref('trainer.online_bookings_business_name').as('businessName'),
-        ref('trainer.online_bookings_show_contact_number').as(
-          'showContactNumber'
-        ),
+        ref('trainer.online_bookings_show_contact_number').as('showContactNumber'),
         ref('trainer.online_bookings_booking_note').as('bookingNote'),
-        ref('trainer.online_bookings_terms_and_conditions').as(
-          'termsAndConditions'
-        ),
-        ref('trainer.online_bookings_cancellation_policy').as(
-          'cancellationPolicy'
-        ),
-        ref(
-          'trainer.online_bookings_duration_until_booking_window_opens'
-        ).as('durationUntilBookingWindowOpens'),
-        ref(
-          'trainer.online_bookings_duration_until_booking_window_closes'
-        ).as('durationUntilBookingWindowCloses'),
-        ref('trainer.online_bookings_monday_accepting_bookings').as(
-          'mondayAcceptingBookings'
-        ),
-        ref('trainer.online_bookings_monday_available_intervals').as(
-          'mondayAvailableIntervals'
-        ),
-        ref('trainer.online_bookings_tuesday_accepting_bookings').as(
-          'tuesdayAcceptingBookings'
-        ),
-        ref('trainer.online_bookings_tuesday_available_intervals').as(
-          'tuesdayAvailableIntervals'
-        ),
-        ref('trainer.online_bookings_wednesday_accepting_bookings').as(
-          'wednesdayAcceptingBookings'
-        ),
-        ref('trainer.online_bookings_wednesday_available_intervals').as(
-          'wednesdayAvailableIntervals'
-        ),
-        ref('trainer.online_bookings_thursday_accepting_bookings').as(
-          'thursdayAcceptingBookings'
-        ),
-        ref('trainer.online_bookings_thursday_available_intervals').as(
-          'thursdayAvailableIntervals'
-        ),
-        ref('trainer.online_bookings_friday_accepting_bookings').as(
-          'fridayAcceptingBookings'
-        ),
-        ref('trainer.online_bookings_friday_available_intervals').as(
-          'fridayAvailableIntervals'
-        ),
-        ref('trainer.online_bookings_saturday_accepting_bookings').as(
-          'saturdayAcceptingBookings'
-        ),
-        ref('trainer.online_bookings_saturday_available_intervals').as(
-          'saturdayAvailableIntervals'
-        ),
-        ref('trainer.online_bookings_sunday_accepting_bookings').as(
-          'sundayAcceptingBookings'
-        ),
-        ref('trainer.online_bookings_sunday_available_intervals').as(
-          'sundayAvailableIntervals'
-        ),
+        ref('trainer.online_bookings_terms_and_conditions').as('termsAndConditions'),
+        ref('trainer.online_bookings_cancellation_policy').as('cancellationPolicy'),
+        ref('trainer.online_bookings_duration_until_booking_window_opens').as('durationUntilBookingWindowOpens'),
+        ref('trainer.online_bookings_duration_until_booking_window_closes').as('durationUntilBookingWindowCloses'),
+        ref('trainer.online_bookings_monday_accepting_bookings').as('mondayAcceptingBookings'),
+        ref('trainer.online_bookings_monday_available_intervals').as('mondayAvailableIntervals'),
+        ref('trainer.online_bookings_tuesday_accepting_bookings').as('tuesdayAcceptingBookings'),
+        ref('trainer.online_bookings_tuesday_available_intervals').as('tuesdayAvailableIntervals'),
+        ref('trainer.online_bookings_wednesday_accepting_bookings').as('wednesdayAcceptingBookings'),
+        ref('trainer.online_bookings_wednesday_available_intervals').as('wednesdayAvailableIntervals'),
+        ref('trainer.online_bookings_thursday_accepting_bookings').as('thursdayAcceptingBookings'),
+        ref('trainer.online_bookings_thursday_available_intervals').as('thursdayAvailableIntervals'),
+        ref('trainer.online_bookings_friday_accepting_bookings').as('fridayAcceptingBookings'),
+        ref('trainer.online_bookings_friday_available_intervals').as('fridayAvailableIntervals'),
+        ref('trainer.online_bookings_saturday_accepting_bookings').as('saturdayAcceptingBookings'),
+        ref('trainer.online_bookings_saturday_available_intervals').as('saturdayAvailableIntervals'),
+        ref('trainer.online_bookings_sunday_accepting_bookings').as('sundayAcceptingBookings'),
+        ref('trainer.online_bookings_sunday_available_intervals').as('sundayAvailableIntervals'),
       ])
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()) as RawTrainerSettingsRow | undefined
@@ -533,8 +431,7 @@ export async function GET(request: Request) {
         buildErrorResponse({
           status: 404,
           title: 'Trainer not found',
-          detail:
-            'No trainer record was found for the authenticated access token.',
+          detail: 'No trainer record was found for the authenticated access token.',
           type: '/trainer-not-found',
         }),
         { status: 404 }
@@ -605,15 +502,9 @@ export async function GET(request: Request) {
         return accumulator
       }
 
-      const accepting =
-        row.acceptingBookings === null
-          ? null
-          : row.acceptingBookings === true
+      const accepting = row.acceptingBookings === null ? null : row.acceptingBookings === true
 
-      const availableIntervals =
-        row.availableIntervals === null
-          ? null
-          : parseTimerangeList(row.availableIntervals)
+      const availableIntervals = row.availableIntervals === null ? null : parseTimerangeList(row.availableIntervals)
 
       accumulator[dateKey] = {
         acceptingBookings: accepting,
@@ -691,7 +582,7 @@ export async function PATCH(request: Request) {
 
   const parsedBody = patchRequestSchema.safeParse(body)
   if (!parsedBody.success) {
-    const detail = parsedBody.error.issues.map(issue => issue.message).join('; ')
+    const detail = parsedBody.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
@@ -705,8 +596,7 @@ export async function PATCH(request: Request) {
   }
 
   const auth = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating online bookings settings',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating online bookings settings',
   })
 
   if (!auth.ok) {
@@ -715,13 +605,8 @@ export async function PATCH(request: Request) {
 
   const data = parsedBody.data
 
-  if (
-    data.availability?.overrides &&
-    Object.keys(data.availability.overrides).length > 0
-  ) {
-    const invalidDateKey = Object.keys(data.availability.overrides).find(
-      dateKey => !parseOverrideDateKey(dateKey)
-    )
+  if (data.availability?.overrides && Object.keys(data.availability.overrides).length > 0) {
+    const invalidDateKey = Object.keys(data.availability.overrides).find((dateKey) => !parseOverrideDateKey(dateKey))
 
     if (invalidDateKey) {
       return NextResponse.json(
@@ -743,8 +628,7 @@ export async function PATCH(request: Request) {
         buildErrorResponse({
           status: 400,
           title: 'Invalid page URL slug',
-          detail:
-            'Page slug can only contain letters, numbers, hyphens, and underscores.',
+          detail: 'Page slug can only contain letters, numbers, hyphens, and underscores.',
           type: '/invalid-body',
         }),
         { status: 400 }
@@ -774,10 +658,7 @@ export async function PATCH(request: Request) {
   const trainerMeta = await db
     .selectFrom('trainer')
     .leftJoin('country', 'country.id', 'trainer.country_id')
-    .select(({ ref }) => [
-      ref('trainer.id').as('trainerId'),
-      ref('country.alpha_2_code').as('countryCode'),
-    ])
+    .select(({ ref }) => [ref('trainer.id').as('trainerId'), ref('country.alpha_2_code').as('countryCode')])
     .where('trainer.id', '=', auth.trainerId)
     .executeTakeFirst()
 
@@ -786,8 +667,7 @@ export async function PATCH(request: Request) {
       buildErrorResponse({
         status: 404,
         title: 'Trainer not found',
-        detail:
-          'No trainer record was found for the authenticated access token.',
+        detail: 'No trainer record was found for the authenticated access token.',
         type: '/trainer-not-found',
       }),
       { status: 404 }
@@ -801,10 +681,7 @@ export async function PATCH(request: Request) {
       formattedContactNumber = null
     } else {
       try {
-        formattedContactNumber = formatContactNumber(
-          data.contactNumber,
-          trainerMeta.countryCode
-        )
+        formattedContactNumber = formatContactNumber(data.contactNumber, trainerMeta.countryCode)
       } catch (error) {
         console.error('Invalid contact number provided', error)
         return NextResponse.json(
@@ -821,7 +698,7 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    await db.transaction().execute(async trx => {
+    await db.transaction().execute(async (trx) => {
       // Handle availability overrides
       const overrides = data.availability?.overrides
       if (overrides) {
@@ -846,10 +723,7 @@ export async function PATCH(request: Request) {
             continue
           }
 
-          if (
-            override.acceptingBookings === null &&
-            override.availableIntervals === null
-          ) {
+          if (override.acceptingBookings === null && override.availableIntervals === null) {
             await trx
               .deleteFrom('availability')
               .where('trainer_id', '=', auth.trainerId)
@@ -858,20 +732,14 @@ export async function PATCH(request: Request) {
             continue
           }
 
-          if (
-            override.acceptingBookings === undefined &&
-            override.availableIntervals === undefined
-          ) {
+          if (override.acceptingBookings === undefined && override.availableIntervals === undefined) {
             continue
           }
 
           const insertValues = {
             trainer_id: auth.trainerId,
             date: parsedDate,
-            accepting_bookings:
-              override.acceptingBookings === undefined
-                ? null
-                : override.acceptingBookings,
+            accepting_bookings: override.acceptingBookings === undefined ? null : override.acceptingBookings,
             available_intervals:
               override.availableIntervals === undefined
                 ? null
@@ -891,17 +759,13 @@ export async function PATCH(request: Request) {
 
           if (override.availableIntervals !== undefined) {
             updateSet.available_intervals =
-              override.availableIntervals === null
-                ? null
-                : toTimerangeArray(override.availableIntervals)
+              override.availableIntervals === null ? null : toTimerangeArray(override.availableIntervals)
           }
 
           await trx
             .insertInto('availability')
             .values(insertValues)
-            .onConflict(oc =>
-              oc.columns(['trainer_id', 'date']).doUpdateSet(updateSet)
-            )
+            .onConflict((oc) => oc.columns(['trainer_id', 'date']).doUpdateSet(updateSet))
             .execute()
         }
       }
@@ -918,8 +782,7 @@ export async function PATCH(request: Request) {
 
       if (data.contactEmail !== undefined) {
         const value = normalizeNullableTrimmed(data.contactEmail)
-        updateData.online_bookings_contact_email =
-          value === undefined ? null : value
+        updateData.online_bookings_contact_email = value === undefined ? null : value
       }
 
       if (formattedContactNumber !== undefined) {
@@ -928,8 +791,7 @@ export async function PATCH(request: Request) {
 
       if (data.businessName !== undefined) {
         const value = normalizeNullableTrimmed(data.businessName)
-        updateData.online_bookings_business_name =
-          value === undefined ? null : value
+        updateData.online_bookings_business_name = value === undefined ? null : value
       }
 
       if (data.showContactNumber !== undefined) {
@@ -937,31 +799,26 @@ export async function PATCH(request: Request) {
       }
 
       if (data.durationUntilBookingWindowOpens !== undefined) {
-        updateData.online_bookings_duration_until_booking_window_opens =
-          data.durationUntilBookingWindowOpens
+        updateData.online_bookings_duration_until_booking_window_opens = data.durationUntilBookingWindowOpens
       }
 
       if (data.durationUntilBookingWindowCloses !== undefined) {
-        updateData.online_bookings_duration_until_booking_window_closes =
-          data.durationUntilBookingWindowCloses
+        updateData.online_bookings_duration_until_booking_window_closes = data.durationUntilBookingWindowCloses
       }
 
       if (data.bookingNote !== undefined) {
         const value = normalizeNullableTrimmed(data.bookingNote)
-        updateData.online_bookings_booking_note =
-          value === undefined ? null : value
+        updateData.online_bookings_booking_note = value === undefined ? null : value
       }
 
       if (data.termsAndConditions !== undefined) {
         const value = normalizeNullableTrimmed(data.termsAndConditions)
-        updateData.online_bookings_terms_and_conditions =
-          value === undefined ? null : value
+        updateData.online_bookings_terms_and_conditions = value === undefined ? null : value
       }
 
       if (data.cancellationPolicy !== undefined) {
         const value = normalizeNullableTrimmed(data.cancellationPolicy)
-        updateData.online_bookings_cancellation_policy =
-          value === undefined ? null : value
+        updateData.online_bookings_cancellation_policy = value === undefined ? null : value
       }
 
       const defaults = data.availability?.defaults
@@ -972,29 +829,21 @@ export async function PATCH(request: Request) {
             return
           }
 
-          const acceptingColumn =
-            `online_bookings_${day}_accepting_bookings` as keyof Trainer
-          const intervalsColumn =
-            `online_bookings_${day}_available_intervals` as keyof Trainer
+          const acceptingColumn = `online_bookings_${day}_accepting_bookings` as keyof Trainer
+          const intervalsColumn = `online_bookings_${day}_available_intervals` as keyof Trainer
 
           if (dayUpdate.acceptingBookings !== undefined) {
             updateData[acceptingColumn] = dayUpdate.acceptingBookings
           }
 
           if (dayUpdate.availableIntervals !== undefined) {
-            updateData[intervalsColumn] = toTimerangeArray(
-              dayUpdate.availableIntervals
-            )
+            updateData[intervalsColumn] = toTimerangeArray(dayUpdate.availableIntervals)
           }
         })
       }
 
       if (Object.keys(updateData).length > 0) {
-        await trx
-          .updateTable('trainer')
-          .set(updateData)
-          .where('id', '=', auth.trainerId)
-          .execute()
+        await trx.updateTable('trainer').set(updateData).where('id', '=', auth.trainerId).execute()
       }
     })
 

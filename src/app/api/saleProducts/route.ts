@@ -1,24 +1,15 @@
 import { NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerOrClientRequest,
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
-import {
-  adaptSaleProductRow,
-  fetchSaleProducts,
-  saleProductListSchema,
-  saleProductTypeSchema,
-} from './shared'
+import { authenticateTrainerOrClientRequest, authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { adaptSaleProductRow, fetchSaleProducts, saleProductListSchema, saleProductTypeSchema } from './shared'
 
 const querySchema = z.object({
   type: saleProductTypeSchema.optional(),
   saleId: z.string().min(1).optional(),
   updatedAfter: z
     .string()
-    .transform(value => {
+    .transform((value) => {
       const parsed = new Date(value)
       if (Number.isNaN(parsed.getTime())) {
         throw new Error('updatedAfter must be a valid ISO 8601 datetime string')
@@ -36,8 +27,7 @@ export async function GET(request: Request) {
   const updatedAfterParam = url.searchParams.get('updatedAfter')
   const clientIdParam = url.searchParams.get('clientId')
 
-  const normalize = (value: string | null) =>
-    value && value.trim().length > 0 ? value.trim() : undefined
+  const normalize = (value: string | null) => (value && value.trim().length > 0 ? value.trim() : undefined)
 
   const queryResult = querySchema.safeParse({
     type: normalize(typeParam),
@@ -47,7 +37,7 @@ export async function GET(request: Request) {
   })
 
   if (!queryResult.success) {
-    const detail = queryResult.error.issues.map(issue => issue.message).join('; ')
+    const detail = queryResult.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -94,7 +84,7 @@ export async function GET(request: Request) {
       clientId: filters.clientId,
     })
 
-    const saleProducts = rows.map(row => adaptSaleProductRow(row))
+    const saleProducts = rows.map((row) => adaptSaleProductRow(row))
 
     const parsedSaleProducts = saleProductListSchema.parse(saleProducts)
 
@@ -127,7 +117,7 @@ export async function GET(request: Request) {
 const createSaleProductSchema = z.object({
   saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }),
   productId: z.string().optional(),
-  price: z.union([z.string(), z.number()]).transform(value => value.toString()),
+  price: z.union([z.string(), z.number()]).transform((value) => value.toString()),
   currency: z.string().min(1),
   name: z.string().min(1),
   type: saleProductTypeSchema,
@@ -159,7 +149,7 @@ export async function POST(request: Request) {
 
   const parsed = createSaleProductSchema.safeParse(body)
   if (!parsed.success) {
-    const detail = parsed.error.issues.map(issue => issue.message).join('; ')
+    const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -172,8 +162,7 @@ export async function POST(request: Request) {
   }
 
   const auth = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while creating sale product',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while creating sale product',
   })
 
   if (!auth.ok) {
@@ -183,7 +172,7 @@ export async function POST(request: Request) {
   const data = parsed.data
 
   try {
-    const saleProductId = await db.transaction().execute(async trx => {
+    const saleProductId = await db.transaction().execute(async (trx) => {
       const sale = await trx
         .selectFrom('sale')
         .select(['id', 'client_id'])

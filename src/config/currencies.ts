@@ -184,5 +184,9 @@ export const currencies: ReadonlyArray<Currency> = [
   { id: 990, alphaCode: 'CLF', name: 'Unidad de Fomento' },
   { id: 994, alphaCode: 'XSU', name: 'Sucre' },
   { id: 997, alphaCode: 'USN', name: 'US Dollar (Next day)' },
-  { id: 999, alphaCode: 'XXX', name: 'The codes assigned for transactions where no currency is involved' },
+  {
+    id: 999,
+    alphaCode: 'XXX',
+    name: 'The codes assigned for transactions where no currency is involved',
+  },
 ]

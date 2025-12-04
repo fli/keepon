@@ -6,10 +6,7 @@ import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
 import type { NotificationList } from '@/server/notifications'
-import {
-  markAllNotificationsAsViewedAction,
-  markNotificationAsViewedAction,
-} from './actions'
+import { markAllNotificationsAsViewedAction, markNotificationAsViewedAction } from './actions'
 import { BellOff } from 'lucide-react'
 
 type Notification = NotificationList[number]
@@ -31,35 +28,27 @@ const buildTargetHref = (notification: Notification): Route | null => {
   return null
 }
 
-export default function NotificationsClient({
-  initialNotifications,
-  initialError = null,
-}: NotificationsClientProps) {
+export default function NotificationsClient({ initialNotifications, initialError = null }: NotificationsClientProps) {
   const router = useRouter()
   const [notifications, setNotifications] = useState<NotificationList>(initialNotifications)
   const [error, setError] = useState<string | null>(initialError)
   const [isPending, startTransition] = useTransition()
   const [isMarkingAll, setIsMarkingAll] = useState(false)
 
-  const hasNew = useMemo(
-    () => notifications.some(notification => !notification.viewed),
-    [notifications]
-  )
+  const hasNew = useMemo(() => notifications.some((notification) => !notification.viewed), [notifications])
 
   const handleSelect = useCallback(
     (notification: Notification) => {
       const previous = notifications
       const targetHref = buildTargetHref(notification)
 
-      setNotifications(current =>
-        current.map(item =>
-          item.id === notification.id ? { ...item, viewed: true } : item
-        )
+      setNotifications((current) =>
+        current.map((item) => (item.id === notification.id ? { ...item, viewed: true } : item))
       )
       setError(null)
 
       startTransition(() => {
-        markNotificationAsViewedAction(notification.id).catch(err => {
+        markNotificationAsViewedAction(notification.id).catch((err) => {
           console.error('Failed to mark notification as viewed', err)
           setNotifications(previous)
           setError('Unable to mark notification as read. Please try again.')
@@ -78,12 +67,12 @@ export default function NotificationsClient({
 
     const previous = notifications
     setIsMarkingAll(true)
-    setNotifications(current => current.map(item => ({ ...item, viewed: true })))
+    setNotifications((current) => current.map((item) => ({ ...item, viewed: true })))
     setError(null)
 
     startTransition(() => {
       markAllNotificationsAsViewedAction()
-        .catch(err => {
+        .catch((err) => {
           console.error('Failed to mark all notifications as viewed', err)
           setNotifications(previous)
           setError('Unable to mark all notifications as read. Please try again.')
@@ -96,12 +85,7 @@ export default function NotificationsClient({
     <section className="space-y-4">
       {hasNew ? (
         <div className="flex justify-end">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleMarkAll}
-            disabled={isMarkingAll || isPending}
-          >
+          <Button size="sm" variant="outline" onClick={handleMarkAll} disabled={isMarkingAll || isPending}>
             {isMarkingAll ? 'Marking...' : 'Mark all as read'}
           </Button>
         </div>
@@ -123,12 +107,12 @@ export default function NotificationsClient({
         </div>
       ) : (
         <ul className="divide-y divide-border overflow-hidden rounded-lg border bg-card/40">
-          {notifications.map(notification => (
+          {notifications.map((notification) => (
             <li
               key={notification.id}
               className="flex items-start justify-between gap-3 px-6 py-4 hover:bg-muted/40 cursor-pointer"
               onClick={() => handleSelect(notification)}
-              onKeyDown={event => {
+              onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault()
                   handleSelect(notification)
@@ -138,9 +122,7 @@ export default function NotificationsClient({
               tabIndex={0}
             >
               <div className="space-y-1">
-                <p className="text-sm text-foreground whitespace-pre-line">
-                  {notification.alert}
-                </p>
+                <p className="text-sm text-foreground whitespace-pre-line">{notification.alert}</p>
                 <p className="text-xs text-muted-foreground">
                   {notification.created
                     ? new Date(notification.created).toLocaleString(undefined, {

@@ -1,10 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  AppleSignInError,
-  verifyAppleIdentityToken,
-} from '../app/api/_lib/appleSignIn'
+import { AppleSignInError, verifyAppleIdentityToken } from '../app/api/_lib/appleSignIn'
 import { brandColors } from '@/config/referenceData'
 
 type BrandColorName = (typeof brandColors)[number]
@@ -34,22 +31,21 @@ const defaultTrialDurationMs = (() => {
   for (let i = 0; i < parts.length; i += 2) {
     const value = Number.parseInt(parts[i] ?? '0', 10)
     const unit = (parts[i + 1] ?? '').toLowerCase()
-    const multiplier =
-      unit.startsWith('second')
-        ? 1000
-        : unit.startsWith('minute')
-          ? 60 * 1000
-          : unit.startsWith('hour')
-            ? 60 * 60 * 1000
-            : unit.startsWith('day')
-              ? 24 * 60 * 60 * 1000
-              : unit.startsWith('week')
-                ? 7 * 24 * 60 * 60 * 1000
-                : unit.startsWith('month')
-                  ? 30 * 24 * 60 * 60 * 1000
-                  : unit.startsWith('year')
-                    ? 365 * 24 * 60 * 60 * 1000
-                    : 0
+    const multiplier = unit.startsWith('second')
+      ? 1000
+      : unit.startsWith('minute')
+        ? 60 * 1000
+        : unit.startsWith('hour')
+          ? 60 * 60 * 1000
+          : unit.startsWith('day')
+            ? 24 * 60 * 60 * 1000
+            : unit.startsWith('week')
+              ? 7 * 24 * 60 * 60 * 1000
+              : unit.startsWith('month')
+                ? 30 * 24 * 60 * 60 * 1000
+                : unit.startsWith('year')
+                  ? 365 * 24 * 60 * 60 * 1000
+                  : 0
 
     if (!Number.isFinite(value) || multiplier === 0) {
       return FALLBACK_TRIAL_DURATION
@@ -64,7 +60,7 @@ const defaultTrialDurationMs = (() => {
 const nullableTrimmedString = z
   .string()
   .trim()
-  .transform(value => (value.length === 0 ? null : value))
+  .transform((value) => (value.length === 0 ? null : value))
   .nullable()
   .optional()
 
@@ -77,7 +73,7 @@ const baseSchema = z.object({
     .string()
     .trim()
     .length(2, 'Country must be a 2-letter ISO code')
-    .transform(value => value.toUpperCase()),
+    .transform((value) => value.toUpperCase()),
   timezone: z.string().trim().min(1, 'Timezone is required'),
   locale: z.string().trim().min(1, 'Locale is required'),
   businessName: nullableTrimmedString,
@@ -93,10 +89,7 @@ const passwordSignupSchema = baseSchema.extend({
 })
 
 const appleSignupSchema = baseSchema.extend({
-  signInWithAppleIdentityToken: z
-    .string()
-    .trim()
-    .min(1, 'Sign in with Apple identity token is required'),
+  signInWithAppleIdentityToken: z.string().trim().min(1, 'Sign in with Apple identity token is required'),
   signInWithAppleNonce: z.string().trim().min(1).optional(),
 })
 
@@ -104,8 +97,7 @@ export const trainerSignupSchema = z.union([passwordSignupSchema, appleSignupSch
 
 export type TrainerSignupInput = z.infer<typeof trainerSignupSchema>
 
-const APPLE_AUDIENCE =
-  process.env.APPLE_CLIENT_ID ?? process.env.IOS_BUNDLE_ID ?? null
+const APPLE_AUDIENCE = process.env.APPLE_CLIENT_ID ?? process.env.IOS_BUNDLE_ID ?? null
 
 export async function createTrainerAccount(input: TrainerSignupInput) {
   const parsed = trainerSignupSchema.parse(input)
@@ -123,13 +115,10 @@ export async function createTrainerAccount(input: TrainerSignupInput) {
     }
 
     try {
-      const identity = await verifyAppleIdentityToken(
-        parsed.signInWithAppleIdentityToken,
-        {
-          expectedAudience: APPLE_AUDIENCE,
-          expectedNonce: parsed.signInWithAppleNonce,
-        }
-      )
+      const identity = await verifyAppleIdentityToken(parsed.signInWithAppleIdentityToken, {
+        expectedAudience: APPLE_AUDIENCE,
+        expectedNonce: parsed.signInWithAppleNonce,
+      })
       email = identity.email
       appleUserId = identity.userId
     } catch (error) {
@@ -148,7 +137,7 @@ export async function createTrainerAccount(input: TrainerSignupInput) {
 
   const brandColor: BrandColorName = parsed.brandColor ?? DEFAULT_BRAND_COLOR
 
-  const result = await db.transaction().execute(async trx => {
+  const result = await db.transaction().execute(async (trx) => {
     const countryRow = await trx
       .selectFrom('country')
       .select(['id', 'alpha_2_code'])
@@ -169,11 +158,7 @@ export async function createTrainerAccount(input: TrainerSignupInput) {
       throw new Error('unsupportedCountry')
     }
 
-    const emailExists = await trx
-      .selectFrom('trainer')
-      .select('id')
-      .where('email', '=', email)
-      .executeTakeFirst()
+    const emailExists = await trx.selectFrom('trainer').select('id').where('email', '=', email).executeTakeFirst()
 
     if (emailExists) {
       throw new Error('emailTaken')
@@ -191,19 +176,14 @@ export async function createTrainerAccount(input: TrainerSignupInput) {
       }
     }
 
-    const userRow = await trx
-      .insertInto('user_')
-      .values({ type: 'trainer' })
-      .returning('id')
-      .executeTakeFirst()
+    const userRow = await trx.insertInto('user_').values({ type: 'trainer' }).returning('id').executeTakeFirst()
 
     if (!userRow) {
       throw new Error('userCreateFailed')
     }
 
     const userId = userRow.id
-    const passwordToHash =
-      'password' in parsed ? parsed.password : randomUUID()
+    const passwordToHash = 'password' in parsed ? parsed.password : randomUUID()
 
     const trainerInsert = await sql<{
       id: string

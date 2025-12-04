@@ -68,10 +68,7 @@ export async function getTrainerAccount(trainerId: string): Promise<AccountDetai
   return accountDetailsSchema.parse(row)
 }
 
-export async function updateTrainerAccount(
-  trainerId: string,
-  payload: UpdateAccountPayload
-): Promise<AccountDetails> {
+export async function updateTrainerAccount(trainerId: string, payload: UpdateAccountPayload): Promise<AccountDetails> {
   const parsed = updateAccountSchema.parse(payload)
 
   const emailTaken = await db
@@ -113,10 +110,7 @@ export async function updateTrainerAccount(
   return accountDetailsSchema.parse(updated)
 }
 
-export async function changeTrainerPassword(
-  trainerId: string,
-  payload: ChangePasswordPayload
-): Promise<void> {
+export async function changeTrainerPassword(trainerId: string, payload: ChangePasswordPayload): Promise<void> {
   const { currentPassword, newPassword } = changePasswordSchema.parse(payload)
 
   const result = await sql<{ changed: boolean }>`

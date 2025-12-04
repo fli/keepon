@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { financeItemNoteSchema } from '../../shared'
 
 const paramsSchema = z.object({
@@ -32,17 +29,13 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid finance item identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected finance item identifier schema.',
+        detail: detail || 'Request parameters did not match the expected finance item identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -57,9 +50,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     const rawBody = (await request.json()) as unknown
     const bodyResult = requestBodySchema.safeParse(rawBody)
     if (!bodyResult.success) {
-      const detail = bodyResult.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
@@ -90,8 +81,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating finance item note',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating finance item note',
   })
 
   if (!authorization.ok) {
@@ -130,8 +120,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Finance item not found',
-          detail:
-            'We could not find a finance item with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a finance item with the specified identifier for the authenticated trainer.',
           type: '/finance-item-not-found',
         }),
         { status: 404 }
@@ -143,8 +132,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to validate finance item note response',
-          detail:
-            'Finance item note response did not match the expected schema.',
+          detail: 'Finance item note response did not match the expected schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

@@ -17,9 +17,7 @@ export async function loadNotificationsAction(): Promise<NotificationList> {
   return listTrainerNotifications(session.trainerId, session.userId)
 }
 
-export async function markNotificationAsViewedAction(
-  notificationId: string
-): Promise<void> {
+export async function markNotificationAsViewedAction(notificationId: string): Promise<void> {
   const session = await readSessionFromCookies()
   if (!session) {
     throw new Error('Please sign in to update notifications')

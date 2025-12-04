@@ -62,12 +62,7 @@ const dashboardRowSchema = z.object({
 })
 
 const money = (value: unknown) => {
-  const numeric =
-    typeof value === 'number'
-      ? value
-      : typeof value === 'string'
-        ? Number.parseFloat(value)
-        : Number.NaN
+  const numeric = typeof value === 'number' ? value : typeof value === 'string' ? Number.parseFloat(value) : Number.NaN
   return Number.isFinite(numeric) ? numeric : 0
 }
 
@@ -116,45 +111,32 @@ export type DashboardSummary = {
   }
 }
 
-export async function getDashboardSummary(
-  trainerId: string,
-  userId: string
-): Promise<DashboardSummary> {
+export async function getDashboardSummary(trainerId: string, userId: string): Promise<DashboardSummary> {
   const revenueCte = db
     .selectFrom('payment as p')
-    .select([
-      sql`p.amount::numeric`.as('amount'),
-      sql`p.created_at`.as('ts'),
-    ])
+    .select([sql`p.amount::numeric`.as('amount'), sql`p.created_at`.as('ts')])
     .where('p.trainer_id', '=', trainerId)
     .where('p.refunded_time', 'is', null)
     .where(({ eb, ref }) =>
-      eb
-        .or([
-          eb(ref('p.is_manual'), '=', true),
-          eb(ref('p.is_stripe'), '=', true),
-          eb(ref('p.is_credit_pack'), '=', true),
-          eb(ref('p.is_subscription'), '=', true),
-        ])
+      eb.or([
+        eb(ref('p.is_manual'), '=', true),
+        eb(ref('p.is_stripe'), '=', true),
+        eb(ref('p.is_credit_pack'), '=', true),
+        eb(ref('p.is_subscription'), '=', true),
+      ])
     )
     .unionAll(
       db
         .selectFrom('payment_plan_payment as ppp')
         .innerJoin('payment_plan as pp', 'pp.id', 'ppp.payment_plan_id')
-        .select([
-          sql`ppp.amount::numeric`.as('amount'),
-          sql`ppp.date`.as('ts'),
-        ])
+        .select([sql`ppp.amount::numeric`.as('amount'), sql`ppp.date`.as('ts')])
         .where('pp.trainer_id', '=', trainerId)
         .where('ppp.status', '=', 'paid')
     )
     .unionAll(
       db
         .selectFrom('finance_item as fi')
-        .select([
-          sql`fi.amount::numeric`.as('amount'),
-          sql`fi.start_date`.as('ts'),
-        ])
+        .select([sql`fi.amount::numeric`.as('amount'), sql`fi.start_date`.as('ts')])
         .where('fi.trainer_id', '=', trainerId)
         .where('fi.amount', '>', '0')
     )
@@ -163,16 +145,9 @@ export async function getDashboardSummary(
     .selectFrom('payment_plan_payment as ppp')
     .innerJoin('payment_plan as pp', 'pp.id', 'ppp.payment_plan_id')
     .where('pp.trainer_id', '=', trainerId)
-    .where('ppp.status', 'not in', [
-      'paid',
-      'cancelled',
-      'refunded',
-      'paused',
-    ])
+    .where('ppp.status', 'not in', ['paid', 'cancelled', 'refunded', 'paused'])
     .select(() => [
-      sql`COALESCE(SUM(CASE WHEN ppp.date < NOW() THEN 1 ELSE 0 END), 0)::numeric`.as(
-        'overdueCount'
-      ),
+      sql`COALESCE(SUM(CASE WHEN ppp.date < NOW() THEN 1 ELSE 0 END), 0)::numeric`.as('overdueCount'),
       sql`COALESCE(SUM(CASE WHEN ppp.date < NOW() THEN ppp.amount_outstanding ELSE 0 END), 0)::numeric`.as(
         'overdueTotal'
       ),
@@ -186,10 +161,7 @@ export async function getDashboardSummary(
 
   const creditUsageCte = db
     .selectFrom('payment_credit_pack as pcp')
-    .select([
-      'pcp.sale_credit_pack_id',
-      sql`COALESCE(SUM(pcp.credits_used), 0)::int`.as('credits_used'),
-    ])
+    .select(['pcp.sale_credit_pack_id', sql`COALESCE(SUM(pcp.credits_used), 0)::int`.as('credits_used')])
     .groupBy('pcp.sale_credit_pack_id')
 
   const row = await db
@@ -227,7 +199,7 @@ export async function getDashboardSummary(
           .innerJoin('mission_type', 'mission_type.id', 'mission.id')
           .leftJoin('reward', 'reward.id', 'mission.reward_id')
           .where('mission.trainer_id', '=', trainerId)
-          .select(sub => [
+          .select((sub) => [
             sql`mission.id::text`.as('id'),
             sql`mission.display_order`.as('displayOrder'),
             sql`mission.reward_id::text`.as('rewardId'),
@@ -255,10 +227,7 @@ export async function getDashboardSummary(
           )
         )
         .as('paymentsPaidToday'),
-      eb
-        .selectFrom('pending')
-        .select('overdueCount')
-        .as('pendingOverdueCount'),
+      eb.selectFrom('pending').select('overdueCount').as('pendingOverdueCount'),
       eb.selectFrom('pending').select('overdueTotal').as('pendingOverdueTotal'),
       eb.selectFrom('pending').select('pending7Total').as('pending7Total'),
       eb.selectFrom('pending').select('pendingTodayTotal').as('pendingTodayTotal'),
@@ -310,11 +279,11 @@ export async function getDashboardSummary(
       ).as('nextSession'),
       eb
         .selectFrom('session')
-          .select(({ fn }) => fn.countAll().as('count'))
-          .where('trainer_id', '=', trainerId)
-          .where('bookable_online', '=', true)
-          .where('start', '>', sql<Date>`NOW()`)
-          .as('onlineBookableCount'),
+        .select(({ fn }) => fn.countAll().as('count'))
+        .where('trainer_id', '=', trainerId)
+        .where('bookable_online', '=', true)
+        .where('start', '>', sql<Date>`NOW()`)
+        .as('onlineBookableCount'),
       eb
         .selectFrom('product as p')
         .select(({ fn }) => fn.countAll().as('count'))
@@ -338,12 +307,7 @@ export async function getDashboardSummary(
   const now = new Date()
   const trialDaysRemaining =
     trialEndsAt && trialEndsAt > now
-      ? Math.max(
-          0,
-          Math.ceil(
-            (trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-          )
-        )
+      ? Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
       : 0
 
   const currency = parsed.trainerDefaultCurrency ?? 'USD'
@@ -355,25 +319,26 @@ export async function getDashboardSummary(
 
   if (parsed.balanceObject) {
     balanceAvailable = parsed.balanceObject.available
-      .filter(entry => (currency ? entry.currency === currency : true))
+      .filter((entry) => (currency ? entry.currency === currency : true))
       .reduce((total, entry) => total + centsToMajorUnits(entry.amount), 0)
 
     balancePending = parsed.balanceObject.pending
-      .filter(entry => (currency ? entry.currency === currency : true))
+      .filter((entry) => (currency ? entry.currency === currency : true))
       .reduce((total, entry) => total + centsToMajorUnits(entry.amount), 0)
   }
 
-  const nextSession = parsed.nextSession && parsed.nextSession.id
-    ? {
-        id: parsed.nextSession.id,
-        title: parsed.nextSession.title ?? 'Appointment',
-        startTime: (toDate(parsed.nextSession.startTime) ?? new Date()).toISOString(),
-        durationMinutes: parsed.nextSession.durationMinutes ?? 0,
-        location: parsed.nextSession.location,
-        address: parsed.nextSession.address,
-        timezone: parsed.nextSession.timezone,
-      }
-    : null
+  const nextSession =
+    parsed.nextSession && parsed.nextSession.id
+      ? {
+          id: parsed.nextSession.id,
+          title: parsed.nextSession.title ?? 'Appointment',
+          startTime: (toDate(parsed.nextSession.startTime) ?? new Date()).toISOString(),
+          durationMinutes: parsed.nextSession.durationMinutes ?? 0,
+          location: parsed.nextSession.location,
+          address: parsed.nextSession.address,
+          timezone: parsed.nextSession.timezone,
+        }
+      : null
 
   const paid7 = money(parsed.paymentsPaid7)
   const paidToday = money(parsed.paymentsPaidToday)
@@ -381,18 +346,14 @@ export async function getDashboardSummary(
   const pendingTodayTotal = money(parsed.pendingTodayTotal)
   const overdueCount = Number(parsed.pendingOverdueCount ?? 0)
   const overdueTotal = money(parsed.pendingOverdueTotal)
-  const hasUnreadNotifications =
-    Number(parsed.unreadNotifications ?? 0) > 0
+  const hasUnreadNotifications = Number(parsed.unreadNotifications ?? 0) > 0
   const paymentsSetupRequired = Boolean(parsed.stripePaymentsBlocked ?? false)
   const serviceCount = Number(parsed.serviceCount ?? 0)
 
   return {
     trainer: {
       firstName: parsed.trainerFirstName ?? null,
-      smsCredits:
-        parsed.trainerSmsCredits === null
-          ? null
-      : money(parsed.trainerSmsCredits),
+      smsCredits: parsed.trainerSmsCredits === null ? null : money(parsed.trainerSmsCredits),
       trialEndsAt: trialEndsAt ? trialEndsAt.toISOString() : null,
       trialDaysRemaining: trialDaysRemaining || null,
       defaultCurrency: currency,

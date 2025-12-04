@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 
 const isValidTimeZone = (value: string) => {
   try {
@@ -18,7 +15,7 @@ const isValidTimeZone = (value: string) => {
 
 const formatZodIssues = (issues: z.ZodIssue[]) =>
   issues
-    .map(issue => {
+    .map((issue) => {
       const path = issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''
       return `${path}${issue.message}`
     })
@@ -136,8 +133,7 @@ export async function GET(request: Request) {
       buildErrorResponse({
         status: 400,
         title: 'Invalid query parameters',
-        detail:
-          detail || 'Query parameters did not match the expected schema.',
+        detail: detail || 'Query parameters did not match the expected schema.',
         type: '/invalid-query-parameters',
       }),
       { status: 400 }
@@ -147,8 +143,7 @@ export async function GET(request: Request) {
   const { unit, startTime, timezone, endTime } = queryResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching revenue chart data',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching revenue chart data',
   })
 
   if (!authorization.ok) {
@@ -158,19 +153,9 @@ export async function GET(request: Request) {
   try {
     const currencyRow = await db
       .selectFrom('trainer')
-      .innerJoin(
-        'supported_country_currency',
-        'supported_country_currency.country_id',
-        'trainer.country_id'
-      )
-      .innerJoin(
-        'currency',
-        'currency.id',
-        'supported_country_currency.currency_id'
-      )
-      .select(({ ref }) => [
-        ref('currency.alpha_code').as('currency'),
-      ])
+      .innerJoin('supported_country_currency', 'supported_country_currency.country_id', 'trainer.country_id')
+      .innerJoin('currency', 'currency.id', 'supported_country_currency.currency_id')
+      .select(({ ref }) => [ref('currency.alpha_code').as('currency')])
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()
 
@@ -191,8 +176,7 @@ export async function GET(request: Request) {
     }
 
     const intervalLiteral = `1 ${unit}`
-    const buildEndTimeExpression = () =>
-      endTime ? sql`${endTime}::timestamptz` : sql`NOW()`
+    const buildEndTimeExpression = () => (endTime ? sql`${endTime}::timestamptz` : sql`NOW()`)
 
     const revenueResult = await sql<RawRevenueRow>`
       WITH periods AS (
@@ -265,7 +249,7 @@ export async function GET(request: Request) {
       ORDER BY "startTime"
     `.execute(db)
 
-    const data = revenueResult.rows.map(row => ({
+    const data = revenueResult.rows.map((row) => ({
       startTime: ensureIsoString(row.startTime, 'startTime'),
       endTime: ensureIsoString(row.endTime, 'endTime'),
       value: parseNumeric(row.value ?? 0, 'value'),

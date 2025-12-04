@@ -29,10 +29,7 @@ export default async function NotificationsPage() {
         <h1 className="text-3xl font-semibold leading-tight">Notifications</h1>
       </div>
 
-      <NotificationsClient
-        initialNotifications={notifications}
-        initialError={error}
-      />
+      <NotificationsClient initialNotifications={notifications} initialError={error} />
     </PageContainer>
   )
 }

@@ -10,17 +10,11 @@ import { updateRemindersAction } from '../../../actions'
 
 type TargetParam = 'service-provider' | 'client'
 
-const targetParamToKey = (param: TargetParam) =>
-  param === 'service-provider' ? 'serviceProvider' : 'client'
+const targetParamToKey = (param: TargetParam) => (param === 'service-provider' ? 'serviceProvider' : 'client')
 
-const slotParamToNumber = (param: string | undefined): 1 | 2 | null =>
-  param === '1' ? 1 : param === '2' ? 2 : null
+const slotParamToNumber = (param: string | undefined): 1 | 2 | null => (param === '1' ? 1 : param === '2' ? 2 : null)
 
-export default function AddReminderPage({
-  params,
-}: {
-  params: Promise<{ target: TargetParam; slot: string }>
-}) {
+export default function AddReminderPage({ params }: { params: Promise<{ target: TargetParam; slot: string }> }) {
   return (
     <Suspense
       fallback={
@@ -36,11 +30,7 @@ export default function AddReminderPage({
   )
 }
 
-async function AddReminderContent({
-  params,
-}: {
-  params: Promise<{ target: TargetParam; slot: string }>
-}) {
+async function AddReminderContent({ params }: { params: Promise<{ target: TargetParam; slot: string }> }) {
   const resolvedParams = await params
 
   const session = await readSessionFromCookies()
@@ -57,10 +47,7 @@ async function AddReminderContent({
   try {
     settings = await getReminderSettings(session.trainerId)
   } catch (cause) {
-    error =
-      cause instanceof Error
-        ? cause.message
-        : 'Unable to load reminder settings right now.'
+    error = cause instanceof Error ? cause.message : 'Unable to load reminder settings right now.'
   }
 
   if (error) {
@@ -75,13 +62,12 @@ async function AddReminderContent({
     redirect('/settings/reminders')
   }
 
-  const slots = targetKey === 'serviceProvider'
-    ? [settings.serviceProviderReminder1, settings.serviceProviderReminder2]
-    : [settings.clientReminder1, settings.clientReminder2]
+  const slots =
+    targetKey === 'serviceProvider'
+      ? [settings.serviceProviderReminder1, settings.serviceProviderReminder2]
+      : [settings.clientReminder1, settings.clientReminder2]
 
-  const slot =
-    slotParam ??
-    (slots[0] === null ? 1 : slots[1] === null ? 2 : null)
+  const slot = slotParam ?? (slots[0] === null ? 1 : slots[1] === null ? 2 : null)
 
   if (!slot) {
     // No available slot to add.

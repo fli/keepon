@@ -59,15 +59,12 @@ const sellSchema = z.object({
   packName: z.string().trim().min(1).optional(),
   packPrice: z
     .string()
-    .regex(
-      /^-?\d+(?:\.\d{2})$/,
-      'Money values must be formatted with two decimal places'
-    )
+    .regex(/^-?\d+(?:\.\d{2})$/, 'Money values must be formatted with two decimal places')
     .optional(),
   packCredits: z
     .union([z.string(), z.number()])
-    .transform(value => Number.parseInt(value as string, 10))
-    .refine(value => Number.isInteger(value) && value > 0, 'Credits must be a positive integer')
+    .transform((value) => Number.parseInt(value as string, 10))
+    .refine((value) => Number.isInteger(value) && value > 0, 'Credits must be a positive integer')
     .optional(),
 })
 
@@ -84,9 +81,7 @@ const buildDurationFromDate = (rawDate?: string | null) => {
 
 const findCreditPack = (packs: CreditPack[], id: string) => packs.find((pack) => pack.id === id)
 
-export type SellResult =
-  | { status: 'paid'; saleId: string }
-  | { status: 'requested'; saleId: string }
+export type SellResult = { status: 'paid'; saleId: string } | { status: 'requested'; saleId: string }
 
 export async function completeCreditPackSale(input: unknown): Promise<SellResult> {
   const session = await readSessionFromCookies()
@@ -131,8 +126,7 @@ export async function completeCreditPackSale(input: unknown): Promise<SellResult
     }
 
     const method = parsed.recordMethod === 'cash' ? 'cash' : 'electronic'
-    const specificMethodName =
-      parsed.recordMethod === 'eft' ? parsed.eftType || 'EFT' : 'Cash'
+    const specificMethodName = parsed.recordMethod === 'eft' ? parsed.eftType || 'EFT' : 'Cash'
 
     await createManualSalePaymentForTrainer(trainerId, {
       saleId: sale.id,

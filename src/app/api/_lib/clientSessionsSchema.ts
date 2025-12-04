@@ -1,71 +1,52 @@
 import { z } from 'zod'
 
-export const clientSessionStateSchema = z.enum([
-  'maybe',
-  'cancelled',
-  'invited',
-  'confirmed',
-  'accepted',
-  'declined',
-])
+export const clientSessionStateSchema = z.enum(['maybe', 'cancelled', 'invited', 'confirmed', 'accepted', 'declined'])
 
 export const paymentTypeSchema = z.enum(['payg', 'plan', 'sessionPack'])
-export const paymentStatusSchema = z.enum([
-  'pending',
-  'paid',
-  'requested',
-  'refunded',
-  'rejected',
-])
+export const paymentStatusSchema = z.enum(['pending', 'paid', 'requested', 'refunded', 'rejected'])
 export const paymentMethodSchema = z.enum(['cash', 'card', 'instapay']).nullable()
 
 const stateSet = new Set(clientSessionStateSchema.options)
 
-export const isoDateTimeString = z
-  .union([z.string(), z.date()])
-  .transform(value => {
-    const date = value instanceof Date ? value : new Date(value)
-    if (Number.isNaN(date.getTime())) {
-      throw new Error('Invalid date-time value')
-    }
-    return date.toISOString()
-  })
+export const isoDateTimeString = z.union([z.string(), z.date()]).transform((value) => {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('Invalid date-time value')
+  }
+  return date.toISOString()
+})
 
-export const isoDateTimeStringOrNull = z
-  .union([z.string(), z.date(), z.null()])
-  .transform(value => {
-    if (value === null) {
-      return null
-    }
-    const date = value instanceof Date ? value : new Date(value)
-    if (Number.isNaN(date.getTime())) {
-      throw new Error('Invalid date-time value')
-    }
-    return date.toISOString()
-  })
+export const isoDateTimeStringOrNull = z.union([z.string(), z.date(), z.null()]).transform((value) => {
+  if (value === null) {
+    return null
+  }
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('Invalid date-time value')
+  }
+  return date.toISOString()
+})
 
-export const nullableNumber = z
-  .union([z.number(), z.string(), z.null()])
-  .transform(value => {
-    if (value === null || value === undefined) {
-      return null
-    }
-    if (typeof value === 'number') {
-      if (!Number.isFinite(value)) {
-        throw new Error('Invalid numeric value')
-      }
-      return value
-    }
-    const trimmed = value.trim()
-    if (trimmed.length === 0) {
-      return null
-    }
-    const parsed = Number(trimmed)
-    if (!Number.isFinite(parsed)) {
+export const nullableNumber = z.union([z.number(), z.string(), z.null()]).transform((value) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
       throw new Error('Invalid numeric value')
     }
-    return parsed
-  })
+    return value
+  }
+  const trimmed = value.trim()
+  if (trimmed.length === 0) {
+    return null
+  }
+  const parsed = Number(trimmed)
+  if (!Number.isFinite(parsed)) {
+    throw new Error('Invalid numeric value')
+  }
+  return parsed
+})
 
 export const noteSchema = z
   .object({
@@ -85,22 +66,20 @@ export const paymentSchema = z.object({
   id: z.string(),
   paymentType: paymentTypeSchema,
   contributionAmount: nullableNumber,
-  paidAmount: z
-    .union([z.number(), z.string()])
-    .transform(value => {
-      if (typeof value === 'number') {
-        if (!Number.isFinite(value)) {
-          throw new Error('Invalid paid amount value')
-        }
-        return value
-      }
-      const trimmed = value.trim()
-      const parsed = Number(trimmed)
-      if (!Number.isFinite(parsed)) {
+  paidAmount: z.union([z.number(), z.string()]).transform((value) => {
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) {
         throw new Error('Invalid paid amount value')
       }
-      return parsed
-    }),
+      return value
+    }
+    const trimmed = value.trim()
+    const parsed = Number(trimmed)
+    if (!Number.isFinite(parsed)) {
+      throw new Error('Invalid paid amount value')
+    }
+    return parsed
+  }),
   paymentMethod: paymentMethodSchema,
   paidDate: isoDateTimeStringOrNull,
   status: paymentStatusSchema,
@@ -136,9 +115,7 @@ export const clientSessionSchema = z.object({
 
 export const clientSessionListSchema = z.array(clientSessionSchema)
 
-export const normalizeClientSessionState = (
-  value: unknown
-): z.infer<typeof clientSessionStateSchema> => {
+export const normalizeClientSessionState = (value: unknown): z.infer<typeof clientSessionStateSchema> => {
   if (typeof value !== 'string') {
     throw new Error('Client session state is missing or invalid')
   }
@@ -213,10 +190,7 @@ export type RawClientSessionRow = {
   confirmTime: string | Date | null | undefined
 }
 
-const ensureStringIdentifier = (
-  value: string | null | undefined,
-  label: string
-) => {
+const ensureStringIdentifier = (value: string | null | undefined, label: string) => {
   if (typeof value === 'string' && value.trim().length > 0) {
     return value
   }

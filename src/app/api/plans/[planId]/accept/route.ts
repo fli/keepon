@@ -2,18 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { z } from 'zod'
 import { db, sql } from '@/lib/db'
-import {
-  authenticateClientRequest,
-  buildErrorResponse,
-} from '../../../_lib/accessToken'
+import { authenticateClientRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { normalizePlanRow, type RawPlanRow } from '../../shared'
 
 const paramsSchema = z.object({
-  planId: z
-    .string()
-    .trim()
-    .min(1, 'planId must not be empty')
-    .uuid({ message: 'planId must be a valid UUID' }),
+  planId: z.string().trim().min(1, 'planId must not be empty').uuid({ message: 'planId must be a valid UUID' }),
 })
 
 type HandlerContext = { params: Promise<Record<string, string>> }
@@ -68,28 +61,23 @@ const extractClientIp = async () => {
 
 const joinName = (...parts: Array<string | null | undefined>) =>
   parts
-    .map(part => part?.trim())
+    .map((part) => part?.trim())
     .filter((part): part is string => Boolean(part && part.length > 0))
     .join(' ')
 
-const isCancelled = (status: string | null) =>
-  status?.trim().toLowerCase() === 'cancelled'
+const isCancelled = (status: string | null) => status?.trim().toLowerCase() === 'cancelled'
 
 export async function PUT(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Request path parameters did not match the expected schema.',
+        detail: detail || 'Request path parameters did not match the expected schema.',
         type: '/invalid-path',
       }),
       { status: 400 }
@@ -97,8 +85,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateClientRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while accepting subscription',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while accepting subscription',
   })
 
   if (!authorization.ok) {
@@ -108,7 +95,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const { planId } = paramsResult.data
 
   try {
-    const plan = await db.transaction().execute(async trx => {
+    const plan = await db.transaction().execute(async (trx) => {
       const details = (await trx
         .selectFrom('payment_plan as plan')
         .innerJoin('client', 'client.id', 'plan.client_id')
@@ -311,8 +298,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 409,
           title: 'No payment method on file',
-          detail:
-            'A saved payment method is required before accepting this subscription.',
+          detail: 'A saved payment method is required before accepting this subscription.',
           type: '/no-payment-method-on-file',
         }),
         { status: 409 }
@@ -324,23 +310,19 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse subscription data from database',
-          detail:
-            'Subscription data did not match the expected response schema.',
+          detail: 'Subscription data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
       )
     }
 
-    console.error(
-      'Failed to accept subscription',
-      {
-        planId,
-        clientId: authorization.clientId,
-        trainerId: authorization.trainerId,
-        error,
-      }
-    )
+    console.error('Failed to accept subscription', {
+      planId,
+      clientId: authorization.clientId,
+      trainerId: authorization.trainerId,
+      error,
+    })
 
     return NextResponse.json(
       buildErrorResponse({

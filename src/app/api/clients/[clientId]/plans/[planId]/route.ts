@@ -2,37 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import BigNumber from 'bignumber.js'
 import { z } from 'zod'
 import { db, sql } from '@/lib/db'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../../_lib/constants'
 import { currencyChargeLimits } from '../../../../_lib/transactionFees'
-import {
-  normalizePlanRow,
-  type RawPlanRow,
-} from '../../../../plans/shared'
+import { normalizePlanRow, type RawPlanRow } from '../../../../plans/shared'
 
 const MAX_TIME = new Date(8640000000000000)
 
 const paramsSchema = z.object({
-  clientId: z
-    .string()
-    .trim()
-    .min(1, 'Client id is required')
-    .uuid({ message: 'Client id must be a valid UUID.' }),
-  planId: z
-    .string()
-    .trim()
-    .min(1, 'Plan id is required')
-    .uuid({ message: 'Plan id must be a valid UUID.' }),
+  clientId: z.string().trim().min(1, 'Client id is required').uuid({ message: 'Client id must be a valid UUID.' }),
+  planId: z.string().trim().min(1, 'Plan id is required').uuid({ message: 'Plan id must be a valid UUID.' }),
 })
 
 const requestBodySchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
-  amount: z
-    .number()
-    .positive('Amount must be greater than zero'),
+  amount: z.number().positive('Amount must be greater than zero'),
   endDate: z
     .string()
     .datetime({
@@ -131,8 +115,7 @@ const tailwind600: Record<string, string> = {
   yellow: '#ca8a04',
 }
 
-const resolveBrandColor = (value?: string | null) =>
-  (value && tailwind600[value]) ?? tailwind600.blue
+const resolveBrandColor = (value?: string | null) => (value && tailwind600[value]) ?? tailwind600.blue
 
 const escapeHtml = (value: string) =>
   value
@@ -151,8 +134,7 @@ const buildPlanUpdateEmail = (options: {
   messages: string[]
   requiresClientAcceptance: boolean
 }) => {
-  const provider =
-    options.serviceProviderName.trim() || `${APP_NAME} Team`
+  const provider = options.serviceProviderName.trim() || `${APP_NAME} Team`
   const buttonColor = resolveBrandColor(options.brandColor)
   const logo = options.businessLogoUrl
     ? `<img src="${options.businessLogoUrl}" alt="${escapeHtml(
@@ -160,14 +142,10 @@ const buildPlanUpdateEmail = (options: {
       )}" style="max-width:160px;height:auto;border-radius:12px;" />`
     : ''
 
-  const changeList = options.messages
-    .map(message => `<li>${escapeHtml(message)}</li>`)
-    .join('')
+  const changeList = options.messages.map((message) => `<li>${escapeHtml(message)}</li>`).join('')
 
   const bodyCopy = options.requiresClientAcceptance
-    ? `${escapeHtml(
-        provider
-      )} has updated your subscription. Please review and accept the updated terms.`
+    ? `${escapeHtml(provider)} has updated your subscription. Please review and accept the updated terms.`
     : `${escapeHtml(
         provider
       )} has updated your subscription. No action is required, but you can review the changes anytime.`
@@ -255,17 +233,13 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Request parameters did not match the expected schema.',
+        detail: detail || 'Request parameters did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -279,9 +253,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     const validation = requestBodySchema.safeParse(rawBody)
 
     if (!validation.success) {
-      const detail = validation.error.issues
-        .map(issue => issue.message)
-        .join('; ')
+      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
       return NextResponse.json(
         buildErrorResponse({
@@ -309,8 +281,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating subscription',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating subscription',
   })
 
   if (!authorization.ok) {
@@ -320,24 +291,18 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const { clientId, planId } = paramsResult.data
 
   try {
-    const plan = await db.transaction().execute(async trx => {
+    const plan = await db.transaction().execute(async (trx) => {
       const planRow = await trx
         .selectFrom('payment_plan as plan')
         .innerJoin('client', 'client.id', 'plan.client_id')
         .innerJoin('trainer', 'trainer.id', 'plan.trainer_id')
         .innerJoin('country', 'country.id', 'trainer.country_id')
-        .innerJoin(
-          'supported_country_currency as scc',
-          'scc.country_id',
-          'trainer.country_id'
-        )
+        .innerJoin('supported_country_currency as scc', 'scc.country_id', 'trainer.country_id')
         .innerJoin('currency', 'currency.id', 'scc.currency_id')
         .select(({ ref }) => [
           ref('plan.name').as('name'),
           ref('plan.status').as('status'),
-          ref('plan.frequency_weekly_interval').as(
-            'frequencyWeeklyInterval'
-          ),
+          ref('plan.frequency_weekly_interval').as('frequencyWeeklyInterval'),
           ref('plan.start').as('start'),
           ref('plan.end_').as('end'),
           ref('plan.amount').as('amount'),
@@ -382,8 +347,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       }
 
       const currency = details.currency.toUpperCase()
-      const limits =
-        currencyChargeLimits[currency as keyof typeof currencyChargeLimits]
+      const limits = currencyChargeLimits[currency as keyof typeof currencyChargeLimits]
 
       if (!limits) {
         throw new UnsupportedCurrencyError()
@@ -391,30 +355,17 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
       const updatedAmount = new BigNumber(parsedBody.amount).decimalPlaces(2)
       if (!updatedAmount.isFinite() || updatedAmount.lte(0)) {
-        throw new InvalidAmountError(
-          'Amount must be a positive numeric value.'
-        )
+        throw new InvalidAmountError('Amount must be a positive numeric value.')
       }
 
-      const unitAmount = updatedAmount.shiftedBy(
-        limits.smallestUnitDecimals
-      )
+      const unitAmount = updatedAmount.shiftedBy(limits.smallestUnitDecimals)
       if (!unitAmount.isInteger()) {
-        throw new InvalidAmountError(
-          'Amount must be representable in the smallest currency unit.'
-        )
+        throw new InvalidAmountError('Amount must be representable in the smallest currency unit.')
       }
 
-      if (
-        unitAmount.lt(limits.minimumInSmallestUnit) ||
-        unitAmount.gt(limits.maximumInSmallestUnit)
-      ) {
-        const minDisplay = new BigNumber(
-          limits.minimumInSmallestUnit
-        ).shiftedBy(-limits.smallestUnitDecimals)
-        const maxDisplay = new BigNumber(
-          limits.maximumInSmallestUnit
-        ).shiftedBy(-limits.smallestUnitDecimals)
+      if (unitAmount.lt(limits.minimumInSmallestUnit) || unitAmount.gt(limits.maximumInSmallestUnit)) {
+        const minDisplay = new BigNumber(limits.minimumInSmallestUnit).shiftedBy(-limits.smallestUnitDecimals)
+        const maxDisplay = new BigNumber(limits.maximumInSmallestUnit).shiftedBy(-limits.smallestUnitDecimals)
 
         throw new InvalidAmountError(
           `Amount must be between ${minDisplay.toFixed()} and ${maxDisplay.toFixed()} ${currency}.`
@@ -427,44 +378,29 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           : (() => {
               const parsed = new Date(parsedBody.endDate)
               if (Number.isNaN(parsed.getTime())) {
-                throw new InvalidEndDateError(
-                  'endDate must be an ISO 8601 date-time string'
-                )
+                throw new InvalidEndDateError('endDate must be an ISO 8601 date-time string')
               }
               return parsed
             })()
 
       if (updatedEndDate && updatedEndDate.getTime() < Date.now()) {
-        throw new InvalidEndDateError(
-          'Subscription must not end in the past'
-        )
+        throw new InvalidEndDateError('Subscription must not end in the past')
       }
 
       const startDate = toDateOrThrow(details.start, 'Subscription start')
 
-      if (
-        updatedEndDate &&
-        updatedEndDate.getTime() < startDate.getTime()
-      ) {
-        throw new InvalidEndDateError(
-          'End date must be after the subscription start date'
-        )
+      if (updatedEndDate && updatedEndDate.getTime() < startDate.getTime()) {
+        throw new InvalidEndDateError('End date must be after the subscription start date')
       }
 
       const nextPaymentDate = new Date()
-      if (
-        updatedEndDate &&
-        updatedEndDate.getTime() < nextPaymentDate.getTime()
-      ) {
-        throw new InvalidEndDateError(
-          'End date must be after the next payment date'
-        )
+      if (updatedEndDate && updatedEndDate.getTime() < nextPaymentDate.getTime()) {
+        throw new InvalidEndDateError('End date must be after the next payment date')
       }
 
       if (updatedEndDate) {
         const finalPaymentDate = new Date(
-          updatedEndDate.getTime() +
-            details.frequencyWeeklyInterval * 7 * 24 * 60 * 60 * 1000
+          updatedEndDate.getTime() + details.frequencyWeeklyInterval * 7 * 24 * 60 * 60 * 1000
         )
 
         const paidSessionsAfterEndDate = await sql<{
@@ -486,10 +422,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         }
       }
 
-      const existingEndDate = toDateOrThrow(
-        details.end,
-        'Subscription end date'
-      )
+      const existingEndDate = toDateOrThrow(details.end, 'Subscription end date')
       const newEndDate = updatedEndDate === null ? MAX_TIME : updatedEndDate
 
       let requiresClientAcceptance = false
@@ -509,10 +442,10 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       }
 
       const currentAmount = new BigNumber(details.amount)
-      const formattedAmount = new Intl.NumberFormat(
-        details.locale || 'en-US',
-        { style: 'currency', currency }
-      ).format(Number(updatedAmount.toString()))
+      const formattedAmount = new Intl.NumberFormat(details.locale || 'en-US', {
+        style: 'currency',
+        currency,
+      }).format(Number(updatedAmount.toString()))
 
       if (updatedAmount.gt(currentAmount)) {
         requiresClientAcceptance = true
@@ -522,15 +455,12 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       }
 
       const nameChanged = parsedBody.name !== details.name
-      const shouldUpdatePlan =
-        messages.length > 0 || requiresClientAcceptance || nameChanged
+      const shouldUpdatePlan = messages.length > 0 || requiresClientAcceptance || nameChanged
 
       if (shouldUpdatePlan) {
         const planUpdate: Record<string, unknown> = {
           end_:
-            newEndDate.getTime() === MAX_TIME.getTime()
-              ? sql<Date>`'infinity'::timestamp with time zone`
-              : newEndDate,
+            newEndDate.getTime() === MAX_TIME.getTime() ? sql<Date>`'infinity'::timestamp with time zone` : newEndDate,
           amount: updatedAmount.toString(),
         }
 
@@ -541,9 +471,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           planUpdate.acceptance_request_time = sql<Date>`NOW()`
         } else {
           planUpdate.accepted_end =
-            newEndDate.getTime() === MAX_TIME.getTime()
-              ? sql<Date>`'infinity'::timestamp with time zone`
-              : newEndDate
+            newEndDate.getTime() === MAX_TIME.getTime() ? sql<Date>`'infinity'::timestamp with time zone` : newEndDate
           planUpdate.accepted_amount = updatedAmount.toString()
         }
 
@@ -583,16 +511,10 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
         const baseUrl = process.env.BASE_URL ?? 'http://localhost:3001'
         const link = new URL(baseUrl)
-        link.hash = `/client/${details.clientId}/${tokenRow.id}?email=${encodeURIComponent(
-          details.clientEmail
-        )}`
-        link.searchParams.set(
-          'next',
-          `/client-dashboard/payment-plans/${planId}`
-        )
+        link.hash = `/client/${details.clientId}/${tokenRow.id}?email=${encodeURIComponent(details.clientEmail)}`
+        link.searchParams.set('next', `/client-dashboard/payment-plans/${planId}`)
 
-        const senderName =
-          details.serviceProviderName.trim() || `${APP_NAME} Team`
+        const senderName = details.serviceProviderName.trim() || `${APP_NAME} Team`
         const html = buildPlanUpdateEmail({
           serviceProviderName: details.serviceProviderName,
           brandColor: details.brandColor,
@@ -640,8 +562,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Subscription not found',
-          detail:
-            'We could not find a subscription with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a subscription with the specified identifier for the authenticated trainer.',
           type: '/resource-not-found',
         }),
         { status: 404 }
@@ -653,8 +574,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 409,
           title: 'Client has no email',
-          detail:
-            'A client email address is required to send subscription updates.',
+          detail: 'A client email address is required to send subscription updates.',
           type: '/client-has-no-email',
         }),
         { status: 409 }
@@ -708,15 +628,12 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       )
     }
 
-    if (
-      error instanceof PaidAppointmentsAfterSubscriptionEndDateError
-    ) {
+    if (error instanceof PaidAppointmentsAfterSubscriptionEndDateError) {
       return NextResponse.json(
         buildErrorResponse({
           status: 409,
           title: 'Subscription end date too early',
-          detail:
-            'There are paid appointments scheduled after the proposed end date.',
+          detail: 'There are paid appointments scheduled after the proposed end date.',
           type: '/paid-appointments-after-end-date',
         }),
         { status: 409 }
@@ -728,21 +645,14 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse subscription data from database',
-          detail:
-            'Subscription data did not match the expected response schema.',
+          detail: 'Subscription data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }
       )
     }
 
-    console.error(
-      'Failed to update subscription',
-      authorization.trainerId,
-      clientId,
-      planId,
-      error
-    )
+    console.error('Failed to update subscription', authorization.trainerId, clientId, planId, error)
 
     return NextResponse.json(
       buildErrorResponse({

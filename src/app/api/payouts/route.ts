@@ -1,30 +1,23 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 
-const isoDateTimeString = z
-  .union([z.string(), z.date()])
-  .transform(value => {
-    const date = value instanceof Date ? value : new Date(value)
-    if (Number.isNaN(date.getTime())) {
-      throw new Error('Invalid date-time value')
-    }
-    return date.toISOString()
-  })
+const isoDateTimeString = z.union([z.string(), z.date()]).transform((value) => {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('Invalid date-time value')
+  }
+  return date.toISOString()
+})
 
-const isoDateString = z
-  .union([z.string(), z.date()])
-  .transform(value => {
-    const date = value instanceof Date ? value : new Date(value)
-    if (Number.isNaN(date.getTime())) {
-      throw new Error('Invalid date value')
-    }
-    return date.toISOString().slice(0, 10)
-  })
+const isoDateString = z.union([z.string(), z.date()]).transform((value) => {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('Invalid date value')
+  }
+  return date.toISOString().slice(0, 10)
+})
 
 const payoutStatusSchema = z.enum(['paid', 'pending', 'inTransit', 'canceled', 'failed'])
 
@@ -64,12 +57,10 @@ type PayoutStatus = z.infer<typeof payoutStatusSchema>
 
 type RawPayoutStatus = z.infer<typeof rawPayoutStatusSchema>
 
-const normalizeStatus = (status: RawPayoutStatus): PayoutStatus =>
-  status === 'in_transit' ? 'inTransit' : status
+const normalizeStatus = (status: RawPayoutStatus): PayoutStatus => (status === 'in_transit' ? 'inTransit' : status)
 
 const parseUnixTimestampSeconds = (value: string | number, label: string) => {
-  const numeric =
-    typeof value === 'number' ? value : Number.parseFloat(value.trim())
+  const numeric = typeof value === 'number' ? value : Number.parseFloat(value.trim())
 
   if (!Number.isFinite(numeric)) {
     throw new Error(`Invalid ${label} value encountered in payout record`)
@@ -94,8 +85,7 @@ const toIsoDate = (date: Date, label: string) => {
 }
 
 const parseAmount = (value: string | number) => {
-  const numeric =
-    typeof value === 'number' ? value : Number.parseFloat(value.trim())
+  const numeric = typeof value === 'number' ? value : Number.parseFloat(value.trim())
 
   if (!Number.isFinite(numeric)) {
     throw new Error('Invalid amount value encountered in payout record')
@@ -107,8 +97,7 @@ const parseAmount = (value: string | number) => {
 
 export async function GET(request: Request) {
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching payouts',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching payouts',
   })
 
   if (!authorization.ok) {
@@ -119,33 +108,21 @@ export async function GET(request: Request) {
     const rows = await db
       .selectFrom('stripe.payout as payout')
       .innerJoin('trainer', 'trainer.stripe_account_id', 'payout.account')
-      .select(({ ref }) => [
-        ref('payout.object').as('stripeObject'),
-        ref('payout.updated_at').as('updatedAt'),
-      ])
+      .select(({ ref }) => [ref('payout.object').as('stripeObject'), ref('payout.updated_at').as('updatedAt')])
       .where('trainer.id', '=', authorization.trainerId)
       .execute()
 
     const payouts = payoutListSchema.parse(
       rows
-        .map(row => {
+        .map((row) => {
           const parsedRow = payoutRowSchema.parse(row)
           const stripeObject = payoutObjectSchema.parse(parsedRow.stripeObject)
 
-          const createdAtDate = parseUnixTimestampSeconds(
-            stripeObject.created,
-            'createdAt'
-          )
+          const createdAtDate = parseUnixTimestampSeconds(stripeObject.created, 'createdAt')
 
-          const arrivalDateDate = parseUnixTimestampSeconds(
-            stripeObject.arrival_date,
-            'arrivalDate'
-          )
+          const arrivalDateDate = parseUnixTimestampSeconds(stripeObject.arrival_date, 'arrivalDate')
 
-          const updatedAtIso = toIsoDateTime(
-            parsedRow.updatedAt,
-            'updatedAt'
-          )
+          const updatedAtIso = toIsoDateTime(parsedRow.updatedAt, 'updatedAt')
 
           return {
             id: stripeObject.id,

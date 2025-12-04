@@ -17,15 +17,18 @@
     "jsx-a11y"
   ],
   "jsPlugins": [
-    "eslint-plugin-better-tailwindcss"
+    "eslint-plugin-better-tailwindcss",
+    "eslint-plugin-react-compiler"
   ],
   "rules": {
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn",
+    "react-compiler/react-compiler": "error",
     "better-tailwindcss/sort-classes": [
       "warn",
       {
-        "printWidth": 100
+        "printWidth": 120,
+        "entryPoint": "src/app/globals.css"
       }
     ]
   }

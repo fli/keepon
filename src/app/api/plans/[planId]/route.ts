@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { normalizePlanRow, type RawPlanRow } from '../shared'
 
 const paramsSchema = z.object({
-  planId: z
-    .string()
-    .trim()
-    .min(1, 'planId must not be empty'),
+  planId: z.string().trim().min(1, 'planId must not be empty'),
 })
 
 type HandlerContext = RouteContext<'/api/plans/[planId]'>
@@ -20,17 +14,13 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const parsedParams = paramsSchema.safeParse(await context.params)
 
   if (!parsedParams.success) {
-    const detail = parsedParams.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = parsedParams.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid route parameters',
-        detail:
-          detail ||
-          'Request path parameters did not match the expected schema.',
+        detail: detail || 'Request path parameters did not match the expected schema.',
         type: '/invalid-path',
       }),
       { status: 400 }
@@ -38,8 +28,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching plan',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching plan',
   })
 
   if (!authorization.ok) {

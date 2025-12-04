@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 
 const paramsSchema = z.object({
   sessionSeriesId: z
@@ -15,11 +12,7 @@ const paramsSchema = z.object({
 })
 
 const querySchema = z.object({
-  sessionId: z
-    .string()
-    .trim()
-    .min(1, 'Session id is required')
-    .uuid({ message: 'Session id must be a valid UUID' }),
+  sessionId: z.string().trim().min(1, 'Session id is required').uuid({ message: 'Session id must be a valid UUID' }),
 })
 
 const deleteResponseSchema = z.object({
@@ -78,7 +71,7 @@ const normalizeDeletedCount = (value: unknown) => {
 }
 
 const normalizeDetails = (rows: RawDetailRow[]): NormalizedDetailRow[] =>
-  rows.map(row => ({
+  rows.map((row) => ({
     sessionId: row.session_id,
     clientSessionId: row.client_session_id,
     paidFor: row.paid_for,
@@ -89,17 +82,13 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid session series identifier',
-        detail:
-          detail ||
-          'Request parameters did not match the expected session series identifier schema.',
+        detail: detail || 'Request parameters did not match the expected session series identifier schema.',
         type: '/invalid-parameter',
       }),
       { status: 400 }
@@ -112,17 +101,13 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   })
 
   if (!queryResult.success) {
-    const detail = queryResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = queryResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid query parameters',
-        detail:
-          detail ||
-          'Request query parameters did not match the expected schema.',
+        detail: detail || 'Request query parameters did not match the expected schema.',
         type: '/invalid-query',
       }),
       { status: 400 }
@@ -130,8 +115,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while deleting session series sessions',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while deleting session series sessions',
   })
 
   if (!authorization.ok) {
@@ -142,7 +126,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   const { sessionId } = queryResult.data
 
   try {
-    const transactionResult = await db.transaction().execute(async trx => {
+    const transactionResult = await db.transaction().execute(async (trx) => {
       const detailsResult = await sql<RawDetailRow>`
         SELECT
           session.id AS session_id,
@@ -173,20 +157,14 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         throw new SessionSeriesNotFoundError()
       }
 
-      const hasBlockingPayment = details.some(
-        detail => detail.paidFor && !detail.deletableSaleId
-      )
+      const hasBlockingPayment = details.some((detail) => detail.paidFor && !detail.deletableSaleId)
 
       if (hasBlockingPayment) {
         throw new PaidAppointmentDeletionError()
       }
 
       const deletableSaleIds = Array.from(
-        new Set(
-          details
-            .map(detail => detail.deletableSaleId)
-            .filter((value): value is string => Boolean(value))
-        )
+        new Set(details.map((detail) => detail.deletableSaleId).filter((value): value is string => Boolean(value)))
       )
 
       if (deletableSaleIds.length > 0) {
@@ -196,20 +174,14 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
           .where('sale.trainer_id', '=', authorization.trainerId)
           .executeTakeFirst()
 
-        const deletedSalesCount = normalizeDeletedCount(
-          deleteSalesResult?.numDeletedRows
-        )
+        const deletedSalesCount = normalizeDeletedCount(deleteSalesResult?.numDeletedRows)
 
         if (deletedSalesCount !== deletableSaleIds.length) {
-          throw new Error(
-            `Deleted ${deletedSalesCount} of ${deletableSaleIds.length} sale records`
-          )
+          throw new Error(`Deleted ${deletedSalesCount} of ${deletableSaleIds.length} sale records`)
         }
       }
 
-      const sessionIds = Array.from(
-        new Set(details.map(detail => detail.sessionId))
-      )
+      const sessionIds = Array.from(new Set(details.map((detail) => detail.sessionId)))
 
       if (sessionIds.length === 0) {
         throw new SessionSeriesNotFoundError()
@@ -223,9 +195,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         .execute()
 
       if (deletedSessions.length !== sessionIds.length) {
-        throw new Error(
-          `Deleted ${deletedSessions.length} of ${sessionIds.length} sessions`
-        )
+        throw new Error(`Deleted ${deletedSessions.length} of ${sessionIds.length} sessions`)
       }
 
       const deletedSessionSeriesResult = await sql<{ id: string }>`
@@ -241,15 +211,15 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
       `.execute(trx)
 
       const deletedClientSessions = details
-        .map(detail => detail.clientSessionId)
+        .map((detail) => detail.clientSessionId)
         .filter((value): value is string => Boolean(value))
 
       return {
         succeeded: true as const,
         deletedClientSessions,
         deletedPayments: deletedClientSessions,
-        deletedSessions: deletedSessions.map(row => row.id),
-        deletedSessionSeries: deletedSessionSeriesResult.rows.map(row => row.id),
+        deletedSessions: deletedSessions.map((row) => row.id),
+        deletedSessionSeries: deletedSessionSeriesResult.rows.map((row) => row.id),
       }
     })
 
@@ -262,8 +232,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Session series not found',
-          detail:
-            'We could not find a session series with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a session series with the specified identifier for the authenticated trainer.',
           type: '/session-series-not-found',
         }),
         { status: 404 }
@@ -274,8 +243,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
       return NextResponse.json(
         buildErrorResponse({
           status: 409,
-          title:
-            'One or more clients has paid for the appointment. Please refund first before deleting.',
+          title: 'One or more clients has paid for the appointment. Please refund first before deleting.',
           type: '/cant-delete-paid-appointment',
         }),
         { status: 409 }

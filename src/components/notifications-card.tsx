@@ -1,13 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { Badge } from '@/components/ui/badge'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { NotificationList } from '@/server/notifications'
 
 type Notification = NotificationList[number]
@@ -54,7 +48,7 @@ export function NotificationsCard({
     )
   }
 
-  const hasNew = notifications.some(notification => !notification.viewed)
+  const hasNew = notifications.some((notification) => !notification.viewed)
   const showHeaderExtras = hasNew || Boolean(headerAction)
 
   return (
@@ -73,23 +67,18 @@ export function NotificationsCard({
       </CardHeader>
       <CardContent className="p-0">
         {notifications.length === 0 ? (
-          <div className="px-6 py-8 text-sm text-muted-foreground">
-            {emptyMessage}
-          </div>
+          <div className="px-6 py-8 text-sm text-muted-foreground">{emptyMessage}</div>
         ) : (
           <ul className="divide-y divide-border">
-            {notifications.map(notification => (
+            {notifications.map((notification) => (
               <li
                 key={notification.id}
                 className={`flex items-start justify-between gap-3 px-6 py-4 ${
                   onNotificationSelect ? 'cursor-pointer hover:bg-muted/40' : ''
                 }`}
                 onClick={() => onNotificationSelect?.(notification)}
-                onKeyDown={event => {
-                  if (
-                    onNotificationSelect &&
-                    (event.key === 'Enter' || event.key === ' ')
-                  ) {
+                onKeyDown={(event) => {
+                  if (onNotificationSelect && (event.key === 'Enter' || event.key === ' ')) {
                     event.preventDefault()
                     onNotificationSelect(notification)
                   }
@@ -99,13 +88,9 @@ export function NotificationsCard({
               >
                 <div className="space-y-1">
                   <p className="text-sm text-foreground">{notification.alert}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatNotificationDate(notification.created)}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{formatNotificationDate(notification.created)}</p>
                 </div>
-                {!notification.viewed ? (
-                  <Badge variant="secondary">New</Badge>
-                ) : null}
+                {!notification.viewed ? <Badge variant="secondary">New</Badge> : null}
               </li>
             ))}
           </ul>

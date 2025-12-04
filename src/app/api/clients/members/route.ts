@@ -4,11 +4,7 @@ import { z } from 'zod'
 import { buildErrorResponse } from '../../_lib/accessToken'
 
 const querySchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, 'Email is required')
-    .email('Email must be a valid email address.'),
+  email: z.string().trim().min(1, 'Email is required').email('Email must be a valid email address.'),
 })
 
 const dbRowSchema = z.object({
@@ -36,16 +32,13 @@ export async function GET(request: Request) {
   })
 
   if (!parsedQuery.success) {
-    const detail = parsedQuery.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = parsedQuery.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid query parameters',
-        detail:
-          detail || 'Request query parameters did not match the expected schema.',
+        detail: detail || 'Request query parameters did not match the expected schema.',
         type: '/invalid-query',
       }),
       { status: 400 }
@@ -58,10 +51,8 @@ export async function GET(request: Request) {
     const rows = await db
       .selectFrom('client')
       .innerJoin('trainer', 'trainer.id', 'client.trainer_id')
-      .innerJoin('user_', join =>
-        join
-          .onRef('user_.id', '=', 'client.user_id')
-          .onRef('user_.type', '=', 'client.user_type')
+      .innerJoin('user_', (join) =>
+        join.onRef('user_.id', '=', 'client.user_id').onRef('user_.type', '=', 'client.user_type')
       )
       .select(({ ref }) => [
         ref('user_.id').as('id'),
@@ -88,7 +79,7 @@ export async function GET(request: Request) {
     }
 
     const responseBody = responseSchema.parse(
-      parsedRows.map(row => ({
+      parsedRows.map((row) => ({
         id: row.id,
         firstName: row.trainerFirstName,
         lastName: row.trainerLastName,
@@ -104,8 +95,7 @@ export async function GET(request: Request) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse client member data from database',
-          detail:
-            'Client member data did not match the expected response schema.',
+          detail: 'Client member data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

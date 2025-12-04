@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z, ZodError } from 'zod'
-import {
-  authenticateClientRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateClientRequest, buildErrorResponse } from '../_lib/accessToken'
 
 const clientRowSchema = z.object({
   email: z.string(),
@@ -28,30 +25,18 @@ const stripePaymentMethodRowSchema = z.object({
   }),
 })
 
-const cardBrands = [
-  'amex',
-  'diners',
-  'discover',
-  'jcb',
-  'mastercard',
-  'unionpay',
-  'visa',
-  'unknown',
-] as const
+const cardBrands = ['amex', 'diners', 'discover', 'jcb', 'mastercard', 'unionpay', 'visa', 'unknown'] as const
 
 type CardBrand = (typeof cardBrands)[number]
 
 const normalizeCardBrand = (brand: string): CardBrand => {
   const normalized = brand.toLowerCase()
-  return cardBrands.includes(normalized as CardBrand)
-    ? (normalized as CardBrand)
-    : 'unknown'
+  return cardBrands.includes(normalized as CardBrand) ? (normalized as CardBrand) : 'unknown'
 }
 
 export async function GET(request: Request) {
   const authorization = await authenticateClientRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching client profile',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching client profile',
   })
 
   if (!authorization.ok) {
@@ -78,8 +63,7 @@ export async function GET(request: Request) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail:
-            'We could not find a client for the authenticated access token.',
+          detail: 'We could not find a client for the authenticated access token.',
           type: '/client-not-found',
         }),
         { status: 404 }
@@ -108,14 +92,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ email: clientRow.email })
     }
 
-    const parsedPaymentMethod =
-      stripePaymentMethodRowSchema.parse(paymentMethodRow)
+    const parsedPaymentMethod = stripePaymentMethodRowSchema.parse(paymentMethodRow)
     const { card } = parsedPaymentMethod.object
 
-    const country =
-      typeof card.country === 'string' && card.country.trim().length > 0
-        ? card.country
-        : null
+    const country = typeof card.country === 'string' && card.country.trim().length > 0 ? card.country : null
 
     return NextResponse.json({
       email: clientRow.email,
@@ -141,12 +121,7 @@ export async function GET(request: Request) {
       )
     }
 
-    console.error(
-      'Failed to fetch client profile',
-      authorization.trainerId,
-      authorization.clientId,
-      error
-    )
+    console.error('Failed to fetch client profile', authorization.trainerId, authorization.clientId, error)
 
     return NextResponse.json(
       buildErrorResponse({

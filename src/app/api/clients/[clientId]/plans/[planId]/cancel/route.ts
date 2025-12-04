@@ -1,32 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import {
-  db,
-  sql,
-  type Selectable,
-  type VwLegacyPayment,
-} from '@/lib/db'
+import { db, sql, type Selectable, type VwLegacyPayment } from '@/lib/db'
 import { z, ZodError } from 'zod'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../../../../_lib/accessToken'
-import {
-  normalizePlanRow,
-  type RawPlanRow,
-} from '../../../../../plans/shared'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../../../_lib/accessToken'
+import { normalizePlanRow, type RawPlanRow } from '../../../../../plans/shared'
 import { paymentSchema } from '../../../../../_lib/clientSessionsSchema'
 
 const paramsSchema = z.object({
-  clientId: z
-    .string()
-    .trim()
-    .min(1, 'Client id is required.')
-    .uuid({ message: 'Client id must be a valid UUID.' }),
-  planId: z
-    .string()
-    .trim()
-    .min(1, 'Plan id is required.')
-    .uuid({ message: 'Plan id must be a valid UUID.' }),
+  clientId: z.string().trim().min(1, 'Client id is required.').uuid({ message: 'Client id must be a valid UUID.' }),
+  planId: z.string().trim().min(1, 'Plan id is required.').uuid({ message: 'Plan id must be a valid UUID.' }),
 })
 
 type HandlerContext = RouteContext<'/api/clients/[clientId]/plans/[planId]/cancel'>
@@ -110,22 +91,16 @@ const adaptPaymentRow = (row: RawPaymentRow) => {
     throw new Error('Payment row is missing updatedAt')
   }
 
-  const paidAmount =
-    row.paidAmount === null || row.paidAmount === undefined ? 0 : row.paidAmount
+  const paidAmount = row.paidAmount === null || row.paidAmount === undefined ? 0 : row.paidAmount
 
   return paymentSchema.parse({
     trainerId: row.trainerId,
     id: row.id,
     paymentType: row.paymentType,
-    contributionAmount:
-      row.contributionAmount === null ? null : row.contributionAmount,
+    contributionAmount: row.contributionAmount === null ? null : row.contributionAmount,
     paidAmount,
-    paymentMethod:
-      row.paymentMethod === null ? null : String(row.paymentMethod),
-    paidDate:
-      row.paidDate === null || row.paidDate === undefined
-        ? null
-        : (row.paidDate as Date | string),
+    paymentMethod: row.paymentMethod === null ? null : String(row.paymentMethod),
+    paidDate: row.paidDate === null || row.paidDate === undefined ? null : (row.paidDate as Date | string),
     status: row.status,
     stripeCharge: row.stripeCharge ?? null,
     stripeRefund: row.stripeRefund ?? null,
@@ -141,17 +116,13 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues
-      .map(issue => issue.message)
-      .join('; ')
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
         title: 'Invalid path parameters',
-        detail:
-          detail ||
-          'Request parameters did not match the expected schema.',
+        detail: detail || 'Request parameters did not match the expected schema.',
         type: '/invalid-path-parameters',
       }),
       { status: 400 }
@@ -159,8 +130,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while cancelling subscription',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while cancelling subscription',
   })
 
   if (!authorization.ok) {
@@ -170,13 +140,10 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const { clientId, planId } = paramsResult.data
 
   try {
-    const result = await db.transaction().execute(async trx => {
+    const result = await db.transaction().execute(async (trx) => {
       const planDetails = await trx
         .selectFrom('payment_plan as plan')
-        .select(({ ref }) => [
-          ref('plan.status').as('status'),
-          ref('plan.end_').as('end'),
-        ])
+        .select(({ ref }) => [ref('plan.status').as('status'), ref('plan.end_').as('end')])
         .where('plan.id', '=', planId)
         .where('plan.client_id', '=', clientId)
         .where('plan.trainer_id', '=', authorization.trainerId)
@@ -239,9 +206,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
       const clientSessionIds = Array.from(
         new Set(
-          clientSessionUpdate.rows
-            .map(row => row.id)
-            .filter((value): value is string => typeof value === 'string')
+          clientSessionUpdate.rows.map((row) => row.id).filter((value): value is string => typeof value === 'string')
         )
       )
 
@@ -278,7 +243,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         )
       }
 
-      const payments = paymentRows.map(row => adaptPaymentRow(row))
+      const payments = paymentRows.map((row) => adaptPaymentRow(row))
 
       return { plan, payments }
     })
@@ -290,8 +255,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Subscription not found',
-          detail:
-            'We could not find a subscription with the specified identifier for the authenticated trainer.',
+          detail: 'We could not find a subscription with the specified identifier for the authenticated trainer.',
           type: '/resource-not-found',
         }),
         { status: 404 }
@@ -311,22 +275,18 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     }
 
     if (error instanceof PaymentDataMismatchError) {
-      console.error(
-        'Payment data mismatch while cancelling subscription',
-        {
-          trainerId: authorization.trainerId,
-          clientId,
-          planId,
-          error: error.message,
-        }
-      )
+      console.error('Payment data mismatch while cancelling subscription', {
+        trainerId: authorization.trainerId,
+        clientId,
+        planId,
+        error: error.message,
+      })
 
       return NextResponse.json(
         buildErrorResponse({
           status: 500,
           title: 'Failed to retrieve subscription payments',
-          detail:
-            'Updated client sessions did not match the expected payment records.',
+          detail: 'Updated client sessions did not match the expected payment records.',
           type: '/payment-data-mismatch',
         }),
         { status: 500 }
@@ -338,8 +298,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 500,
           title: 'Failed to parse subscription data from database',
-          detail:
-            'Subscription or payment data did not match the expected response schema.',
+          detail: 'Subscription or payment data did not match the expected response schema.',
           type: '/invalid-response',
         }),
         { status: 500 }

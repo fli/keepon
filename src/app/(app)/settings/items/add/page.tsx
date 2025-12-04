@@ -55,7 +55,7 @@ async function createItem(formData: FormData) {
     throw new Error('Could not resolve your default currency')
   }
 
-  await db.transaction().execute(async trx => {
+  await db.transaction().execute(async (trx) => {
     const productRow = await trx
       .insertInto('product')
       .values({

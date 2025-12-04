@@ -1,13 +1,6 @@
 import { z } from 'zod'
 
-export const paymentPlanPaymentStatusSchema = z.enum([
-  'paid',
-  'cancelled',
-  'refunded',
-  'paused',
-  'pending',
-  'rejected',
-])
+export const paymentPlanPaymentStatusSchema = z.enum(['paid', 'cancelled', 'refunded', 'paused', 'pending', 'rejected'])
 
 export const isoDateTimeString = z.string().datetime({ offset: true })
 
@@ -27,9 +20,7 @@ export const paymentPlanPaymentSchema = z.object({
 
 export const paymentPlanPaymentListSchema = z.array(paymentPlanPaymentSchema)
 
-export type PaymentPlanPaymentStatus = z.infer<
-  typeof paymentPlanPaymentStatusSchema
->
+export type PaymentPlanPaymentStatus = z.infer<typeof paymentPlanPaymentStatusSchema>
 
 export type PaymentPlanPaymentRow = {
   createdAt: Date | string | null
@@ -52,12 +43,7 @@ const toIsoDateTime = (value: Date | string | null, label: string): string => {
     throw new Error(`Missing ${label} value in payment plan payment record`)
   }
 
-  const date =
-    value instanceof Date
-      ? value
-      : typeof value === 'string'
-        ? new Date(value)
-        : null
+  const date = value instanceof Date ? value : typeof value === 'string' ? new Date(value) : null
 
   if (!date || Number.isNaN(date.getTime())) {
     throw new Error(`Invalid ${label} value in payment plan payment record`)
@@ -66,20 +52,12 @@ const toIsoDateTime = (value: Date | string | null, label: string): string => {
   return date.toISOString()
 }
 
-const toOptionalIsoDateTime = (
-  value: Date | string | null,
-  label: string
-): string | null => {
+const toOptionalIsoDateTime = (value: Date | string | null, label: string): string | null => {
   if (value === null) {
     return null
   }
 
-  const date =
-    value instanceof Date
-      ? value
-      : typeof value === 'string'
-        ? new Date(value)
-        : null
+  const date = value instanceof Date ? value : typeof value === 'string' ? new Date(value) : null
 
   if (!date || Number.isNaN(date.getTime())) {
     throw new Error(`Invalid ${label} value in payment plan payment record`)
@@ -88,10 +66,7 @@ const toOptionalIsoDateTime = (
   return date.toISOString()
 }
 
-const toAmountString = (
-  value: string | number | null,
-  label: string
-): string => {
+const toAmountString = (value: string | number | null, label: string): string => {
   if (value === null || value === undefined) {
     throw new Error(`Missing ${label} value in payment plan payment record`)
   }
@@ -136,25 +111,19 @@ const toRetryCount = (value: number | string | null): number => {
   return parsed
 }
 
-const normalizeStatus = (
-  status: string | null
-): PaymentPlanPayment['status'] => {
+const normalizeStatus = (status: string | null): PaymentPlanPayment['status'] => {
   if (!status) {
     throw new Error('Missing status value in payment plan payment record')
   }
   const trimmed = status.trim().toLowerCase()
   const parsed = paymentPlanPaymentStatusSchema.safeParse(trimmed)
   if (!parsed.success) {
-    throw new Error(
-      `Unexpected status value in payment plan payment record: ${status}`
-    )
+    throw new Error(`Unexpected status value in payment plan payment record: ${status}`)
   }
   return parsed.data
 }
 
-export const adaptPaymentPlanPaymentRow = (
-  row: PaymentPlanPaymentRow
-): z.input<typeof paymentPlanPaymentSchema> => {
+export const adaptPaymentPlanPaymentRow = (row: PaymentPlanPaymentRow): z.input<typeof paymentPlanPaymentSchema> => {
   if (!row.id || !row.paymentPlanId || !row.currency) {
     throw new Error('Payment plan payment row is missing required fields')
   }

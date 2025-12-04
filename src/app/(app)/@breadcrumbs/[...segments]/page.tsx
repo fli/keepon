@@ -64,11 +64,7 @@ async function buildCrumbs(segments: string[]): Promise<Crumb[]> {
     const clients = (await loadClientsServer()) ?? []
     const match = clients.find((client) => client.id === normalized[1])
     if (match) {
-      dynamicLabels[1] =
-        [match.firstName, match.lastName]
-          .filter(Boolean)
-          .join(' ')
-          .trim() || 'Client'
+      dynamicLabels[1] = [match.firstName, match.lastName].filter(Boolean).join(' ').trim() || 'Client'
     }
   }
 
@@ -77,11 +73,7 @@ async function buildCrumbs(segments: string[]): Promise<Crumb[]> {
       const clients = (await loadClientsServer()) ?? []
       const match = clients.find((client) => client.id === normalized[3])
       if (match) {
-        dynamicLabels[3] =
-          [match.firstName, match.lastName]
-            .filter(Boolean)
-            .join(' ')
-            .trim() || 'Client'
+        dynamicLabels[3] = [match.firstName, match.lastName].filter(Boolean).join(' ').trim() || 'Client'
       }
     }
 
@@ -104,11 +96,7 @@ async function buildCrumbs(segments: string[]): Promise<Crumb[]> {
   return crumbs
 }
 
-export default async function BreadcrumbsSlot({
-  params,
-}: {
-  params: Promise<{ segments?: string[] }>
-}) {
+export default async function BreadcrumbsSlot({ params }: { params: Promise<{ segments?: string[] }> }) {
   return (
     <Suspense fallback={null}>
       <BreadcrumbsContent params={params} />
@@ -116,11 +104,7 @@ export default async function BreadcrumbsSlot({
   )
 }
 
-async function BreadcrumbsContent({
-  params,
-}: {
-  params: Promise<{ segments?: string[] }>
-}) {
+async function BreadcrumbsContent({ params }: { params: Promise<{ segments?: string[] }> }) {
   const { segments = [] } = await params
   const crumbs = await buildCrumbs(segments)
 

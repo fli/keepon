@@ -1,20 +1,13 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import {
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 
-const isoDateString = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid ISO date format (expected YYYY-MM-DD)')
+const isoDateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid ISO date format (expected YYYY-MM-DD)')
 
 const isoDatePattern = /^(\d{4})-(\d{2})-(\d{2})$/
 
-const isoDateTimeString = z
-  .string()
-  .datetime({ offset: true, message: 'Invalid ISO date-time string' })
+const isoDateTimeString = z.string().datetime({ offset: true, message: 'Invalid ISO date-time string' })
 
 const dateOrDateTimeSchema = z.union([isoDateString, isoDateTimeString])
 
@@ -38,16 +31,14 @@ const requestBusyTimeSchema = z
       if (!isoDateTimeString.safeParse(value.startDate).success) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message:
-            'startDate must be a full ISO date-time string with timezone when allDay is false.',
+          message: 'startDate must be a full ISO date-time string with timezone when allDay is false.',
           path: ['startDate'],
         })
       }
       if (!isoDateTimeString.safeParse(value.endDate).success) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message:
-            'endDate must be a full ISO date-time string with timezone when allDay is false.',
+          message: 'endDate must be a full ISO date-time string with timezone when allDay is false.',
           path: ['endDate'],
         })
       }
@@ -115,8 +106,7 @@ const normalizeRow = (row: BusyTimeRow) => {
   }
 }
 
-const buildBusyTimeResponse = (rows: BusyTimeRow[]) =>
-  busyTimeListSchema.parse(rows.map(normalizeRow))
+const buildBusyTimeResponse = (rows: BusyTimeRow[]) => busyTimeListSchema.parse(rows.map(normalizeRow))
 
 type BusyTimeInsertValues = {
   trainer_id: string
@@ -135,7 +125,7 @@ class InvalidBusyTimeInputError extends Error {
 
 const formatZodIssues = (issues: z.ZodIssue[]) =>
   issues
-    .map(issue => {
+    .map((issue) => {
       const path = issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''
       return `${path}${issue.message}`
     })
@@ -166,39 +156,25 @@ const createInvalidJsonResponse = () =>
 const parseIsoCalendarDate = (value: string, label: string) => {
   const match = isoDatePattern.exec(value.slice(0, 10))
   if (!match) {
-    throw new InvalidBusyTimeInputError(
-      `${label} must be a valid ISO date (YYYY-MM-DD).`
-    )
+    throw new InvalidBusyTimeInputError(`${label} must be a valid ISO date (YYYY-MM-DD).`)
   }
 
   const [, yearStr, monthStr, dayStr] = match
   if (!yearStr || !monthStr || !dayStr) {
-    throw new InvalidBusyTimeInputError(
-      `${label} must be a valid ISO date (YYYY-MM-DD).`
-    )
+    throw new InvalidBusyTimeInputError(`${label} must be a valid ISO date (YYYY-MM-DD).`)
   }
 
   const year = Number.parseInt(yearStr, 10)
   const month = Number.parseInt(monthStr, 10)
   const day = Number.parseInt(dayStr, 10)
 
-  if (
-    Number.isNaN(year) ||
-    Number.isNaN(month) ||
-    Number.isNaN(day) ||
-    month < 1 ||
-    month > 12
-  ) {
-    throw new InvalidBusyTimeInputError(
-      `${label} must be a valid ISO date (YYYY-MM-DD).`
-    )
+  if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day) || month < 1 || month > 12) {
+    throw new InvalidBusyTimeInputError(`${label} must be a valid ISO date (YYYY-MM-DD).`)
   }
 
   const maxDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
   if (day < 1 || day > maxDay) {
-    throw new InvalidBusyTimeInputError(
-      `${label} must be a valid calendar date.`
-    )
+    throw new InvalidBusyTimeInputError(`${label} must be a valid calendar date.`)
   }
 
   return { year, month, day }
@@ -213,17 +189,12 @@ const ensureDateTimeValue = (value: string, label: string) => {
   parseIsoCalendarDate(value, label)
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) {
-    throw new InvalidBusyTimeInputError(
-      `${label} must be a valid ISO date-time with timezone.`
-    )
+    throw new InvalidBusyTimeInputError(`${label} must be a valid ISO date-time with timezone.`)
   }
   return parsed
 }
 
-const buildInsertValues = (
-  items: z.infer<typeof requestBodySchema>,
-  trainerId: string
-): BusyTimeInsertValues[] =>
+const buildInsertValues = (items: z.infer<typeof requestBodySchema>, trainerId: string): BusyTimeInsertValues[] =>
   items.map((item, index) => {
     const prefix = `body[${index}]`
     if (item.allDay) {
@@ -231,9 +202,7 @@ const buildInsertValues = (
       const endDate = ensureAllDayDate(item.endDate, `${prefix}.endDate`)
 
       if (endDate.getTime() < startDate.getTime()) {
-        throw new InvalidBusyTimeInputError(
-          `${prefix}.endDate must be on or after startDate.`
-        )
+        throw new InvalidBusyTimeInputError(`${prefix}.endDate must be on or after startDate.`)
       }
 
       return {
@@ -245,16 +214,11 @@ const buildInsertValues = (
       }
     }
 
-    const startTime = ensureDateTimeValue(
-      item.startDate,
-      `${prefix}.startDate`
-    )
+    const startTime = ensureDateTimeValue(item.startDate, `${prefix}.startDate`)
     const endTime = ensureDateTimeValue(item.endDate, `${prefix}.endDate`)
 
     if (endTime.getTime() < startTime.getTime()) {
-      throw new InvalidBusyTimeInputError(
-        `${prefix}.endDate must be on or after startDate.`
-      )
+      throw new InvalidBusyTimeInputError(`${prefix}.endDate must be on or after startDate.`)
     }
 
     return {
@@ -268,8 +232,7 @@ const buildInsertValues = (
 
 export async function GET(request: Request) {
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching busy times',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching busy times',
   })
 
   if (!authorization.ok) {
@@ -337,8 +300,7 @@ export async function PUT(request: Request) {
   }
 
   const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage:
-      'Failed to extend access token expiry while updating busy times',
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating busy times',
   })
 
   if (!authorization.ok) {
@@ -347,10 +309,7 @@ export async function PUT(request: Request) {
 
   let insertValues: BusyTimeInsertValues[] = []
   try {
-    insertValues =
-      parsedBody.length > 0
-        ? buildInsertValues(parsedBody, authorization.trainerId)
-        : []
+    insertValues = parsedBody.length > 0 ? buildInsertValues(parsedBody, authorization.trainerId) : []
   } catch (error) {
     if (error instanceof InvalidBusyTimeInputError) {
       return createInvalidBodyResponse(error.message)
@@ -359,11 +318,8 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const busyTimes = await db.transaction().execute(async trx => {
-      await trx
-        .deleteFrom('busy_time')
-        .where('trainer_id', '=', authorization.trainerId)
-        .execute()
+    const busyTimes = await db.transaction().execute(async (trx) => {
+      await trx.deleteFrom('busy_time').where('trainer_id', '=', authorization.trainerId).execute()
 
       if (insertValues.length > 0) {
         await trx.insertInto('busy_time').values(insertValues).execute()

@@ -3,10 +3,7 @@ import { z } from 'zod'
 
 export const moneyString = z
   .string()
-  .regex(
-    /^-?\d+(?:\.\d{2})$/,
-    'Money values must be formatted with two decimal places'
-  )
+  .regex(/^-?\d+(?:\.\d{2})$/, 'Money values must be formatted with two decimal places')
 
 export const isoDateTimeString = z.string().datetime({ offset: true })
 
@@ -34,13 +31,11 @@ export const salesQuerySchema = z.object({
     .trim()
     .min(1, 'updatedAfter must not be empty')
     .pipe(
-      z
-        .string()
-        .datetime({
-          message: 'updatedAfter must be a valid ISO date-time string',
-        })
+      z.string().datetime({
+        message: 'updatedAfter must be a valid ISO date-time string',
+      })
     )
-    .transform(value => new Date(value))
+    .transform((value) => new Date(value))
     .optional(),
   clientId: z
     .string()
@@ -68,10 +63,7 @@ export type RawSaleRow = {
   clientSessionId: string | null
 }
 
-const ensureDate = (
-  value: Date | string | null | undefined,
-  label: string
-): Date => {
+const ensureDate = (value: Date | string | null | undefined, label: string): Date => {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
       throw new Error(`Invalid ${label} value encountered in sale record`)
@@ -94,15 +86,9 @@ const ensureDate = (
   throw new Error(`Unsupported ${label} value encountered in sale record`)
 }
 
-const toIsoDateTime = (
-  value: Date | string | null | undefined,
-  label: string
-) => ensureDate(value, label).toISOString()
+const toIsoDateTime = (value: Date | string | null | undefined, label: string) => ensureDate(value, label).toISOString()
 
-const formatMoney = (
-  value: string | number | null | undefined,
-  label: string
-): string => {
+const formatMoney = (value: string | number | null | undefined, label: string): string => {
   if (value === null || value === undefined) {
     return '0.00'
   }
@@ -141,10 +127,7 @@ export const adaptSaleRow = (row: RawSaleRow) => {
   }
 
   const createdAtIso = toIsoDateTime(row.createdAt, 'createdAt')
-  const updatedAtIso = toIsoDateTime(
-    row.combinedUpdatedAt ?? row.createdAt,
-    'updatedAt'
-  )
+  const updatedAtIso = toIsoDateTime(row.combinedUpdatedAt ?? row.createdAt, 'updatedAt')
   const dueAtIso = toIsoDateTime(row.dueAt, 'dueAt')
 
   return {
@@ -153,11 +136,8 @@ export const adaptSaleRow = (row: RawSaleRow) => {
     createdAt: createdAtIso,
     updatedAt: updatedAtIso,
     dueAt: dueAtIso,
-    paymentRequested:
-      row.paymentRequestTime !== null &&
-      row.paymentRequestTime !== undefined,
-    paymentRequestPassOnTransactionFee:
-      row.paymentRequestPassOnTransactionFee ?? false,
+    paymentRequested: row.paymentRequestTime !== null && row.paymentRequestTime !== undefined,
+    paymentRequestPassOnTransactionFee: row.paymentRequestPassOnTransactionFee ?? false,
     total: formatMoney(row.totalAmount, 'total amount'),
     amountPaid: formatMoney(row.amountPaid, 'amount paid'),
     amountRefunded: formatMoney(row.amountRefunded, 'amount refunded'),
@@ -178,9 +158,7 @@ const buildSaleProductSummary = () =>
           'FM999999999990.00'
         )
       `.as('totalAmount'),
-      sql<Date | null>`MAX(${sql.ref('saleProduct.updated_at')})`.as(
-        'latestUpdatedAt'
-      ),
+      sql<Date | null>`MAX(${sql.ref('saleProduct.updated_at')})`.as('latestUpdatedAt'),
     ])
     .groupBy('saleProduct.sale_id')
     .as('saleProductSummary')
@@ -210,9 +188,7 @@ const buildPaymentSummary = () =>
           'FM999999999990.00'
         )
       `.as('totalRefunded'),
-      sql<Date | null>`MAX(${sql.ref('payment.updated_at')})`.as(
-        'latestUpdatedAt'
-      ),
+      sql<Date | null>`MAX(${sql.ref('payment.updated_at')})`.as('latestUpdatedAt'),
     ])
     .groupBy('payment.sale_id')
     .as('paymentSummary')
@@ -222,9 +198,7 @@ const buildClientSessionSummary = () =>
     .selectFrom('client_session as clientSession')
     .select(({ ref }) => [
       ref('clientSession.sale_id').as('saleId'),
-      sql<string | null>`MAX(${sql.ref('clientSession.id')})`.as(
-        'clientSessionId'
-      ),
+      sql<string | null>`MAX(${sql.ref('clientSession.id')})`.as('clientSessionId'),
     ])
     .groupBy('clientSession.sale_id')
     .as('clientSessionSummary')
@@ -254,11 +228,7 @@ export const fetchSales = async (options: {
       'supportedCountryCurrency.country_id',
       'trainer.country_id'
     )
-    .innerJoin(
-      'currency as currency',
-      'currency.id',
-      'supportedCountryCurrency.currency_id'
-    )
+    .innerJoin('currency as currency', 'currency.id', 'supportedCountryCurrency.currency_id')
     .leftJoin(saleProductSummary, 'saleProductSummary.saleId', 'sale.id')
     .leftJoin(paymentSummary, 'paymentSummary.saleId', 'sale.id')
     .leftJoin(clientSessionSummary, 'clientSessionSummary.saleId', 'sale.id')
@@ -269,9 +239,7 @@ export const fetchSales = async (options: {
       ref('sale.created_at').as('createdAt'),
       combinedUpdatedAt.as('combinedUpdatedAt'),
       ref('sale.payment_request_time').as('paymentRequestTime'),
-      ref('sale.payment_request_pass_on_transaction_fee').as(
-        'paymentRequestPassOnTransactionFee'
-      ),
+      ref('sale.payment_request_pass_on_transaction_fee').as('paymentRequestPassOnTransactionFee'),
       ref('sale.note').as('note'),
       ref('currency.alpha_code').as('currency'),
       ref('saleProductSummary.totalAmount').as('totalAmount'),
@@ -291,7 +259,5 @@ export const fetchSales = async (options: {
     query = query.where(({ eb }) => eb(combinedUpdatedAt, '>', updatedAfter))
   }
 
-  return query.orderBy('sale.created_at', 'desc').execute() as Promise<
-    RawSaleRow[]
-  >
+  return query.orderBy('sale.created_at', 'desc').execute() as Promise<RawSaleRow[]>
 }
