@@ -1,0 +1,32 @@
+{
+  "$schema": "https://oxc.rs/schema/oxlintrc.json",
+  "ignore": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/.turbo/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.output/**",
+    "src/lib/db/generated.ts"
+  ],
+  "plugins": [
+    "eslint",
+    "typescript",
+    "react",
+    "nextjs",
+    "jsx-a11y"
+  ],
+  "jsPlugins": [
+    "eslint-plugin-better-tailwindcss"
+  ],
+  "rules": {
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
+    "better-tailwindcss/sort-classes": [
+      "warn",
+      {
+        "printWidth": 100
+      }
+    ]
+  }
+}

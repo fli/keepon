@@ -23,19 +23,18 @@
         "name": "next"
       }
     ],
-    "baseUrl": "./src",
     "paths": {
       "@/*": [
-        "./*"
+        "./src/*"
       ],
       "@/components/*": [
-        "components/*"
+        "./src/components/*"
       ],
       "@/lib/*": [
-        "lib/*"
+        "./src/lib/*"
       ],
       "@/server/*": [
-        "server/*"
+        "./src/server/*"
       ]
     }
   },

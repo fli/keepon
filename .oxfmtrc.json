@@ -1,0 +1,13 @@
+{
+  "$schema": "https://oxc.rs/schema/oxfmtrc.json",
+  "printWidth": 100,
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/.turbo/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.output/**",
+    "src/lib/db/generated.ts"
+  ]
+}
