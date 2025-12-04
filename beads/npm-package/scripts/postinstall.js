@@ -184,7 +184,7 @@ async function install() {
       const output = execSync(`"${binaryPath}" version`, { encoding: 'utf8' });
       console.log(`✓ bd installed successfully: ${output.trim()}`);
     } catch (err) {
-      console.warn('Warning: Could not verify binary version');
+      console.warn('Warning: Could not verify binary version', err);
     }
 
   } catch (err) {

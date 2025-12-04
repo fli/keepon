@@ -10,7 +10,7 @@
  * 4. Claude Code for Web simulation
  */
 
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -437,6 +437,7 @@ async function runTests() {
       results.passed++;
     } catch (err) {
       results.failed++;
+      logError(`Binary functionality test failed: ${err.message}`);
     }
 
     // Test 3: Basic workflow
@@ -446,6 +447,7 @@ async function runTests() {
       results.passed++;
     } catch (err) {
       results.failed++;
+      logError(`Basic workflow test failed: ${err.message}`);
     }
 
     // Test 4: Claude Code for Web
@@ -455,6 +457,7 @@ async function runTests() {
       results.passed++;
     } catch (err) {
       results.failed++;
+      logError(`Claude Code web simulation failed: ${err.message}`);
     }
 
     // Test 5: Platform detection
@@ -464,6 +467,7 @@ async function runTests() {
       results.passed++;
     } catch (err) {
       results.failed++;
+      logError(`Platform detection test failed: ${err.message}`);
     }
 
   } finally {

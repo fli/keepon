@@ -71,10 +71,15 @@ const serviceProductSchema = baseProductSchema.extend({
   image5Url: z.string().nullable(),
 })
 
-export const productListSchema = z.array(
-  z.union([creditPackProductSchema, itemProductSchema, serviceProductSchema])
-)
+export const productSchema = z.union([
+  creditPackProductSchema,
+  itemProductSchema,
+  serviceProductSchema,
+])
+
+export const productListSchema = z.array(productSchema)
 export type ProductList = z.infer<typeof productListSchema>
+export type Product = z.infer<typeof productSchema>
 
 const productTypeSchema = z.enum(['creditPack', 'service', 'item'])
 
@@ -93,6 +98,7 @@ export const querySchema = z.object({
 })
 
 export type QueryParams = z.infer<typeof querySchema>
+export type ProductFilters = QueryParams & { productId?: string }
 
 export type RawProductRow = {
   id: string
@@ -321,7 +327,7 @@ const mapRowToProduct = (row: RawProductRow) => {
 
 export const fetchProductsForTrainer = async (
   trainerId: string,
-  filters: QueryParams
+  filters: ProductFilters
 ): Promise<RawProductRow[]> => {
   const greatestUpdatedAt = sql<Date>`
     GREATEST(
@@ -381,6 +387,10 @@ export const fetchProductsForTrainer = async (
     ])
     .where('product.trainer_id', '=', trainerId)
 
+  if (filters.productId) {
+    query = query.where('product.id', '=', filters.productId)
+  }
+
   if (filters.type) {
     if (filters.type === 'creditPack') {
       query = query.where('product.is_credit_pack', '=', true)
@@ -416,4 +426,18 @@ export const fetchProductsForTrainer = async (
 export async function listProducts(trainerId: string, filters: QueryParams): Promise<ProductList> {
   const rows = await fetchProductsForTrainer(trainerId, filters)
   return productListSchema.parse(rows.map(mapRowToProduct))
+}
+
+export async function getProductById(
+  trainerId: string,
+  productId: string
+): Promise<Product | null> {
+  const rows = await fetchProductsForTrainer(trainerId, { productId })
+  const row = rows[0]
+
+  if (!row) {
+    return null
+  }
+
+  return productSchema.parse(mapRowToProduct(row))
 }

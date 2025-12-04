@@ -227,6 +227,9 @@ async function showIssueDetail(issueId) {
     }
 }
 
+// Expose for inline onclick handlers defined in templates
+window.showIssueDetail = showIssueDetail;
+
 // Close modal
 document.querySelector('.close').onclick = function() {
     document.getElementById('issue-modal').style.display = 'none';

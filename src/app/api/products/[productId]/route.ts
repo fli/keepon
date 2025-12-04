@@ -5,6 +5,7 @@ import {
   authenticateTrainerRequest,
   buildErrorResponse,
 } from '../../_lib/accessToken'
+import { getProductById } from '@/server/products'
 
 export const runtime = 'nodejs'
 
@@ -20,7 +21,86 @@ const deleteResponseSchema = z.object({
   count: z.number().int().nonnegative(),
 })
 
-type HandlerContext = RouteContext<'/api/products/[productId]'>
+type HandlerContext = { params: Promise<{ productId: string }> }
+
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
+
+  if (!paramsResult.success) {
+    const detail = paramsResult.error.issues
+      .map(issue => issue.message)
+      .join('; ')
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Invalid product identifier',
+        detail:
+          detail ||
+          'Request parameters did not match the expected product identifier schema.',
+        type: '/invalid-parameter',
+      }),
+      { status: 400 }
+    )
+  }
+
+  const authorization = await authenticateTrainerRequest(request, {
+    extensionFailureLogMessage:
+      'Failed to extend access token expiry while fetching product',
+  })
+
+  if (!authorization.ok) {
+    return authorization.response
+  }
+
+  const { productId } = paramsResult.data
+
+  try {
+    const product = await getProductById(authorization.trainerId, productId)
+
+    if (!product) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 404,
+          title: 'Product not found',
+          detail:
+            'We could not find a product with the specified identifier for the authenticated trainer.',
+          type: '/product-not-found',
+        }),
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(product)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 500,
+          title: 'Failed to parse product data from database',
+          detail: 'Product data did not match the expected response schema.',
+          type: '/invalid-response',
+        }),
+        { status: 500 }
+      )
+    }
+
+    console.error('Failed to fetch product', {
+      trainerId: authorization.trainerId,
+      productId,
+      error,
+    })
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 500,
+        title: 'Failed to fetch product',
+        type: '/internal-server-error',
+      }),
+      { status: 500 }
+    )
+  }
+}
 
 export async function DELETE(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
