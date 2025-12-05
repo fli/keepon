@@ -1,23 +1,14 @@
+import Link from 'next/link'
+
 import { AlertCircle, Bell, Calendar, ChevronRight, Clock, PenSquare } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { DashboardActions } from './dashboard-actions'
 
 export function DashboardHeaderSkeleton() {
-  const primaryActions = [
-    { label: 'Sell credit pack', width: 'w-[148px]' },
-    { label: 'Sell service', width: 'w-[126px]' },
-    { label: 'Sell item', width: 'w-[112px]' },
-    { label: 'Sell subscription', width: 'w-[172px]' },
-  ]
-
-  const secondaryActions = [
-    { label: 'Charge custom amount', width: 'w-[196px]' },
-    { label: 'Add expense', width: 'w-[134px]' },
-  ]
-
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
       <div className="flex flex-col gap-3">
@@ -26,52 +17,14 @@ export function DashboardHeaderSkeleton() {
           <Skeleton className="h-9 w-44" />
           <Skeleton className="h-9 w-40" />
         </div>
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
-            {primaryActions.map(({ label, width }) => (
-              <Button
-                key={label}
-                variant="secondary"
-                type="button"
-                disabled
-                className={`pointer-events-none justify-center ${width}`}
-              >
-                <span className="sr-only">{label}</span>
-                <Skeleton aria-hidden className="h-4 w-full" />
-              </Button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              type="button"
-              disabled
-              className={`pointer-events-none justify-center ${secondaryActions[0].width}`}
-            >
-              <span className="sr-only">{secondaryActions[0].label}</span>
-              <Skeleton aria-hidden className="h-4 w-full" />
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              type="button"
-              disabled
-              className={`pointer-events-none justify-center ${secondaryActions[1].width}`}
-            >
-              <span className="sr-only">{secondaryActions[1].label}</span>
-              <Skeleton aria-hidden className="h-4 w-full" />
-            </Button>
-          </div>
-        </div>
+        <DashboardActions />
       </div>
 
       <Button
         variant="outline"
         size="icon-lg"
         aria-label="Notifications"
-        disabled
-        className="pointer-events-none"
+        render={<Link href="/dashboard/notifications" />}
       >
         <Bell className="size-5" aria-hidden />
       </Button>

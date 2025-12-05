@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { getDashboardSummary, type DashboardSummary } from '@/server/dashboard'
 import { readSessionFromCookies } from '../../session.server'
+import { DashboardActions } from './dashboard-actions'
 import { ProjectedPaidCard } from './projected-paid-card'
 import {
   DashboardHeaderSkeleton,
@@ -124,32 +125,7 @@ function DashboardHeader({
           ) : null}
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" type="button" render={<Link href="/dashboard/sell/credit-pack" />}>
-              Sell credit pack
-            </Button>
-            <Button variant="secondary" type="button">
-              Sell service
-            </Button>
-            <Button variant="secondary" type="button">
-              Sell item
-            </Button>
-            <Button variant="secondary" type="button">
-              Sell subscription
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" type="button">
-              Charge custom amount
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" type="button">
-              Add expense
-            </Button>
-          </div>
-        </div>
+        <DashboardActions />
       </div>
 
       <div className="relative">
