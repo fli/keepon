@@ -6,7 +6,13 @@ import {
   authenticateTrainerRequest,
   buildErrorResponse,
 } from '../../_lib/accessToken'
-import { adaptSaleProductRow, fetchSaleProducts, saleProductSchema, type FetchSaleProductFilters } from '../shared'
+import {
+  adaptSaleProductRow,
+  fetchSaleProducts,
+  geoSchema,
+  saleProductSchema,
+  type FetchSaleProductFilters,
+} from '../shared'
 
 const paramsSchema = z.object({
   saleProductId: z
@@ -32,6 +38,20 @@ class PaidSaleProductDeletionNotAllowedError extends Error {
   }
 }
 
+class CantEditProductPricePaidByStripeError extends Error {
+  constructor() {
+    super("You can't edit a product that has been paid by a Stripe payment.")
+    this.name = 'CantEditProductPricePaidByStripeError'
+  }
+}
+
+const determineSaleProductType = (flags: { isService: boolean | null; isCreditPack: boolean | null; isItem: boolean | null }) => {
+  if (flags.isService) return 'service' as const
+  if (flags.isCreditPack) return 'creditPack' as const
+  if (flags.isItem) return 'item' as const
+  throw new Error('Sale product row has unsupported type flags')
+}
+
 const normalizeDeletedCount = (value: unknown) => {
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : 0
@@ -48,6 +68,52 @@ const normalizeDeletedCount = (value: unknown) => {
 
   return 0
 }
+
+const moneyAmountSchema = z
+  .union([z.string(), z.number()])
+  .transform((value) => {
+    const numeric =
+      typeof value === 'number'
+        ? value
+        : (() => {
+            const trimmed = value.trim()
+            return Number.parseFloat(trimmed)
+          })()
+
+    if (!Number.isFinite(numeric)) {
+      throw new Error('price must be a valid number')
+    }
+
+    if (numeric < 0) {
+      throw new Error('price must be at least 0')
+    }
+
+    return numeric.toFixed(2)
+  })
+  .pipe(z.string().regex(/^\d+(?:\.\d{2})$/, 'price must be a non-negative amount with two decimals'))
+
+const nullableTrimmedStringSchema = z
+  .union([z.string(), z.null()])
+  .optional()
+  .transform((value) => {
+    if (value === undefined || value === null) return value === null ? null : undefined
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  })
+
+const patchRequestBodySchema = z
+  .object({
+    price: moneyAmountSchema.optional(),
+    name: z.string().trim().min(1, 'name must not be empty').optional(),
+    quantity: z.number().int().min(1, 'quantity must be at least 1').optional(),
+    totalCredits: z.number().int().min(0, 'totalCredits must be at least 0').optional(),
+    durationMinutes: z.number().int().min(1, 'durationMinutes must be at least 1').optional(),
+    location: nullableTrimmedStringSchema,
+    address: nullableTrimmedStringSchema,
+    geo: geoSchema.nullable().optional(),
+    googlePlaceId: nullableTrimmedStringSchema,
+  })
+  .strict()
 
 export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
@@ -131,6 +197,278 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       buildErrorResponse({
         status: 500,
         title: 'Failed to fetch sale product',
+        type: '/internal-server-error',
+      }),
+      { status: 500 }
+    )
+  }
+}
+
+export async function PATCH(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
+
+  if (!paramsResult.success) {
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Invalid sale product identifier',
+        detail: detail || 'Request parameters did not match the expected sale product identifier schema.',
+        type: '/invalid-parameter',
+      }),
+      { status: 400 }
+    )
+  }
+
+  let parsedBody: z.infer<typeof patchRequestBodySchema>
+  try {
+    const rawText = await request.text()
+    const rawBody: unknown = rawText.trim().length === 0 ? {} : (JSON.parse(rawText) as unknown)
+
+    const bodyResult = patchRequestBodySchema.safeParse(rawBody)
+
+    if (!bodyResult.success) {
+      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
+
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 400,
+          title: 'Invalid request body',
+          detail: detail || 'Request body did not match the expected schema.',
+          type: '/invalid-body',
+        }),
+        { status: 400 }
+      )
+    }
+
+    parsedBody = bodyResult.data
+  } catch (error) {
+    console.error('Failed to parse sale product update request body', error)
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Invalid JSON payload',
+        detail: 'Request body must be valid JSON.',
+        type: '/invalid-json',
+      }),
+      { status: 400 }
+    )
+  }
+
+  const authorization = await authenticateTrainerRequest(request, {
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating sale product',
+  })
+
+  if (!authorization.ok) {
+    return authorization.response
+  }
+
+  const { saleProductId } = paramsResult.data
+  const hasUpdates = Object.values(parsedBody).some((value) => value !== undefined)
+
+  try {
+    let saleProductType: 'creditPack' | 'item' | 'service'
+    let paymentId: string | null = null
+
+    await db.transaction().execute(async (trx) => {
+      const details = await trx
+        .selectFrom('sale_product as saleProduct')
+        .innerJoin('sale', 'sale.id', 'saleProduct.sale_id')
+        .leftJoin('payment', 'payment.sale_id', 'sale.id')
+        .select((eb) => [
+          eb.ref('sale.id').as('saleId'),
+          eb.ref('payment.is_stripe').as('isStripePayment'),
+          eb.ref('payment.id').as('paymentId'),
+          eb.ref('saleProduct.is_credit_pack').as('isCreditPack'),
+          eb.ref('saleProduct.is_item').as('isItem'),
+          eb.ref('saleProduct.is_service').as('isService'),
+        ])
+        .where('saleProduct.id', '=', saleProductId)
+        .where('saleProduct.trainer_id', '=', authorization.trainerId)
+        .executeTakeFirst()
+
+      if (!details) {
+        throw new SaleProductNotFoundError()
+      }
+
+      saleProductType = determineSaleProductType({
+        isService: details.isService,
+        isCreditPack: details.isCreditPack,
+        isItem: details.isItem,
+      })
+
+      paymentId = details.paymentId ?? null
+
+      if (details.isStripePayment && parsedBody.price !== undefined) {
+        throw new CantEditProductPricePaidByStripeError()
+      }
+
+      if (hasUpdates) {
+        const saleProductUpdate: Record<string, unknown> = {}
+
+        if (parsedBody.price !== undefined) {
+          saleProductUpdate.price = parsedBody.price
+        }
+
+        if (parsedBody.name !== undefined) {
+          saleProductUpdate.name = parsedBody.name
+        }
+
+        if (Object.keys(saleProductUpdate).length > 0) {
+          saleProductUpdate.updated_at = sql`now()`
+          await trx
+            .updateTable('sale_product')
+            .set(saleProductUpdate)
+            .where('sale_product.id', '=', saleProductId)
+            .where('sale_product.trainer_id', '=', authorization.trainerId)
+            .executeTakeFirst()
+        }
+
+        if (parsedBody.price !== undefined && paymentId) {
+          await trx
+            .updateTable('payment')
+            .set({
+              amount: parsedBody.price,
+              updated_at: sql`now()`,
+            })
+            .where('payment.id', '=', paymentId)
+            .where('payment.trainer_id', '=', authorization.trainerId)
+            .executeTakeFirst()
+        }
+
+        switch (saleProductType) {
+          case 'creditPack': {
+            if (parsedBody.totalCredits !== undefined) {
+              await trx
+                .updateTable('sale_credit_pack')
+                .set({
+                  total_credits: parsedBody.totalCredits,
+                  updated_at: sql`now()`,
+                })
+                .where('sale_credit_pack.id', '=', saleProductId)
+                .where('sale_credit_pack.trainer_id', '=', authorization.trainerId)
+                .executeTakeFirst()
+            }
+            break
+          }
+          case 'item': {
+            if (parsedBody.quantity !== undefined) {
+              await trx
+                .updateTable('sale_item')
+                .set({
+                  quantity: parsedBody.quantity,
+                  updated_at: sql`now()`,
+                })
+                .where('sale_item.id', '=', saleProductId)
+                .where('sale_item.trainer_id', '=', authorization.trainerId)
+                .executeTakeFirst()
+            }
+            break
+          }
+          case 'service': {
+            const serviceUpdate: Record<string, unknown> = {}
+
+            if (parsedBody.durationMinutes !== undefined) {
+              serviceUpdate.duration = sql`make_interval(mins := ${parsedBody.durationMinutes})`
+            }
+
+            if (parsedBody.location !== undefined) {
+              serviceUpdate.location = parsedBody.location
+            }
+
+            if (parsedBody.address !== undefined) {
+              serviceUpdate.address = parsedBody.address
+            }
+
+            if (parsedBody.googlePlaceId !== undefined) {
+              serviceUpdate.google_place_id = parsedBody.googlePlaceId
+            }
+
+            if (parsedBody.geo !== undefined) {
+              serviceUpdate.geo =
+                parsedBody.geo === null ? null : sql`point(${parsedBody.geo.lat}, ${parsedBody.geo.lng})`
+            }
+
+            if (Object.keys(serviceUpdate).length > 0) {
+              serviceUpdate.updated_at = sql`now()`
+              await trx
+                .updateTable('sale_service')
+                .set(serviceUpdate)
+                .where('sale_service.id', '=', saleProductId)
+                .where('sale_service.trainer_id', '=', authorization.trainerId)
+                .executeTakeFirst()
+            }
+            break
+          }
+        }
+      }
+    })
+
+    const rows = await fetchSaleProducts(authorization.trainerId, { saleProductId })
+    const saleProductRow = rows[0]
+
+    if (!saleProductRow) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 404,
+          title: 'Sale product not found',
+          detail: 'We could not find a sale product with the specified identifier for the authenticated trainer.',
+          type: '/sale-product-not-found',
+        }),
+        { status: 404 }
+      )
+    }
+
+    const responseBody = saleProductSchema.parse(adaptSaleProductRow(saleProductRow))
+
+    return NextResponse.json(responseBody)
+  } catch (error) {
+    if (error instanceof SaleProductNotFoundError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 404,
+          title: 'Sale product not found',
+          detail: 'We could not find a sale product with the specified identifier for the authenticated trainer.',
+          type: '/sale-product-not-found',
+        }),
+        { status: 404 }
+      )
+    }
+
+    if (error instanceof CantEditProductPricePaidByStripeError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 409,
+          title: "You can't edit a product that has been paid by a Stripe payment.",
+          type: '/cant-edit-product-price-paid-by-stripe',
+        }),
+        { status: 409 }
+      )
+    }
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 500,
+          title: 'Failed to parse sale product data from database',
+          detail: 'Sale product data did not match the expected response schema.',
+          type: '/invalid-response',
+        }),
+        { status: 500 }
+      )
+    }
+
+    console.error('Failed to update sale product', {
+      trainerId: authorization.trainerId,
+      saleProductId,
+      error,
+    })
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 500,
+        title: 'Failed to update sale product',
         type: '/internal-server-error',
       }),
       { status: 500 }
