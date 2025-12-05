@@ -2,7 +2,22 @@ import { NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerOrClientRequest, authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
-import { adaptSaleProductRow, fetchSaleProducts, saleProductListSchema, saleProductTypeSchema } from './shared'
+import {
+  adaptSaleProductRow,
+  fetchSaleProducts,
+  geoSchema,
+  saleProductListSchema,
+  saleProductSchema,
+  saleProductTypeSchema,
+} from './shared'
+
+type PgError = { code?: string; constraint?: string }
+
+const isPgError = (error: unknown): error is PgError =>
+  typeof error === 'object' && error !== null && 'code' in error && typeof (error as PgError).code === 'string'
+
+class SaleNotFoundError extends Error {}
+class SaleAlreadyHasProductError extends Error {}
 
 const querySchema = z.object({
   type: saleProductTypeSchema.optional(),
@@ -114,20 +129,69 @@ export async function GET(request: Request) {
   }
 }
 
-const createSaleProductSchema = z.object({
+const moneyAmountSchema = z
+  .union([z.string(), z.number()])
+  .transform((value) => {
+    const numeric =
+      typeof value === 'number'
+        ? value
+        : (() => {
+            const trimmed = value.trim()
+            return Number.parseFloat(trimmed)
+          })()
+
+    if (!Number.isFinite(numeric)) {
+      throw new Error('price must be a valid number')
+    }
+
+    if (numeric < 0) {
+      throw new Error('price must be at least 0')
+    }
+
+    return numeric.toFixed(2)
+  })
+  .pipe(z.string().regex(/^\d+(?:\.\d{2})$/, 'price must be a non-negative amount with two decimals'))
+
+const baseSaleProductSchema = z.object({
   saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }),
-  productId: z.string().optional(),
-  price: z.union([z.string(), z.number()]).transform((value) => value.toString()),
-  currency: z.string().min(1),
-  name: z.string().min(1),
-  type: saleProductTypeSchema,
-  totalCredits: z.number().int().optional(),
-  quantity: z.number().int().optional(),
-  durationMinutes: z.number().int().optional(),
-  location: z.string().nullable().optional(),
-  address: z.string().nullable().optional(),
-  googlePlaceId: z.string().nullable().optional(),
+  price: moneyAmountSchema,
+  currency: z.string().trim().min(1, 'currency must not be empty'),
+  name: z.string().trim().min(1, 'name must not be empty'),
+  productId: z
+    .string()
+    .trim()
+    .min(1, 'productId must not be empty')
+    .nullable()
+    .optional(),
 })
+
+const createSaleProductSchema = z.discriminatedUnion('type', [
+  baseSaleProductSchema.extend({
+    type: z.literal('creditPack'),
+    totalCredits: z.number().int().min(0, 'totalCredits must be at least 0'),
+  }),
+  baseSaleProductSchema.extend({
+    type: z.literal('item'),
+    quantity: z.number().int().min(1, 'quantity must be at least 1').optional(),
+  }),
+  baseSaleProductSchema.extend({
+    type: z.literal('service'),
+    durationMinutes: z.number().int().min(1, 'durationMinutes must be at least 1'),
+    location: z.string().nullable().optional(),
+    address: z.string().nullable().optional(),
+    geo: geoSchema.nullable().optional(),
+    googlePlaceId: z.string().nullable().optional(),
+  }),
+])
+
+const toNullableTrimmedString = (value?: string | null) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
 
 export async function POST(request: Request) {
   let body: unknown
@@ -181,7 +245,7 @@ export async function POST(request: Request) {
         .executeTakeFirst()
 
       if (!sale) {
-        throw new Error('Sale not found for trainer')
+        throw new SaleNotFoundError()
       }
 
       const inserted = await trx
@@ -192,7 +256,7 @@ export async function POST(request: Request) {
           sale_id: data.saleId,
           price: data.price,
           name: data.name,
-          product_id: data.productId ?? null,
+          product_id: toNullableTrimmedString(data.productId),
           is_credit_pack: data.type === 'creditPack',
           is_item: data.type === 'item',
           is_service: data.type === 'service',
@@ -200,6 +264,12 @@ export async function POST(request: Request) {
         })
         .returning('id')
         .executeTakeFirst()
+        .catch((error: unknown) => {
+          if (isPgError(error) && error.code === '23505' && error.constraint === 'unique_sale_id') {
+            throw new SaleAlreadyHasProductError()
+          }
+          throw error
+        })
 
       if (!inserted) {
         throw new Error('Failed to insert sale product')
@@ -212,7 +282,7 @@ export async function POST(request: Request) {
             .values({
               id: inserted.id,
               trainer_id: auth.trainerId,
-              total_credits: data.totalCredits ?? 0,
+              total_credits: data.totalCredits,
               is_credit_pack: true,
             })
             .execute()
@@ -231,17 +301,16 @@ export async function POST(request: Request) {
           break
         }
         case 'service': {
-          const minutes = data.durationMinutes ?? 60
           await trx
             .insertInto('sale_service')
             .values({
               id: inserted.id,
               trainer_id: auth.trainerId,
-              duration: sql`make_interval(mins := ${minutes})`,
-              location: data.location ?? null,
-              address: data.address ?? null,
-              google_place_id: data.googlePlaceId ?? null,
-              geo: null,
+              duration: sql`make_interval(mins := ${data.durationMinutes})`,
+              location: toNullableTrimmedString(data.location),
+              address: toNullableTrimmedString(data.address),
+              google_place_id: toNullableTrimmedString(data.googlePlaceId),
+              geo: data.geo ? sql`point(${data.geo.lat}, ${data.geo.lng})` : null,
               is_service: true,
             })
             .execute()
@@ -276,9 +345,43 @@ export async function POST(request: Request) {
       )
     }
 
-    const responseBody = adaptSaleProductRow(firstRow)
+    const responseBody = saleProductSchema.parse(adaptSaleProductRow(firstRow))
     return NextResponse.json(responseBody)
   } catch (error) {
+    if (error instanceof SaleNotFoundError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 400,
+          title: 'Sale not found',
+          type: '/parameter-resource-not-found',
+        }),
+        { status: 400 }
+      )
+    }
+
+    if (error instanceof SaleAlreadyHasProductError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 409,
+          title: 'The sale already has a product attached.',
+          type: '/sale-already-has-product',
+        }),
+        { status: 409 }
+      )
+    }
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 500,
+          title: 'Failed to parse sale product data after creation',
+          detail: 'Sale product data did not match the expected response schema.',
+          type: '/invalid-response',
+        }),
+        { status: 500 }
+      )
+    }
+
     console.error('Failed to create sale product', error)
     return NextResponse.json(
       buildErrorResponse({
