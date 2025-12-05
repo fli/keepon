@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { authenticateTrainerOrClientRequest, authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { adaptSaleRow, fetchSales, saleSchema } from '../shared'
 
 const paramsSchema = z.object({
   saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }),
@@ -38,6 +39,88 @@ const normalizeDeletedCount = (value: unknown) => {
   }
 
   return 0
+}
+
+export async function GET(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
+
+  if (!paramsResult.success) {
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Invalid sale identifier',
+        detail: detail || undefined,
+        type: '/invalid-parameter',
+      }),
+      { status: 400 }
+    )
+  }
+
+  const auth = await authenticateTrainerOrClientRequest(request, {
+    trainerExtensionFailureLogMessage: 'Failed to extend access token expiry while fetching sale for trainer request',
+    clientExtensionFailureLogMessage: 'Failed to extend access token expiry while fetching sale for client request',
+  })
+
+  if (!auth.ok) {
+    return auth.response
+  }
+
+  const { saleId } = paramsResult.data
+
+  try {
+    const rows = await fetchSales({
+      trainerId: auth.trainerId,
+      clientId: auth.actor === 'client' ? auth.clientId : undefined,
+      saleId,
+    })
+
+    const saleRow = rows[0]
+
+    if (!saleRow) {
+      throw new SaleNotFoundError()
+    }
+
+    const sale = saleSchema.parse(adaptSaleRow(saleRow))
+
+    return NextResponse.json(sale)
+  } catch (error) {
+    if (error instanceof SaleNotFoundError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 404,
+          title: 'Sale not found',
+          detail: 'No sale exists for this trainer with that id.',
+          type: '/sale-not-found',
+        }),
+        { status: 404 }
+      )
+    }
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 500,
+          title: 'Failed to parse sale data from database',
+          detail: 'Sale data did not match the expected response schema.',
+          type: '/invalid-response',
+        }),
+        { status: 500 }
+      )
+    }
+
+    console.error('Failed to fetch sale', { saleId, actor: auth.actor, error })
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 500,
+        title: 'Failed to fetch sale',
+        type: '/internal-server-error',
+      }),
+      { status: 500 }
+    )
+  }
 }
 
 export async function DELETE(request: NextRequest, context: HandlerContext) {
