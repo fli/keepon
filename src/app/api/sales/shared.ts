@@ -207,6 +207,7 @@ export const fetchSales = async (options: {
   trainerId: string
   clientId?: string
   updatedAfter?: Date
+  saleId?: string
 }): Promise<RawSaleRow[]> => {
   const saleProductSummary = buildSaleProductSummary()
   const paymentSummary = buildPaymentSummary()
@@ -251,6 +252,10 @@ export const fetchSales = async (options: {
 
   if (options.clientId) {
     query = query.where('sale.client_id', '=', options.clientId)
+  }
+
+  if (options.saleId) {
+    query = query.where('sale.id', '=', options.saleId)
   }
 
   const updatedAfter = options.updatedAfter

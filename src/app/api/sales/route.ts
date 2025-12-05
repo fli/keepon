@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateTrainerOrClientRequest, authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
-import { adaptSaleRow, fetchSales, saleListSchema, salesQuerySchema } from './shared'
+import { adaptSaleRow, fetchSales, saleListSchema, saleSchema, salesQuerySchema } from './shared'
 import { db } from '@/lib/db'
 
 export async function GET(request: Request) {
@@ -111,6 +111,20 @@ const parseDueAfter = (value: string | null | undefined) => {
   return new Date(Date.now() + totalDays * 24 * 60 * 60 * 1000)
 }
 
+class ClientSessionAlreadyPaidError extends Error {
+  constructor() {
+    super('Client session already has a sale recorded')
+    this.name = 'ClientSessionAlreadyPaidError'
+  }
+}
+
+class ClientSessionNotFoundError extends Error {
+  constructor() {
+    super('Client session not found for trainer')
+    this.name = 'ClientSessionNotFoundError'
+  }
+}
+
 export async function POST(request: Request) {
   let body: unknown
   try {
@@ -153,7 +167,7 @@ export async function POST(request: Request) {
   const { clientId, note, dueAfter, paymentRequestPassOnTransactionFee, clientSessionId } = parsed.data
 
   try {
-    const created = await db.transaction().execute(async (trx) => {
+    const saleId = await db.transaction().execute(async (trx) => {
       const sale = await trx
         .insertInto('sale')
         .values({
@@ -173,6 +187,21 @@ export async function POST(request: Request) {
       await trx.insertInto('sale_payment_status').values({ sale_id: sale.id, payment_status: 'none' }).execute()
 
       if (clientSessionId) {
+        const existingSession = await trx
+          .selectFrom('client_session')
+          .select(['id', 'sale_id'])
+          .where('id', '=', clientSessionId)
+          .where('trainer_id', '=', auth.trainerId)
+          .executeTakeFirst()
+
+        if (!existingSession) {
+          throw new ClientSessionNotFoundError()
+        }
+
+        if (existingSession.sale_id) {
+          throw new ClientSessionAlreadyPaidError()
+        }
+
         const updated = await trx
           .updateTable('client_session')
           .set({ sale_id: sale.id })
@@ -182,15 +211,58 @@ export async function POST(request: Request) {
           .executeTakeFirst()
 
         if (!updated) {
-          throw new Error('Client session not found for trainer')
+          throw new ClientSessionNotFoundError()
         }
       }
 
-      return sale
+      return sale.id
     })
 
-    return NextResponse.json({ id: created.id })
+    const saleRows = await fetchSales({ trainerId: auth.trainerId, clientId, saleId })
+    const sale = saleRows[0] ? saleSchema.parse(adaptSaleRow(saleRows[0])) : null
+
+    if (!sale) {
+      throw new Error('Failed to load created sale')
+    }
+
+    return NextResponse.json(sale)
   } catch (error) {
+    if (error instanceof ClientSessionAlreadyPaidError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 409,
+          title: "You've already paid for this.",
+          detail: 'A sale has already been recorded for this client session.',
+          type: '/already-paid-for',
+        }),
+        { status: 409 }
+      )
+    }
+
+    if (error instanceof ClientSessionNotFoundError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 404,
+          title: 'Client session not found',
+          detail: 'No client session exists for this trainer with that id.',
+          type: '/client-session-not-found',
+        }),
+        { status: 404 }
+      )
+    }
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 500,
+          title: 'Failed to parse sale data from database',
+          detail: 'Sale data did not match the expected response schema.',
+          type: '/invalid-response',
+        }),
+        { status: 500 }
+      )
+    }
+
     console.error('Failed to create sale', error)
     return NextResponse.json(
       buildErrorResponse({
