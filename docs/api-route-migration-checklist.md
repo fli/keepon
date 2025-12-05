@@ -231,7 +231,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 - [x] `GET` `/sales` — security: `serviceProviderOrClient` _(source: ../keepon-full/api-server/src/routes/sales.get.ts)_
 - [x] `POST` `/sales` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/sales.post.ts)_
-- [ ] `DELETE` `/sales/:saleId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/sales.[saleId].delete.ts)_
+- [x] `DELETE` `/sales/:saleId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/sales.[saleId].delete.ts)_
 - [ ] `GET` `/sales/:saleId` — security: `serviceProviderOrClient` _(source: ../keepon-full/api-server/src/routes/sales.[saleId].get.ts)_
 - [ ] `PATCH` `/sales/:saleId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/sales.[saleId].patch.ts)_
 - [ ] `DELETE` `/sales/:saleId/paymentRequest` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/sales.[saleId].payment-request.delete.ts)_
