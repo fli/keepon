@@ -104,10 +104,16 @@ function DashboardHeader({
         <h1 className="text-3xl leading-tight font-semibold">{greeting}</h1>
         <div className="flex flex-wrap gap-2">
           {showTrial && trialText ? (
-            <Button variant="outline" size="sm" type="button" className="gap-1 pr-2">
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              className="gap-1 pr-2"
+              render={<Link href="/dashboard/subscription" />}
+            >
               <span>{trialText}</span>
               <ChevronRight className="size-4" aria-hidden />
-              <span className="sr-only">View plan</span>
+              <span className="sr-only">View subscription options</span>
             </Button>
           ) : null}
           {typeof data?.trainer.smsCredits === 'number' ? (

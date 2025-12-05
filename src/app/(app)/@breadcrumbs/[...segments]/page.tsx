@@ -32,6 +32,7 @@ const TITLE_MAP: Record<string, string> = {
   users: 'Users',
   add: 'Add',
   make: 'Make',
+  subscription: 'Subscription',
 }
 
 function formatSegment(segment: string, parent?: string): string {
