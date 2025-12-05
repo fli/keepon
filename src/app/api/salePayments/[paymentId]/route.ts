@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import { authenticateTrainerOrClientRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { authenticateTrainerOrClientRequest, authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { adaptSalePaymentRow, salePaymentSchema, type SalePaymentRow } from '../../_lib/salePayments'
 
 const paramsSchema = z.object({
@@ -9,6 +9,37 @@ const paramsSchema = z.object({
 })
 
 type HandlerContext = RouteContext<'/api/salePayments/[paymentId]'>
+
+class SalePaymentNotFoundError extends Error {
+  constructor() {
+    super('Sale payment not found')
+    this.name = 'SalePaymentNotFoundError'
+  }
+}
+
+class StripePaymentDeletionNotAllowedError extends Error {
+  constructor() {
+    super("You can't delete a Stripe payment")
+    this.name = 'StripePaymentDeletionNotAllowedError'
+  }
+}
+
+const normalizeDeletedCount = (value: unknown) => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0
+  }
+
+  if (typeof value === 'bigint') {
+    return Number(value)
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+
+  return 0
+}
 export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
@@ -135,6 +166,105 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       buildErrorResponse({
         status: 500,
         title: 'Failed to fetch sale payment',
+        type: '/internal-server-error',
+      }),
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest, context: HandlerContext) {
+  const paramsResult = paramsSchema.safeParse(await context.params)
+
+  if (!paramsResult.success) {
+    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Invalid payment identifier',
+        detail: detail || 'Request parameters did not match the expected payment identifier schema.',
+        type: '/invalid-parameter',
+      }),
+      { status: 400 }
+    )
+  }
+
+  const authorization = await authenticateTrainerRequest(request, {
+    extensionFailureLogMessage: 'Failed to extend access token expiry while deleting sale payment',
+  })
+
+  if (!authorization.ok) {
+    return authorization.response
+  }
+
+  const { paymentId } = paramsResult.data
+
+  try {
+    await db.transaction().execute(async (trx) => {
+      const paymentRow = await trx
+        .selectFrom('payment')
+        .select(['is_stripe'])
+        .where('payment.id', '=', paymentId)
+        .where('payment.trainer_id', '=', authorization.trainerId)
+        .executeTakeFirst()
+
+      if (!paymentRow) {
+        throw new SalePaymentNotFoundError()
+      }
+
+      if (paymentRow.is_stripe) {
+        throw new StripePaymentDeletionNotAllowedError()
+      }
+
+      const deleteResult = await trx
+        .deleteFrom('payment')
+        .where('payment.id', '=', paymentId)
+        .where('payment.trainer_id', '=', authorization.trainerId)
+        .executeTakeFirst()
+
+      const deletedCount = normalizeDeletedCount(deleteResult?.numDeletedRows ?? 0)
+
+      if (deletedCount === 0) {
+        throw new SalePaymentNotFoundError()
+      }
+    })
+
+    return new NextResponse(null, { status: 204 })
+  } catch (error) {
+    if (error instanceof SalePaymentNotFoundError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 404,
+          title: 'Payment not found',
+          detail: 'We could not find a sale payment with the specified identifier for the authenticated account.',
+          type: '/sale-payment-not-found',
+        }),
+        { status: 404 }
+      )
+    }
+
+    if (error instanceof StripePaymentDeletionNotAllowedError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 409,
+          title: "You can't delete a Stripe payment.",
+          type: '/cant-delete-stripe-payment',
+        }),
+        { status: 409 }
+      )
+    }
+
+    console.error('Failed to delete sale payment', {
+      trainerId: authorization.trainerId,
+      paymentId,
+      error,
+    })
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 500,
+        title: 'Failed to delete sale payment',
         type: '/internal-server-error',
       }),
       { status: 500 }
