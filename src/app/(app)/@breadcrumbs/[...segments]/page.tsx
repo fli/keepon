@@ -58,6 +58,10 @@ async function buildCrumbs(segments: string[]): Promise<Crumb[]> {
 
   if (normalized.length === 0) return []
 
+  if (normalized[0] === 'dashboard' && normalized[1] === 'sell' && normalized[2] === 'credit-pack') {
+    return buildSellCreditPackCrumbs(normalized)
+  }
+
   const dynamicLabels: Record<number, string | undefined> = {}
 
   if (normalized[0] === 'clients' && normalized[1] && normalized[1] !== 'add') {
@@ -65,24 +69,6 @@ async function buildCrumbs(segments: string[]): Promise<Crumb[]> {
     const match = clients.find((client) => client.id === normalized[1])
     if (match) {
       dynamicLabels[1] = [match.firstName, match.lastName].filter(Boolean).join(' ').trim() || 'Client'
-    }
-  }
-
-  if (normalized[0] === 'dashboard' && normalized[1] === 'sell' && normalized[2] === 'credit-pack') {
-    if (normalized[3]) {
-      const clients = (await loadClientsServer()) ?? []
-      const match = clients.find((client) => client.id === normalized[3])
-      if (match) {
-        dynamicLabels[3] = [match.firstName, match.lastName].filter(Boolean).join(' ').trim() || 'Client'
-      }
-    }
-
-    if (normalized[4] === 'pack' && normalized[5]) {
-      const packs = await loadCreditPacks()
-      const match = packs.find((pack) => pack.id === normalized[5])
-      if (match) {
-        dynamicLabels[5] = match.name || 'Credit pack'
-      }
     }
   }
 
@@ -94,6 +80,54 @@ async function buildCrumbs(segments: string[]): Promise<Crumb[]> {
   })
 
   return crumbs
+}
+
+async function buildSellCreditPackCrumbs(normalized: string[]): Promise<Crumb[]> {
+  const [, , , clientId, maybePackKeyword, productId] = normalized
+
+  const clients = clientId ? (await loadClientsServer()) ?? [] : []
+  const packs = maybePackKeyword === 'pack' && productId ? await loadCreditPacks() : []
+
+  const clientName = clientId
+    ? clients.find((client) => client.id === clientId)
+    : undefined
+
+  const packName = maybePackKeyword === 'pack' && productId
+    ? packs.find((pack) => pack.id === productId)
+    : undefined
+
+  const dashboard: Crumb = { href: '/dashboard' as Route, label: 'Dashboard' }
+  const flowRoot: Crumb = { href: '/dashboard/sell/credit-pack' as Route, label: 'Sell credit pack' }
+
+  // Step 1 – choose client (landing page)
+  if (!clientId) {
+    return [dashboard, flowRoot, { href: flowRoot.href, label: 'Choose client' }]
+  }
+
+  const chooseClientLabel = clientName
+    ? `Choose client (${[clientName.firstName, clientName.lastName].filter(Boolean).join(' ').trim() || 'Client'})`
+    : 'Choose client'
+
+  // Step 2 – choose pack
+  if (maybePackKeyword !== 'pack' || !productId) {
+    return [
+      dashboard,
+      flowRoot,
+      { href: flowRoot.href, label: chooseClientLabel },
+      { href: `/dashboard/sell/credit-pack/${clientId}` as Route, label: 'Choose credit pack' },
+    ]
+  }
+
+  const choosePackLabel = packName?.name ? `Choose credit pack (${packName.name})` : 'Choose credit pack'
+
+  // Step 3 – payment
+  return [
+    dashboard,
+    flowRoot,
+    { href: flowRoot.href, label: chooseClientLabel },
+    { href: `/dashboard/sell/credit-pack/${clientId}` as Route, label: choosePackLabel },
+    { href: `/dashboard/sell/credit-pack/${clientId}/pack/${productId}` as Route, label: 'Payment' },
+  ]
 }
 
 export default async function BreadcrumbsSlot({ params }: { params: Promise<{ segments?: string[] }> }) {
@@ -121,7 +155,7 @@ async function BreadcrumbsContent({ params }: { params: Promise<{ segments?: str
             const isRoot = index === 0
 
             return (
-              <Fragment key={crumb.href}>
+              <Fragment key={`${crumb.href}-${index}`}>
                 <BreadcrumbItem>
                   {!isLast || isRoot ? (
                     <BreadcrumbLink asChild>
