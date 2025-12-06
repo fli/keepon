@@ -3,6 +3,8 @@ import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { AppleSignInError, verifyAppleIdentityToken } from '../app/api/_lib/appleSignIn'
 import { brandColors } from '@/config/referenceData'
+import type { Transaction } from 'kysely'
+import type { DB } from '@/lib/db'
 
 type BrandColorName = (typeof brandColors)[number]
 
@@ -98,6 +100,223 @@ export const trainerSignupSchema = z.union([passwordSignupSchema, appleSignupSch
 export type TrainerSignupInput = z.infer<typeof trainerSignupSchema>
 
 const APPLE_AUDIENCE = process.env.APPLE_CLIENT_ID ?? process.env.IOS_BUNDLE_ID ?? null
+
+type SeedDefaultsParams = {
+  trx: Transaction<DB>
+  trainerId: string
+  email: string
+  timezone: string
+  currencyId: number
+}
+
+const defaultServices = [
+  {
+    name: 'Consultation',
+    description: 'This is a test service. Book in to see how online bookings works!',
+    price: 0,
+    durationMinutes: 30,
+    location: 'Victoria Square / Tarntanyangga',
+    address: 'Grote St, Adelaide SA 5000',
+    googlePlaceId: 'ChIJVeCrXdjOsGoRMEC6RVU2Aw8',
+    geo: { lat: -34.92813189936252, lng: 138.59992296839098 },
+  },
+  {
+    name: 'Appointment',
+    description: 'This is a test service. Book in to see how online bookings works!',
+    price: 60,
+    durationMinutes: 45,
+    location: 'Victoria Square / Tarntanyangga',
+    address: 'Grote St, Adelaide SA 5000',
+    googlePlaceId: 'ChIJVeCrXdjOsGoRMEC6RVU2Aw8',
+    geo: { lat: -34.92813189936252, lng: 138.59992296839098 },
+  },
+]
+
+const formatMoney = (value: number) => value.toFixed(2)
+
+const seedTrainerDefaults = async ({ trx, trainerId, email, timezone, currencyId }: SeedDefaultsParams) => {
+  // Reward + missions
+  const rewardRow = await trx
+    .insertInto('reward')
+    .values({ trainer_id: trainerId, type: '2TextCredits' })
+    .returning('id')
+    .executeTakeFirst()
+
+  const missionRows = [
+    {
+      trainer_id: trainerId,
+      id: 'createInitialData',
+      reward_id: rewardRow?.id ?? null,
+      completed_at: new Date(),
+      display_order: 0,
+    },
+    { trainer_id: trainerId, id: 'enableNotifications', reward_id: null, completed_at: null, display_order: 1 },
+    { trainer_id: trainerId, id: 'createOnlineBooking', reward_id: null, completed_at: null, display_order: 2 },
+    { trainer_id: trainerId, id: 'completeStripeVerification', reward_id: null, completed_at: null, display_order: 3 },
+    { trainer_id: trainerId, id: 'createActiveSubscription', reward_id: null, completed_at: null, display_order: 4 },
+  ]
+
+  await trx.insertInto('mission').values(missionRows).execute()
+
+  // Default products and services
+  for (const [index, service] of defaultServices.entries()) {
+    const serviceId = randomUUID()
+    await trx
+      .insertInto('product')
+      .values({
+        id: serviceId,
+        trainer_id: trainerId,
+        name: service.name,
+        description: service.description,
+        price: formatMoney(service.price),
+        currency_id: currencyId,
+        is_credit_pack: null,
+        is_item: null,
+        is_service: true,
+        is_membership: null,
+        display_order: index,
+      })
+      .execute()
+
+    await trx
+      .insertInto('service')
+      .values({
+        id: serviceId,
+        trainer_id: trainerId,
+        duration: sql`make_interval(mins := ${service.durationMinutes})`,
+        location: service.location,
+        address: service.address,
+        google_place_id: service.googlePlaceId,
+        geo: sql`point(${service.geo.lat}, ${service.geo.lng})`,
+        bookable_online: true,
+        booking_payment_type: 'noPrepayment',
+        is_service: true,
+      })
+      .execute()
+  }
+
+  const packProductId = randomUUID()
+  await trx
+    .insertInto('product')
+    .values({
+      id: packProductId,
+      trainer_id: trainerId,
+      name: '12 Session Pack',
+      description:
+        "Sell this credit pack to a client. You can then use it as a payment option. We'll keep track of how many credits they've used up.",
+      price: '120.00',
+      currency_id: currencyId,
+      is_credit_pack: true,
+      is_item: null,
+      is_service: null,
+      is_membership: null,
+      display_order: defaultServices.length,
+    })
+    .execute()
+
+  await trx
+    .insertInto('credit_pack')
+    .values({
+      id: packProductId,
+      trainer_id: trainerId,
+      total_credits: 12,
+      is_credit_pack: true,
+    })
+    .execute()
+
+  // Default client
+  const clientUser = await trx.insertInto('user_').values({ type: 'client' }).returning('id').executeTakeFirst()
+  if (!clientUser?.id) {
+    throw new Error('clientUserCreateFailed')
+  }
+
+  const clientRow = await trx
+    .insertInto('client')
+    .values({
+      user_id: clientUser.id,
+      user_type: 'client',
+      email,
+      first_name: 'Test',
+      last_name: 'Client',
+      status: 'current',
+      trainer_id: trainerId,
+    })
+    .returning('id')
+    .executeTakeFirst()
+
+  if (!clientRow?.id) {
+    throw new Error('clientCreateFailed')
+  }
+
+  // Sample sessions
+  const now = Date.now()
+  const sessionSeriesData = [
+    {
+      id: randomUUID(),
+      eventType: 'single_session',
+      name: 'Example Appointment',
+      start: new Date(now + 11 * 60 * 1000),
+      price: '50.00',
+    },
+    {
+      id: randomUUID(),
+      eventType: 'group_session',
+      name: 'Example Group Appointment',
+      start: new Date(now + 41 * 60 * 1000),
+      price: '50.00',
+    },
+  ] as const
+
+  for (const series of sessionSeriesData) {
+    await trx
+      .insertInto('session_series')
+      .values({
+        id: series.id,
+        trainer_id: trainerId,
+        event_type: series.eventType,
+        duration: sql`make_interval(mins := ${30})`,
+        start: series.start,
+        end_: null,
+        daily_recurrence_interval: null,
+        location: 'Area 51',
+        timezone,
+        price: series.price,
+        name: series.name,
+        color: null,
+        session_icon_id: null,
+        icon_url: null,
+      })
+      .execute()
+
+    const sessionId = await trx
+      .insertInto('session')
+      .values({
+        session_series_id: series.id,
+        trainer_id: trainerId,
+        start: series.start,
+        duration: sql`make_interval(mins := ${30})`,
+        timezone,
+        location: 'Area 51',
+        address: 'Nevada, USA',
+        geo: sql`point(${37.2514874}, ${-115.8043178})`,
+        google_place_id: 'ChIJgYw-uqobuIARrjdijuMnBJc',
+      })
+      .returning('id')
+      .executeTakeFirst()
+
+    if (sessionId?.id) {
+      await trx
+        .insertInto('client_session')
+        .values({
+          client_id: clientRow.id,
+          session_id: sessionId.id,
+          trainer_id: trainerId,
+          price: series.price,
+        })
+        .execute()
+    }
+  }
+}
 
 export async function createTrainerAccount(input: TrainerSignupInput) {
   const parsed = trainerSignupSchema.parse(input)
@@ -259,6 +478,14 @@ export async function createTrainerAccount(input: TrainerSignupInput) {
     if (!tokenRow) {
       throw new Error('tokenCreateFailed')
     }
+
+  await seedTrainerDefaults({
+    trx,
+    trainerId: trainer.id,
+    email,
+    timezone: parsed.timezone,
+    currencyId: currencyRow.currency_id,
+  })
 
     return {
       id: tokenRow.accessToken,
