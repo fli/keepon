@@ -248,7 +248,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 ## Session Invitations (sessionInvitations)
 
 - [x] `POST` `/sessionInvitations` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/session-invitations.post.ts)_
-- [ ] `DELETE` `/sessionInvitations/:id` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/session-invitations.[id].delete.ts)_
+- [x] `DELETE` `/sessionInvitations/:id` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/session-invitations.[id].delete.ts)_
 
 ## Sessions (sessions)
 
