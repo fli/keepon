@@ -266,7 +266,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 - [x] `GET` `/sessionSeries` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/session-series.get.ts)_
 - [x] `POST` `/sessionSeries` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/session-series.post.ts)_
 - [x] `GET` `/sessionSeries/:sessionSeriesId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/session-series.[sessionSeriesId].get.ts)_
-- [ ] `PUT` `/sessionSeries/:sessionSeriesId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/session-series.[sessionSeriesId].put.ts)_
+- [x] `PUT` `/sessionSeries/:sessionSeriesId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/session-series.[sessionSeriesId].put.ts)_
 - [x] `DELETE` `/sessionSeries/:sessionSeriesId/sessions/all` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/sessionSeries.[sessionSeriesId].sessions.all.delete.ts)_
 
 ## Sms Credit Checkouts (smsCreditCheckouts)
