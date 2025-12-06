@@ -304,7 +304,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 - [x] `POST` `/trainers` — security: none _(source: ../keepon-full/api-server/src/routes/trainers.post.ts)_
 - [x] `GET` `/trainers/:trainerId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].get.ts)_
-- [ ] `PUT` `/trainers/:trainerId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].put.ts)_
+- [x] `PUT` `/trainers/:trainerId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].put.ts)_
 - [x] `GET` `/trainers/:trainerId/clients` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].clients.get.ts)_
 - [ ] `POST` `/trainers/:trainerId/clients` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].clients.post.ts)_
 - [x] `GET` `/trainers/:trainerId/financeItems` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].financeItems.get.ts)_
