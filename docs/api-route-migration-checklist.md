@@ -306,7 +306,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 - [x] `GET` `/trainers/:trainerId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].get.ts)_
 - [x] `PUT` `/trainers/:trainerId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].put.ts)_
 - [x] `GET` `/trainers/:trainerId/clients` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].clients.get.ts)_
-- [ ] `POST` `/trainers/:trainerId/clients` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].clients.post.ts)_
+- [x] `POST` `/trainers/:trainerId/clients` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].clients.post.ts)_
 - [x] `GET` `/trainers/:trainerId/financeItems` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].financeItems.get.ts)_
 - [ ] `POST` `/trainers/:trainerId/financeItems` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].financeItems.post.ts)_
 - [x] `PUT` `/trainers/:trainerId/notifications/:notificationId/view` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainers.[trainerId].notifications.[notificationId].view.put.ts)_

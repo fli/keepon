@@ -1,34 +1,80 @@
 import { db, type Point, type Selectable, type VwLegacyClient } from '@/lib/db'
 import { z } from 'zod'
+import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
+import type { CountryCode } from 'libphonenumber-js'
+import { supportedCountryCodes } from '@/lib/supportedCountries'
 import { adaptClientRow, clientListSchema } from '../app/api/clients/shared'
 
 export type ClientList = z.infer<typeof clientListSchema>
 export type ClientItem = ClientList[number]
 
-const nullableTrimmedString = z
-  .string()
-  .trim()
-  .transform((value) => (value.length === 0 ? null : value))
+const nullableTrimmedBase = z.union([z.string(), z.null()]).transform((value) => {
+  if (value === null) return null
+  const trimmed = value.trim()
+  return trimmed.length === 0 ? null : trimmed
+})
+
+const nullableTrimmedString = nullableTrimmedBase.optional()
+
+const nullableEmail = nullableTrimmedBase
+  .refine((value) => value === null || z.string().email().safeParse(value).success, {
+    message: 'Email must be a valid email address.',
+  })
+  .optional()
+
+const nullablePhoneString = nullableTrimmedString
+
+const birthdaySchema = z.preprocess((value) => {
+  if (value === undefined) return undefined
+  if (value === null) return null
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed.length === 0 ? null : trimmed
+  }
+  return value
+}, z.union([z.coerce.date(), z.null()]).optional())
+
+const geoSchema = z
+  .union([z.object({ lat: z.number(), lng: z.number() }), z.object({ lat: z.null(), lng: z.null() })])
   .nullable()
   .optional()
+
+const formatDateOnly = (date: Date) => date.toISOString().slice(0, 10)
+
+const normalizePhoneNumber = (value?: string | null): string | null => {
+  const raw = value?.trim()
+  if (!raw) return null
+
+  for (const country of supportedCountryCodes) {
+    const parsed = parsePhoneNumberFromString(raw, country as CountryCode)
+    if (parsed?.isValid()) {
+      return parsed.format('E.164')
+    }
+
+    const parsedWithoutPlus = parsePhoneNumberFromString(raw.replace(/^\+/, ''), country as CountryCode)
+    if (parsedWithoutPlus?.isValid()) {
+      return parsedWithoutPlus.format('E.164')
+    }
+  }
+
+  return null
+}
 
 export const createClientSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required'),
   lastName: nullableTrimmedString,
-  email: nullableTrimmedString,
-  mobileNumber: nullableTrimmedString,
-  otherNumber: nullableTrimmedString,
+  email: nullableEmail,
+  mobileNumber: nullablePhoneString,
+  otherNumber: nullablePhoneString,
   status: z.enum(['current', 'lead', 'past']).default('current'),
   company: nullableTrimmedString,
   location: nullableTrimmedString,
   address: nullableTrimmedString,
   googlePlaceId: nullableTrimmedString,
-  geo: z
-    .object({
-      lat: z.number(),
-      lng: z.number(),
-    })
-    .optional(),
+  geo: geoSchema,
+  birthday: birthdaySchema,
+  emergencyContactName: nullableTrimmedString,
+  emergencyContactMobileNumber: nullablePhoneString,
 })
 
 export type CreateClientInput = z.infer<typeof createClientSchema>
@@ -55,7 +101,13 @@ export async function listClientsForTrainer(trainerId: string, sessionId?: strin
 
 export async function createClientForTrainer(trainerId: string, payload: CreateClientInput): Promise<ClientItem> {
   const parsed = createClientSchema.parse(payload)
-  const geo: Point | null = parsed.geo ? { x: parsed.geo.lat, y: parsed.geo.lng } : null
+  const geo: Point | null =
+    parsed.geo && parsed.geo.lat !== null && parsed.geo.lng !== null ? { x: parsed.geo.lat, y: parsed.geo.lng } : null
+
+  const birthday = parsed.birthday ? formatDateOnly(parsed.birthday) : null
+  const mobileNumber = normalizePhoneNumber(parsed.mobileNumber ?? null)
+  const otherNumber = normalizePhoneNumber(parsed.otherNumber ?? null)
+  const emergencyContactMobileNumber = normalizePhoneNumber(parsed.emergencyContactMobileNumber ?? null)
 
   const created: Selectable<VwLegacyClient>[] = await db.transaction().execute(async (trx) => {
     const userRows = await trx
@@ -78,8 +130,11 @@ export async function createClientForTrainer(trainerId: string, payload: CreateC
         first_name: parsed.firstName,
         last_name: parsed.lastName ?? null,
         email: parsed.email ?? null,
-        mobile_number: parsed.mobileNumber ?? null,
-        other_number: parsed.otherNumber ?? null,
+        mobile_number: mobileNumber,
+        other_number: otherNumber,
+        emergency_contact_name: parsed.emergencyContactName ?? null,
+        emergency_contact_mobile_number: emergencyContactMobileNumber,
+        birthday,
         status: parsed.status,
         company: parsed.company ?? null,
         location: parsed.location ?? null,
