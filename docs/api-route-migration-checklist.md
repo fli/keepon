@@ -271,7 +271,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 ## Sms Credit Checkouts (smsCreditCheckouts)
 
-- [ ] `GET` `/smsCreditCheckouts/:id` — security: none _(source: ../keepon-full/api-server/src/routes/sms-credit-checkouts.[id].get.ts)_
+- [x] `GET` `/smsCreditCheckouts/:id` — security: none _(source: ../keepon-full/api-server/src/routes/sms-credit-checkouts.[id].get.ts)_
 
 ## Sms Credit Checkout Sessions (smsCreditCheckoutSessions)
 
