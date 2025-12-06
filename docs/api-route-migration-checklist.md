@@ -294,7 +294,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 ## Stripe Setup Intents (stripeSetupIntents)
 
-- [ ] `POST` `/stripeSetupIntents` — security: `client` _(source: ../keepon-full/api-server/src/routes/stripe-setup-intents.post.ts)_
+- [x] `POST` `/stripeSetupIntents` — security: `client` _(source: ../keepon-full/api-server/src/routes/stripe-setup-intents.post.ts)_
 
 ## Trainer (trainer)
 
