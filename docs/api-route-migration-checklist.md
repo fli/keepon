@@ -253,7 +253,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 ## Sessions (sessions)
 
 - [x] `GET` `/sessions` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/sessions.get.ts)_
-- [ ] `DELETE` `/sessions/:sessionId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/sessions.[sessionId].delete.ts)_
+- [x] `DELETE` `/sessions/:sessionId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/sessions.[sessionId].delete.ts)_
 - [x] `GET` `/sessions/:sessionId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/sessions.[sessionId].get.ts)_
 - [ ] `PUT` `/sessions/:sessionId` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/sessions.[sessionId].put.ts)_
 - [ ] `POST` `/sessions/:sessionId/clients` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/sessions.[sessionId].clients.post.ts)_
