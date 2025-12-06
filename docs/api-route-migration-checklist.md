@@ -275,7 +275,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 ## Sms Credit Checkout Sessions (smsCreditCheckoutSessions)
 
-- [ ] `POST` `/smsCreditCheckoutSessions` — security: none _(source: ../keepon-full/api-server/src/routes/sms-credit-checkout-sessions.post.ts)_
+- [x] `POST` `/smsCreditCheckoutSessions` — security: none _(source: ../keepon-full/api-server/src/routes/sms-credit-checkout-sessions.post.ts)_
 
 ## Stripe (stripe)
 
