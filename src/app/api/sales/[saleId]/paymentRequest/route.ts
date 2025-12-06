@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
+import { adaptSaleRow, fetchSales, saleSchema } from '../../shared'
+import {
+  AccessTokenCreationError,
+  ClientHasNoEmailError,
+  SaleNotFoundError,
+  requestPaymentForSale,
+} from '@/server/sales'
 
 const paramsSchema = z.object({
   saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }),
@@ -36,15 +43,20 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const { saleId } = paramsResult.data
 
   try {
-    const updated = await db
-      .updateTable('sale')
-      .set({ payment_request_time: new Date() })
-      .where('id', '=', saleId)
-      .where('trainer_id', '=', auth.trainerId)
-      .returning('id')
-      .executeTakeFirst()
+    await requestPaymentForSale(auth.trainerId, saleId)
 
-    if (!updated) {
+    const rows = await fetchSales({ trainerId: auth.trainerId, saleId })
+    const saleRow = rows[0]
+
+    if (!saleRow) {
+      throw new SaleNotFoundError()
+    }
+
+    const sale = saleSchema.parse(adaptSaleRow(saleRow))
+
+    return NextResponse.json(sale)
+  } catch (error) {
+    if (error instanceof SaleNotFoundError) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
@@ -56,15 +68,42 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       )
     }
 
-    await db
-      .updateTable('sale_payment_status')
-      .set({ payment_status: 'requested' })
-      .where('sale_id', '=', saleId)
-      .execute()
+    if (error instanceof ClientHasNoEmailError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 409,
+          title: 'Client has no email',
+          detail: 'A client email address is required to send a payment request.',
+          type: '/client-has-no-email',
+        }),
+        { status: 409 }
+      )
+    }
 
-    return NextResponse.json({ status: 'requested' })
-  } catch (error) {
-    console.error('Failed to request payment', { saleId, error })
+    if (error instanceof AccessTokenCreationError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 500,
+          title: 'Failed to create client dashboard access token',
+          type: '/internal-server-error',
+        }),
+        { status: 500 }
+      )
+    }
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 500,
+          title: 'Failed to parse sale data from database',
+          detail: 'Sale data did not match the expected response schema.',
+          type: '/invalid-response',
+        }),
+        { status: 500 }
+      )
+    }
+
+    console.error('Failed to request payment', { saleId, trainerId: auth.trainerId, error })
     return NextResponse.json(
       buildErrorResponse({
         status: 500,
