@@ -286,7 +286,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 ## Stripe Events (stripeEvents)
 
-- [ ] `POST` `/stripeEvents` — security: none _(source: ../keepon-full/api-server/src/routes/stripe-events.post.ts)_
+- [x] `POST` `/stripeEvents` — security: none _(source: ../keepon-full/api-server/src/routes/stripe-events.post.ts)_
 
 ## Stripe Onboarding Links (stripeOnboardingLinks)
 
