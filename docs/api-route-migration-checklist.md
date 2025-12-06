@@ -298,7 +298,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 ## Trainer (trainer)
 
-- [ ] `POST` `/trainer/upload` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainer.upload.post.ts)_
+- [x] `POST` `/trainer/upload` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/trainer.upload.post.ts)_
 
 ## Trainers (trainers)
 
