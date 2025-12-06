@@ -282,7 +282,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 - [x] `GET` `/stripe/account` — security: `serviceProviderOrClient` _(source: ../keepon-full/api-server/src/routes/stripe.account.get.ts)_
 - [x] `POST` `/stripe/account_links` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/stripe.account_links.post.ts)_
 - [x] `GET` `/stripe/external_accounts` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/stripe.external_accounts.get.ts)_
-- [ ] `POST` `/stripe/external_accounts` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/stripe.external_accounts.post.ts)_
+- [x] `POST` `/stripe/external_accounts` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/stripe.external_accounts.post.ts)_
 
 ## Stripe Events (stripeEvents)
 
