@@ -243,7 +243,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 ## Session Invitation Links (sessionInvitationLinks)
 
-- [ ] `GET` `/sessionInvitationLinks/:invitationId` — security: none _(source: ../keepon-full/api-server/src/routes/session-invitation-links.[invitationId].get.ts)_
+- [x] `GET` `/sessionInvitationLinks/:invitationId` — security: none _(source: ../keepon-full/api-server/src/routes/session-invitation-links.[invitationId].get.ts)_
 
 ## Session Invitations (sessionInvitations)
 
