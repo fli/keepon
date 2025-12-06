@@ -290,7 +290,7 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 ## Stripe Onboarding Links (stripeOnboardingLinks)
 
-- [ ] `POST` `/stripeOnboardingLinks` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/stripe-onboarding-links.post.ts)_
+- [x] `POST` `/stripeOnboardingLinks` — security: `serviceProvider` _(source: ../keepon-full/api-server/src/routes/stripe-onboarding-links.post.ts)_
 
 ## Stripe Setup Intents (stripeSetupIntents)
 
