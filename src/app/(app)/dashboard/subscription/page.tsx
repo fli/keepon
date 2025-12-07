@@ -53,21 +53,13 @@ const loadPlan = async (token: string, origin: string): Promise<SubscriptionPlan
   return null
 }
 
-const loadPublishableKey = async (origin: string): Promise<string | null> => {
-  try {
-    const res = await fetch(buildInternalUrl('/api/config', origin), {
-      cache: 'no-store',
-    })
-
-    if (!res.ok) return null
-
-    const json = (await res.json()) as unknown
-    const key = (json as { stripePublishableKey?: unknown })?.stripePublishableKey
-    return typeof key === 'string' && key.trim().length > 0 ? key : null
-  } catch (error) {
-    console.error('subscription/paywall: failed to load config', error)
+const getPublishableKey = (): string | null => {
+  const key = process.env.STRIPE_PUBLISHABLE_KEY?.trim()
+  if (!key || key.length === 0) {
+    console.error('subscription/paywall: STRIPE_PUBLISHABLE_KEY is missing or empty')
     return null
   }
+  return key
 }
 
 const formatCurrency = (amount: string | number, currency: string) => {
@@ -91,11 +83,11 @@ export default async function SubscriptionPaywallPage() {
   const host = headerList.get('x-forwarded-host') ?? headerList.get('host')
   const origin = host ? `${proto}://${host}` : FALLBACK_ORIGIN
 
-  const [dashboard, plan, publishableKey] = await Promise.all([
+  const [dashboard, plan] = await Promise.all([
     getDashboardSummary(session.trainerId, session.userId),
     loadPlan(session.token, origin),
-    loadPublishableKey(origin),
   ])
+  const publishableKey = getPublishableKey()
 
   const trialDaysRemaining = dashboard.trainer.trialDaysRemaining
   const trialEndsAt = dashboard.trainer.trialEndsAt
