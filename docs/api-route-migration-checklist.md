@@ -327,4 +327,4 @@ Security values reflect middleware expectations from the legacy server (`null` m
 
 ## Twilio Status Message (twilioStatusMessage)
 
-- [ ] `POST` `/twilioStatusMessage` — security: none _(source: ../keepon-full/api-server/src/routes/twilio-status-message.post.ts)_
+- [x] `POST` `/twilioStatusMessage` — security: none _(source: ../keepon-full/api-server/src/routes/twilio-status-message.post.ts)_
