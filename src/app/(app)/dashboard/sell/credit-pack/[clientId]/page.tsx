@@ -57,10 +57,10 @@ export default async function SelectCreditPackPage({
           </Suspense>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" render={<Link href={backHref} />}>
+          <Button size="sm" variant="outline" nativeButton={false} render={<Link href={backHref} />}>
             Change client
           </Button>
-          <Button size="sm" render={<Link href={addCreditPackHref} />}>
+          <Button size="sm" nativeButton={false} render={<Link href={addCreditPackHref} />}>
             New credit pack
           </Button>
         </div>

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import { authenticateTrainerOrClientRequest, authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import {
+  authenticateTrainerOrClientRequest,
+  authenticateTrainerRequest,
+  buildErrorResponse,
+} from '../../_lib/accessToken'
 import { adaptSaleRow, fetchSales, saleSchema } from '../shared'
 
 const paramsSchema = z.object({

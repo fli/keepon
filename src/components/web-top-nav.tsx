@@ -48,14 +48,14 @@ export function WebTopNav() {
 
               return (
                 <NavigationMenuItem key={item.href}>
-                <NavigationMenuLink
-                  className="h-8 px-2 text-[12px] leading-tight sm:h-9 sm:px-3 sm:text-sm"
-                  active={active}
-                  aria-current={active ? 'page' : undefined}
-                  render={<Link href={item.href} />}
-                >
-                  {item.label}
-                </NavigationMenuLink>
+                  <NavigationMenuLink
+                    className="h-8 px-2 text-[12px] leading-tight sm:h-9 sm:px-3 sm:text-sm"
+                    active={active}
+                    aria-current={active ? 'page' : undefined}
+                    render={<Link href={item.href} />}
+                  >
+                    {item.label}
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
               )
             })}

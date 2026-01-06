@@ -176,9 +176,7 @@ const trainerRowSchema = z.object({
   sessionSeries: z.unknown().optional(),
 })
 
-const accountRequirements = (
-  account: Stripe.Account | null
-): TrainerProfile['requirements'] => {
+const accountRequirements = (account: Stripe.Account | null): TrainerProfile['requirements'] => {
   const requirements = account?.requirements
 
   const currentlyDue = (requirements?.currently_due ?? []).filter((item) => item !== 'external_account')
@@ -204,7 +202,7 @@ const accountRequirements = (
   const currentDeadline =
     typeof requirements?.current_deadline === 'number'
       ? new Date(requirements.current_deadline * 1000).toISOString()
-      : (requirements?.current_deadline as string | null | undefined) ?? null
+      : ((requirements?.current_deadline as string | null | undefined) ?? null)
 
   return {
     currentDeadline,
@@ -234,8 +232,18 @@ const computeBalance = (balance: Stripe.Balance | null, currency: string): Train
       .reduce((acc, entry) => acc.plus(new BigNumber(entry.amount ?? 0)), new BigNumber(0))
 
   return {
-    available: { amount: sum(balance.available ?? []).shiftedBy(-2).toString(), currency },
-    pending: { amount: sum(balance.pending ?? []).shiftedBy(-2).toString(), currency },
+    available: {
+      amount: sum(balance.available ?? [])
+        .shiftedBy(-2)
+        .toString(),
+      currency,
+    },
+    pending: {
+      amount: sum(balance.pending ?? [])
+        .shiftedBy(-2)
+        .toString(),
+      currency,
+    },
   }
 }
 

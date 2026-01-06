@@ -24,6 +24,7 @@ export function DashboardHeaderSkeleton() {
         variant="outline"
         size="icon-lg"
         aria-label="Notifications"
+        nativeButton={false}
         render={<Link href="/dashboard/notifications" />}
       >
         <Bell className="size-5" aria-hidden />
@@ -65,7 +66,7 @@ export function PaymentsSkeleton() {
           <CardHeader className="pb-2">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Badge variant="danger" className="rounded-full p-2">
+                <Badge variant="destructive" className="rounded-full p-2">
                   <AlertCircle className="size-4" aria-hidden />
                 </Badge>
                 <CardDescription className="text-sm font-semibold text-foreground">
@@ -181,9 +182,7 @@ export function OnlineBookingsSkeleton() {
         <Card className="flex flex-col border-dashed">
           <CardHeader className="space-y-2 pb-2">
             <CardDescription className="text-sm font-semibold text-foreground">Setup online bookings</CardDescription>
-            <p className="text-sm text-muted-foreground">
-              Share your services and start taking bookings in minutes.
-            </p>
+            <p className="text-sm text-muted-foreground">Share your services and start taking bookings in minutes.</p>
           </CardHeader>
           <CardContent className="mt-auto pt-0">
             <Skeleton className="h-9 w-44" />

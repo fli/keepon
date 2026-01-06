@@ -46,7 +46,7 @@ export function ProjectedPaidCard({ payments }: ProjectedPaidCardProps) {
             aria-label="Select revenue timeframe"
             value={timeframe}
             onChange={(event) => setTimeframe(event.target.value as Timeframe)}
-            containerClassName="w-36"
+            className="w-36"
           >
             {timeframeOptions.map((option) => (
               <option key={option.value} value={option.value}>

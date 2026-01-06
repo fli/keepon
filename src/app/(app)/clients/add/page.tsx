@@ -76,7 +76,7 @@ async function AddClientContent() {
       <form action={addClient} className="w-full max-w-xl space-y-5">
         <div className="space-y-2">
           <Label htmlFor="firstName">First name</Label>
-          <Input id="firstName" name="firstName" required  autoComplete="given-name" />
+          <Input id="firstName" name="firstName" required autoComplete="given-name" />
         </div>
 
         <div className="space-y-2">

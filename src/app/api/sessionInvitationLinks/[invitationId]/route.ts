@@ -218,8 +218,8 @@ const buildCapacityReachedEmail = (details: InvitationDetails, maximumAttendance
     <h2 style="margin:0 0 8px 0;font-size:20px;">${escapeHtml(details.clientFullName)} tried to accept an invitation</h2>
     <p style="margin:0 0 12px 0;">${escapeHtml(details.eventName)}<br />${escapeHtml(details.dateRange)}</p>
     <p style="margin:0 0 12px 0;">The appointment is already at its limit of ${maximumAttendance} attendee${
-  maximumAttendance === 1 ? '' : 's'
-}.</p>
+      maximumAttendance === 1 ? '' : 's'
+    }.</p>
     <p style="margin:0;">${APP_NAME}</p>
   </body>
 </html>
@@ -330,7 +330,11 @@ const sendDeclineSideEffects = async (trx: DbTransaction, details: InvitationDet
   await Promise.all(tasks)
 }
 
-const sendCapacityReachedSideEffects = async (trx: DbTransaction, details: InvitationDetails, maximumAttendance: number) => {
+const sendCapacityReachedSideEffects = async (
+  trx: DbTransaction,
+  details: InvitationDetails,
+  maximumAttendance: number
+) => {
   await sql`
     INSERT INTO mail (trainer_id, client_id, from_email, from_name, to_email, to_name, subject, html, reply_to)
     VALUES (
@@ -514,7 +518,8 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         renderPage({
           badge: 'Expired',
           headline: 'This invitation has expired',
-          message: 'This appointment has already started or finished. Please contact the provider if you think this is a mistake.',
+          message:
+            'This appointment has already started or finished. Please contact the provider if you think this is a mistake.',
           details,
           statusColor: '#dc2626',
         }),

@@ -6,7 +6,7 @@ import { buildErrorResponse } from '../_lib/accessToken'
 import { APP_EMAIL, APP_NAME, KEEPON_LOGO_COLOR_URL } from '../_lib/constants'
 
 const requestSchema = z.object({
-  email: z.string().trim().min(1, 'Email is required').email('Email must be a valid email address.'),
+  email: z.string().min(1, 'Email is required').email('Email must be a valid email address.'),
 })
 
 const generateRandomSixDigitCode = () => crypto.randomInt(0, 1_000_000).toString().padStart(6, '0')
@@ -53,9 +53,8 @@ const createInvalidJsonResponse = () =>
   NextResponse.json(
     buildErrorResponse({
       status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
+      title: 'JSON body could not be parsed.',
+      type: '/invalid-json-body',
     }),
     { status: 400 }
   )
@@ -64,9 +63,9 @@ const createInvalidBodyResponse = (detail: string | undefined) =>
   NextResponse.json(
     buildErrorResponse({
       status: 400,
-      title: 'Invalid request body',
+      title: 'Your parameters were invalid.',
       detail: detail || 'Request body did not match the expected schema.',
-      type: '/invalid-body',
+      type: '/invalid-parameters',
     }),
     { status: 400 }
   )
@@ -75,8 +74,7 @@ const createInternalErrorResponse = () =>
   NextResponse.json(
     buildErrorResponse({
       status: 500,
-      title: 'Failed to create client login request',
-      type: '/internal-server-error',
+      title: 'Something on our end went wrong.',
     }),
     { status: 500 }
   )

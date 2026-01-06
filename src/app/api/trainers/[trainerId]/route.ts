@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { z } from 'zod'
 
-import { brandColors, clientAppointmentReminderTypes, serviceProviderAppointmentReminderTypes } from '@/config/referenceData'
+import {
+  brandColors,
+  clientAppointmentReminderTypes,
+  serviceProviderAppointmentReminderTypes,
+} from '@/config/referenceData'
 import { db, sql } from '@/lib/db'
 import { isIsoDuration } from '@/lib/reminders'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
@@ -39,12 +43,10 @@ const isoDurationSchema = z
 const brandColorSchema = z.enum([...brandColors] as [BrandColor, ...BrandColor[]])
 
 const serviceProviderReminderSchema = z.object({
-  type: z.enum(
-    [...serviceProviderAppointmentReminderTypes] as [
-      ServiceProviderReminderType,
-      ...ServiceProviderReminderType[]
-    ]
-  ),
+  type: z.enum([...serviceProviderAppointmentReminderTypes] as [
+    ServiceProviderReminderType,
+    ...ServiceProviderReminderType[],
+  ]),
   timeBeforeStart: isoDurationSchema,
 })
 
@@ -219,7 +221,7 @@ const mapClientReminderTypeToDb = async (type: string | null | undefined) => {
   return type
 }
 
-const normalizeDeviceId = (value: string | undefined) => (value === 'IOS-SIMULATOR' ? null : value ?? undefined)
+const normalizeDeviceId = (value: string | undefined) => (value === 'IOS-SIMULATOR' ? null : (value ?? undefined))
 
 class StripeConfigurationMissingError extends Error {}
 class TokenMustBeBankAccountError extends Error {}

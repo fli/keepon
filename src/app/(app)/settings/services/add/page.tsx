@@ -157,7 +157,7 @@ async function AddServiceContent() {
       <form action={createService} className="w-full max-w-xl space-y-5">
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>
-          <Input id="name" name="name" required  />
+          <Input id="name" name="name" required />
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

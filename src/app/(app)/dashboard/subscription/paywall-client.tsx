@@ -68,9 +68,7 @@ export function SubscriptionPaywall({ plan, publishableKey, trainerName, trialDa
     if (!plan) return null
     const monthly = Number.parseFloat(plan.monthlyPrice)
     const yearly = Number.parseFloat(plan.yearlyPrice)
-    return Number.isFinite(monthly) && Number.isFinite(yearly)
-      ? { monthly, yearly, currency: plan.currency }
-      : null
+    return Number.isFinite(monthly) && Number.isFinite(yearly) ? { monthly, yearly, currency: plan.currency } : null
   }, [plan])
 
   const savings = useMemo(() => {
@@ -338,7 +336,12 @@ export function SubscriptionPaywall({ plan, publishableKey, trainerName, trialDa
         </div>
 
         {!clientSecret ? (
-          <Button type="button" className="w-full" onClick={handleCreateIntent} disabled={isPending || intentLoading || !plan}>
+          <Button
+            type="button"
+            className="w-full"
+            onClick={handleCreateIntent}
+            disabled={isPending || intentLoading || !plan}
+          >
             {isPending || intentLoading ? 'Loading payment form…' : 'Load payment form'}
           </Button>
         ) : null}

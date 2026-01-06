@@ -1,7 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, type AnchorHTMLAttributes } from 'react'
-import Link from 'next/link'
+import { useCallback, useEffect, useMemo } from 'react'
 import type { Route } from 'next'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
@@ -166,13 +165,19 @@ export function ClientsGrid({ clients }: Props) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="w-full sm:w-80">
-          <Input
-            value={quickFilter}
-            onChange={(event) => handleSearchChange(event.target.value)}
-            placeholder="Search name, email, company"
-            leadingIcon={<Search className="size-4" aria-hidden />}
-            aria-label="Search clients"
-          />
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              value={quickFilter}
+              onChange={(event) => handleSearchChange(event.target.value)}
+              placeholder="Search name, email, company"
+              aria-label="Search clients"
+              className="pl-9"
+            />
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -350,11 +355,6 @@ export function ClientsGrid({ clients }: Props) {
                     onClick={(event) => {
                       event.preventDefault()
                       updateQuery({ page: pageNumber })
-                    }}
-                    render={(props) => {
-                      const anchorProps = props as AnchorHTMLAttributes<HTMLAnchorElement>
-                      const href = (anchorProps.href ?? pageHref) as Route
-                      return <Link {...anchorProps} href={href} scroll={false} />
                     }}
                   >
                     {pageNumber}

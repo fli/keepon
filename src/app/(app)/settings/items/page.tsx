@@ -64,7 +64,7 @@ export default async function ItemsPage() {
             <h1 className="text-3xl leading-tight font-semibold">Items</h1>
             <p className="text-sm text-muted-foreground">Sell add-ons and one-off items.</p>
           </div>
-          <Button size="sm" render={<Link href="/settings/items/add" />}>
+          <Button size="sm" nativeButton={false} render={<Link href="/settings/items/add" />}>
             Add item
           </Button>
         </div>

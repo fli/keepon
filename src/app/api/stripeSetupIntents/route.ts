@@ -218,8 +218,7 @@ export async function POST(request: Request) {
     return createInternalErrorResponse()
   }
 
-  const requestThreeDS =
-    threeDsExceptions.has(customerId) || stripeAccountType === 'standard' ? 'automatic' : 'any'
+  const requestThreeDS = threeDsExceptions.has(customerId) || stripeAccountType === 'standard' ? 'automatic' : 'any'
 
   try {
     const setupIntent = await stripeClient.setupIntents.create(

@@ -21,7 +21,12 @@ export function DashboardActions() {
       {actionRows.map((row, index) => (
         <div key={index} className="flex flex-wrap gap-2">
           {row.map(({ label, href }) => (
-            <Button key={label} variant="secondary" type="button" render={href ? <Link href={href} /> : undefined}>
+            <Button
+              key={label}
+              variant="secondary"
+              nativeButton={href ? false : undefined}
+              render={href ? <Link href={href} /> : undefined}
+            >
               {label}
             </Button>
           ))}

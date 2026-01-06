@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import { authenticateTrainerOrClientRequest, authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
-import { adaptSalePaymentRow, manualMethodSchema, salePaymentSchema, type SalePaymentRow } from '../../_lib/salePayments'
+import {
+  authenticateTrainerOrClientRequest,
+  authenticateTrainerRequest,
+  buildErrorResponse,
+} from '../../_lib/accessToken'
+import {
+  adaptSalePaymentRow,
+  manualMethodSchema,
+  salePaymentSchema,
+  type SalePaymentRow,
+} from '../../_lib/salePayments'
 
 const paramsSchema = z.object({
   paymentId: z.string().trim().min(1, 'Payment id is required').uuid({ message: 'Payment id must be a valid UUID' }),

@@ -251,7 +251,10 @@ export async function POST(request: Request) {
       cancel_url: new URL(`/sms-credit-checkouts/${encodeURIComponent(body.smsCreditCheckoutId)}`, baseUrl).toString(),
       mode: 'payment',
       payment_method_types: ['card'],
-      success_url: new URL(`/sms-credit-checkouts/${encodeURIComponent(body.smsCreditCheckoutId)}/success`, baseUrl).toString(),
+      success_url: new URL(
+        `/sms-credit-checkouts/${encodeURIComponent(body.smsCreditCheckoutId)}/success`,
+        baseUrl
+      ).toString(),
       submit_type: 'pay',
       customer: stripeCustomerId,
       client_reference_id: checkoutDetails.serviceProviderId,

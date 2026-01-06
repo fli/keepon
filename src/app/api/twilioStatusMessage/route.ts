@@ -94,7 +94,10 @@ const buildExpectedSignature = ({
     return crypto.createHmac('sha1', authToken).update(data).digest('base64')
   }
 
-  return crypto.createHmac('sha1', authToken).update(url + rawBody).digest('base64')
+  return crypto
+    .createHmac('sha1', authToken)
+    .update(url + rawBody)
+    .digest('base64')
 }
 
 const validateTwilioSignature = ({

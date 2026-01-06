@@ -24,7 +24,7 @@ export default async function ClientsPage() {
           <h1 className="text-3xl leading-tight font-semibold">Clients</h1>
           <div className="flex items-center gap-2">
             <ImportClientsButton />
-            <Button size="sm" render={<Link href="/clients/add" />}>
+            <Button size="sm" nativeButton={false} render={<Link href="/clients/add" />}>
               Add client
             </Button>
           </div>

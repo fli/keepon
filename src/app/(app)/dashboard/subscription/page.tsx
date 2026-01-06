@@ -95,13 +95,17 @@ export default async function SubscriptionPaywallPage() {
 
   const headlinePrice = plan ? formatCurrency(plan.monthlyPrice, plan.currency) : null
   const annualPrice = plan ? formatCurrency(plan.yearlyPrice, plan.currency) : null
-  const trialLabel = trialDaysRemaining && trialDaysRemaining > 0 ? `${trialDaysRemaining} days left on trial` : 'Trial ending soon'
+  const trialLabel =
+    trialDaysRemaining && trialDaysRemaining > 0 ? `${trialDaysRemaining} days left on trial` : 'Trial ending soon'
 
   return (
     <PageContainer className="py-10">
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-[1.2fr,0.8fr]">
         <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-600 text-white shadow-xl">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.18),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.2),transparent_30%),radial-gradient(circle_at_40%_60%,rgba(255,255,255,0.14),transparent_26%)]" aria-hidden />
+          <div
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.18),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.2),transparent_30%),radial-gradient(circle_at_40%_60%,rgba(255,255,255,0.14),transparent_26%)]"
+            aria-hidden
+          />
           <CardHeader className="relative space-y-4">
             <div className="flex items-center gap-2 text-sm font-medium text-white/80">
               <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
@@ -118,7 +122,8 @@ export default async function SubscriptionPaywallPage() {
                 Unlock the full Keepon toolkit
               </CardTitle>
               <p className="max-w-2xl text-base text-white/85">
-                Keep clients booked, paid, and engaged with automated payments, online bookings, missions, and reminders. Stay on once your trial ends.
+                Keep clients booked, paid, and engaged with automated payments, online bookings, missions, and
+                reminders. Stay on once your trial ends.
               </p>
             </div>
           </CardHeader>
@@ -141,7 +146,9 @@ export default async function SubscriptionPaywallPage() {
                   <span>{headlinePrice ?? '—'}</span>
                   <span className="text-lg font-normal text-white/80">per month</span>
                 </div>
-                <p className="text-sm text-white/80">{annualPrice ? `${annualPrice} billed yearly option available` : 'Annual billing available.'}</p>
+                <p className="text-sm text-white/80">
+                  {annualPrice ? `${annualPrice} billed yearly option available` : 'Annual billing available.'}
+                </p>
               </div>
               <div className="flex flex-wrap gap-2 text-sm text-white/85">
                 <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30">

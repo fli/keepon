@@ -100,7 +100,7 @@ export default async function AddItemPage() {
       <form action={createItem} className="w-full max-w-xl space-y-5">
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>
-          <Input id="name" name="name" required  />
+          <Input id="name" name="name" required />
         </div>
 
         <div className="space-y-2">

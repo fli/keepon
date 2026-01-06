@@ -56,7 +56,7 @@ export function CreditPackSelector({ clientId, creditPacks, backQuery }: Props) 
                   <p className="text-lg font-semibold">{formatPrice(pack.price, pack.currency)}</p>
                   <p className="text-sm text-muted-foreground">{pack.totalCredits} credits</p>
                 </div>
-                <Button size="sm" render={<Link href={href} />} className="shrink-0">
+                <Button size="sm" nativeButton={false} render={<Link href={href} />} className="shrink-0">
                   Choose
                 </Button>
               </CardContent>

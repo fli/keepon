@@ -46,7 +46,6 @@ export function CreateAccountForm({ defaultCountry }: CreateAccountFormProps) {
             required
             autoComplete="given-name"
             defaultValue={state.defaultValues?.firstName}
-            
           />
         </div>
         <div className="space-y-2">
@@ -83,7 +82,14 @@ export function CreateAccountForm({ defaultCountry }: CreateAccountFormProps) {
 
         <div className="space-y-2">
           <Label htmlFor="country">Country</Label>
-          <NativeSelect id="country" name="country" defaultValue={selectedCountry} autoComplete="country" required>
+          <NativeSelect
+            id="country"
+            name="country"
+            defaultValue={selectedCountry}
+            autoComplete="country"
+            required
+            className="w-full"
+          >
             {supportedCountries.map((country) => (
               <option key={country.code} value={country.code}>
                 {country.flag} {country.name}

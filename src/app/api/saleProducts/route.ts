@@ -157,12 +157,7 @@ const baseSaleProductSchema = z.object({
   price: moneyAmountSchema,
   currency: z.string().trim().min(1, 'currency must not be empty'),
   name: z.string().trim().min(1, 'name must not be empty'),
-  productId: z
-    .string()
-    .trim()
-    .min(1, 'productId must not be empty')
-    .nullable()
-    .optional(),
+  productId: z.string().trim().min(1, 'productId must not be empty').nullable().optional(),
 })
 
 const createSaleProductSchema = z.discriminatedUnion('type', [

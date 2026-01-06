@@ -47,10 +47,10 @@ export default async function SellPaymentPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" render={<Link href={changePackHref} />}>
+          <Button size="sm" variant="outline" nativeButton={false} render={<Link href={changePackHref} />}>
             Change pack
           </Button>
-          <Button size="sm" variant="outline" render={<Link href="/dashboard/sell/credit-pack" />}>
+          <Button size="sm" variant="outline" nativeButton={false} render={<Link href="/dashboard/sell/credit-pack" />}>
             Start over
           </Button>
         </div>

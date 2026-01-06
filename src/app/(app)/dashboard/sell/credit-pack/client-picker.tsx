@@ -94,7 +94,12 @@ export function ClientPicker({ clients }: Props) {
               </Button>
             )
           })}
-          <Button size="sm" render={<Link href={addClientHref} />} className="inline-flex items-center gap-2">
+          <Button
+            size="sm"
+            nativeButton={false}
+            render={<Link href={addClientHref} />}
+            className="inline-flex items-center gap-2"
+          >
             <Plus className="size-4" aria-hidden />
             New client
           </Button>

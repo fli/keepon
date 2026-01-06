@@ -221,7 +221,11 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         return []
       }
 
-      const rows = (await clientSessionSelect(trx, authorization.trainerId, insertedIds).execute()) as RawClientSessionRow[]
+      const rows = (await clientSessionSelect(
+        trx,
+        authorization.trainerId,
+        insertedIds
+      ).execute()) as RawClientSessionRow[]
 
       return rows.map((row) => adaptClientSessionRow(row))
     })

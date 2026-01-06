@@ -45,7 +45,11 @@ class CantEditProductPricePaidByStripeError extends Error {
   }
 }
 
-const determineSaleProductType = (flags: { isService: boolean | null; isCreditPack: boolean | null; isItem: boolean | null }) => {
+const determineSaleProductType = (flags: {
+  isService: boolean | null
+  isCreditPack: boolean | null
+  isItem: boolean | null
+}) => {
   if (flags.isService) return 'service' as const
   if (flags.isCreditPack) return 'creditPack' as const
   if (flags.isItem) return 'item' as const

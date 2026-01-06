@@ -8,26 +8,23 @@ const paramsSchema = z.object({
   trainerId: z.string().min(1, 'Trainer id is required'),
 })
 
-const requestBodySchema = z
-  .array(
-    z
-      .object({
-        name: z.string({ message: 'name must be a string.' }).trim().min(1, 'name must not be empty.'),
-        amount: z
-          .number({ message: 'amount must be a number.' })
-          .refine(Number.isFinite, { message: 'amount must be a finite number.' }),
-        startDate: z
-          .union([z.string(), z.date()])
-          .transform((value) => {
-            const date = value instanceof Date ? value : new Date(value)
-            if (Number.isNaN(date.getTime())) {
-              throw new Error('startDate must be a valid date-time value.')
-            }
-            return date
-          }),
-      })
-      .strict()
-  )
+const requestBodySchema = z.array(
+  z
+    .object({
+      name: z.string({ message: 'name must be a string.' }).trim().min(1, 'name must not be empty.'),
+      amount: z
+        .number({ message: 'amount must be a number.' })
+        .refine(Number.isFinite, { message: 'amount must be a finite number.' }),
+      startDate: z.union([z.string(), z.date()]).transform((value) => {
+        const date = value instanceof Date ? value : new Date(value)
+        if (Number.isNaN(date.getTime())) {
+          throw new Error('startDate must be a valid date-time value.')
+        }
+        return date
+      }),
+    })
+    .strict()
+)
 
 const querySchema = z.object({
   updatedAtGt: z
@@ -258,7 +255,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
             start_date: item.startDate,
           }))
         )
-        .returning(eb => [eb.ref('finance_item.id').as('id')])
+        .returning((eb) => [eb.ref('finance_item.id').as('id')])
         .execute()
 
       const ids = inserted.map((row) => row.id).filter((id): id is string => Boolean(id))
@@ -269,7 +266,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
       const rows = (await trx
         .selectFrom('vw_legacy_finance_item as v')
-        .select(eb => [
+        .select((eb) => [
           eb.ref('v.id').as('id'),
           eb.ref('v.trainerId').as('trainerId'),
           eb.ref('v.amount').as('amount'),

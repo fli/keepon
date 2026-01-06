@@ -79,11 +79,7 @@ export default function DashboardPage() {
   )
 }
 
-function DashboardHeader({
-  dashboardPromise,
-}: {
-  dashboardPromise: Promise<DashboardResult>
-}) {
+function DashboardHeader({ dashboardPromise }: { dashboardPromise: Promise<DashboardResult> }) {
   const { data, error } = use(dashboardPromise)
 
   const greeting = (() => {
@@ -107,8 +103,8 @@ function DashboardHeader({
             <Button
               variant="outline"
               size="sm"
-              type="button"
               className="gap-1 pr-2"
+              nativeButton={false}
               render={<Link href="/dashboard/subscription" />}
             >
               <span>{trialText}</span>
@@ -120,8 +116,8 @@ function DashboardHeader({
             <Button
               variant="outline"
               size="sm"
-              type="button"
               className="gap-1 pr-2"
+              nativeButton={false}
               render={<Link href="/settings/credit-packs" />}
             >
               <span>{data.trainer.smsCredits.toLocaleString()} text credits</span>
@@ -139,6 +135,7 @@ function DashboardHeader({
           variant="outline"
           size="icon-lg"
           aria-label="Notifications"
+          nativeButton={false}
           render={<Link href="/dashboard/notifications" />}
         >
           <Bell className="size-5" aria-hidden />
@@ -154,11 +151,7 @@ function DashboardHeader({
   )
 }
 
-function PaymentsSection({
-  dashboardPromise,
-}: {
-  dashboardPromise: Promise<DashboardResult>
-}) {
+function PaymentsSection({ dashboardPromise }: { dashboardPromise: Promise<DashboardResult> }) {
   const { data } = use(dashboardPromise)
 
   const showSetupPayments = Boolean(data?.trainer.paymentsSetupRequired)
@@ -173,7 +166,7 @@ function PaymentsSection({
           <CardHeader className="pb-2">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Badge variant="danger" className="rounded-full p-2">
+                <Badge variant="destructive" className="rounded-full p-2">
                   <AlertCircle className="size-4" aria-hidden />
                 </Badge>
                 <CardDescription className="text-sm font-semibold text-foreground">
@@ -241,11 +234,7 @@ function PaymentsSection({
   )
 }
 
-function SubscriptionsSection({
-  dashboardPromise,
-}: {
-  dashboardPromise: Promise<DashboardResult>
-}) {
+function SubscriptionsSection({ dashboardPromise }: { dashboardPromise: Promise<DashboardResult> }) {
   const { data } = use(dashboardPromise)
 
   return (
@@ -276,11 +265,7 @@ function SubscriptionsSection({
   )
 }
 
-function NextAppointmentSection({
-  dashboardPromise,
-}: {
-  dashboardPromise: Promise<DashboardResult>
-}) {
+function NextAppointmentSection({ dashboardPromise }: { dashboardPromise: Promise<DashboardResult> }) {
   const { data } = use(dashboardPromise)
 
   return (
@@ -332,11 +317,7 @@ function NextAppointmentSection({
   )
 }
 
-function OnlineBookingsSection({
-  dashboardPromise,
-}: {
-  dashboardPromise: Promise<DashboardResult>
-}) {
+function OnlineBookingsSection({ dashboardPromise }: { dashboardPromise: Promise<DashboardResult> }) {
   const { data } = use(dashboardPromise)
 
   const showOnlineBookingsOnboarding =
@@ -350,9 +331,7 @@ function OnlineBookingsSection({
           <Card className="flex flex-col border-dashed">
             <CardHeader className="space-y-2 pb-2">
               <CardDescription className="text-sm font-semibold text-foreground">Setup online bookings</CardDescription>
-              <p className="text-sm text-muted-foreground">
-                Share your services and start taking bookings in minutes.
-              </p>
+              <p className="text-sm text-muted-foreground">Share your services and start taking bookings in minutes.</p>
             </CardHeader>
             <CardContent className="mt-auto pt-0">
               <Button className="w-fit">Setup your booking page</Button>

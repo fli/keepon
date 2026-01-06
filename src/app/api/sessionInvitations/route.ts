@@ -312,7 +312,10 @@ export async function POST(request: NextRequest) {
             invite_time: sql<Date>`NOW()`,
           })
         )
-        .returning((eb) => [eb.ref('client_session.id').as('id'), eb.ref('client_session.invite_time').as('inviteTime')])
+        .returning((eb) => [
+          eb.ref('client_session.id').as('id'),
+          eb.ref('client_session.invite_time').as('inviteTime'),
+        ])
         .executeTakeFirst()
 
       if (!invitationRow) {

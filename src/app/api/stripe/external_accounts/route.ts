@@ -258,7 +258,10 @@ const stripeBankAccountSchema = z
     account_type: z.union([z.string(), z.null()]).optional(),
     bank_name: z.union([z.string(), z.null()]).optional(),
     default_for_currency: z.union([z.boolean(), z.null()]).optional(),
-    available_payout_methods: z.array(z.enum(['instant', 'standard'])).nullable().optional(),
+    available_payout_methods: z
+      .array(z.enum(['instant', 'standard']))
+      .nullable()
+      .optional(),
   })
   .passthrough()
 

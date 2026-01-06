@@ -283,6 +283,7 @@ export function PaymentForm({ client, pack }: Props) {
                       id="eftType"
                       value={eftType}
                       onChange={(event) => setParam('eftType', event.target.value)}
+                      className="w-full"
                     >
                       {EFT_OPTIONS.map((option) => (
                         <option key={option.id} value={option.id}>

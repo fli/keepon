@@ -531,7 +531,11 @@ export async function POST(request: Request) {
 
       const saleDetails = saleDetailsSchema.parse(saleDetailsRow)
 
-      if (saleDetails.paymentStatus && saleDetails.paymentStatus !== 'none' && saleDetails.paymentStatus !== 'requested') {
+      if (
+        saleDetails.paymentStatus &&
+        saleDetails.paymentStatus !== 'none' &&
+        saleDetails.paymentStatus !== 'requested'
+      ) {
         throw new SaleAlreadyPaidError()
       }
 
@@ -573,7 +577,11 @@ export async function POST(request: Request) {
       const paymentId = paymentRow.id
 
       const markSalePaid = async () => {
-        await trx.updateTable('sale_payment_status').set({ payment_status: 'paid' }).where('sale_id', '=', payload.saleId).execute()
+        await trx
+          .updateTable('sale_payment_status')
+          .set({ payment_status: 'paid' })
+          .where('sale_id', '=', payload.saleId)
+          .execute()
       }
 
       if (payload.type === 'manual') {
@@ -643,7 +651,11 @@ export async function POST(request: Request) {
       const stripeAccountType = saleDetails.stripeAccountType ?? undefined
       const stripeAccountId = saleDetails.stripeAccountId ?? undefined
 
-      if (!stripeAccountId || !stripeAccountType || (stripeAccountType !== 'standard' && stripeAccountType !== 'custom')) {
+      if (
+        !stripeAccountId ||
+        !stripeAccountType ||
+        (stripeAccountType !== 'standard' && stripeAccountType !== 'custom')
+      ) {
         throw new StripePaymentsDisabledError()
       }
 
@@ -694,7 +706,11 @@ export async function POST(request: Request) {
           )
           .execute()
 
-        await trx.updateTable('client').set({ stripe_customer_id: customer.id }).where('id', '=', saleDetails.clientId).execute()
+        await trx
+          .updateTable('client')
+          .set({ stripe_customer_id: customer.id })
+          .where('id', '=', saleDetails.clientId)
+          .execute()
       }
 
       let paymentMethod: Stripe.PaymentMethod
@@ -716,7 +732,11 @@ export async function POST(request: Request) {
           throw new StripeCardRequiredError()
         }
 
-        paymentMethod = await stripeClient.paymentMethods.retrieve(payload.stripePaymentMethodId, {}, stripeRequestOptions)
+        paymentMethod = await stripeClient.paymentMethods.retrieve(
+          payload.stripePaymentMethodId,
+          {},
+          stripeRequestOptions
+        )
       }
 
       if (!paymentMethod.card) {
@@ -736,9 +756,10 @@ export async function POST(request: Request) {
         throw new InvalidFeeConfigurationError()
       }
 
-      const passOnFee = authorization.actor === 'trainer'
-        ? payload.passOnFee ?? false
-        : saleDetails.paymentRequestPassOnTransactionFee
+      const passOnFee =
+        authorization.actor === 'trainer'
+          ? (payload.passOnFee ?? false)
+          : saleDetails.paymentRequestPassOnTransactionFee
 
       const amountToUse = amountRounded.decimalPlaces(limits.smallestUnitDecimals)
       let transactionFee: BigNumber
@@ -807,7 +828,8 @@ export async function POST(request: Request) {
             transfer_data: stripeAccountType === 'standard' ? undefined : { destination: stripeAccountId },
             confirmation_method: 'manual',
             confirm: true,
-            setup_future_usage: authorization.actor === 'client' && payload.setupFutureUsage ? 'off_session' : undefined,
+            setup_future_usage:
+              authorization.actor === 'client' && payload.setupFutureUsage ? 'off_session' : undefined,
             use_stripe_sdk: true,
             payment_method_options: {
               card: {
@@ -847,11 +869,14 @@ export async function POST(request: Request) {
 
       if (passOnFee) {
         await trx.updateTable('payment').set({ amount: chargeAmount.toString() }).where('id', '=', paymentId).execute()
-        await trx.updateTable('sale_product').set({ price: chargeAmount.toString() }).where('id', '=', saleDetails.saleProductId).execute()
+        await trx
+          .updateTable('sale_product')
+          .set({ price: chargeAmount.toString() })
+          .where('id', '=', saleDetails.saleProductId)
+          .execute()
       }
 
-      const latestChargeId =
-        typeof paymentIntent.latest_charge === 'string' ? paymentIntent.latest_charge : null
+      const latestChargeId = typeof paymentIntent.latest_charge === 'string' ? paymentIntent.latest_charge : null
 
       await trx
         .insertInto('payment_stripe')

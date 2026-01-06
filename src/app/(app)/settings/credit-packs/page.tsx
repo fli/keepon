@@ -65,7 +65,7 @@ export default async function CreditPacksPage() {
               Review packs of credits that clients can purchase and apply toward sessions.
             </p>
           </div>
-          <Button size="sm" render={<Link href="/settings/credit-packs/add" />}>
+          <Button size="sm" nativeButton={false} render={<Link href="/settings/credit-packs/add" />}>
             Add credit pack
           </Button>
         </div>

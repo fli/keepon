@@ -225,11 +225,7 @@ export async function POST(request: Request) {
     body.type === 'update' && stripeAccountType !== 'standard' ? 'account_update' : 'account_onboarding'
 
   const collect: Stripe.AccountLinkCreateParams.Collect | undefined =
-    stripeAccountType === 'custom'
-      ? body.collect === 'eventuallyDue'
-        ? 'eventually_due'
-        : 'currently_due'
-      : undefined
+    stripeAccountType === 'custom' ? (body.collect === 'eventuallyDue' ? 'eventually_due' : 'currently_due') : undefined
 
   try {
     const accountLink = await stripeClient.accountLinks.create({

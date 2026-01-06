@@ -32,10 +32,7 @@ const clientReminderSchema = z
   .nullable()
   .optional()
 
-const geoSchema = z
-  .object({ lat: z.number(), lng: z.number() })
-  .nullable()
-  .optional()
+const geoSchema = z.object({ lat: z.number(), lng: z.number() }).nullable().optional()
 
 const appointmentProductSchema = z.discriminatedUnion('type', [
   z.object({
@@ -154,7 +151,11 @@ const groupSessionSchema = z
   })
   .merge(z.object(commonPartialSchema))
 
-const requestBodySchema = z.discriminatedUnion('sessionType', [eventSessionSchema, singleSessionSchema, groupSessionSchema])
+const requestBodySchema = z.discriminatedUnion('sessionType', [
+  eventSessionSchema,
+  singleSessionSchema,
+  groupSessionSchema,
+])
 
 class ClientNotFoundError extends Error {
   constructor() {
@@ -348,11 +349,7 @@ export async function POST(request: Request) {
       }
 
       const eventType =
-        data.sessionType === 'event'
-          ? 'event'
-          : data.sessionType === 'single'
-            ? 'single_session'
-            : 'group_session'
+        data.sessionType === 'event' ? 'event' : data.sessionType === 'single' ? 'single_session' : 'group_session'
 
       const seriesInsert = await sql<{ id: string; timezone: string }>`
         INSERT INTO session_series (
@@ -400,7 +397,8 @@ export async function POST(request: Request) {
           : sql`NULL`
 
       const spReminder1Type =
-        data.serviceProviderReminder1?.type ?? (appReminderTriggerMinutes !== null ? 'notification' : 'emailAndNotification')
+        data.serviceProviderReminder1?.type ??
+        (appReminderTriggerMinutes !== null ? 'notification' : 'emailAndNotification')
 
       const spReminder2Interval = data.serviceProviderReminder2?.timeBeforeStart
         ? sql`${data.serviceProviderReminder2.timeBeforeStart}::interval`

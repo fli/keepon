@@ -479,13 +479,13 @@ export async function createTrainerAccount(input: TrainerSignupInput) {
       throw new Error('tokenCreateFailed')
     }
 
-  await seedTrainerDefaults({
-    trx,
-    trainerId: trainer.id,
-    email,
-    timezone: parsed.timezone,
-    currencyId: currencyRow.currency_id,
-  })
+    await seedTrainerDefaults({
+      trx,
+      trainerId: trainer.id,
+      email,
+      timezone: parsed.timezone,
+      currencyId: currencyRow.currency_id,
+    })
 
     return {
       id: tokenRow.accessToken,

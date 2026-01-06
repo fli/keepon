@@ -35,7 +35,9 @@ export async function GET(request: Request) {
       .select((eb) => [
         eb.ref('trainer.first_name').as('firstName'),
         eb.ref('trainer.last_name').as('lastName'),
-        eb.fn.coalesce(eb.ref('trainer.business_name'), eb.ref('trainer.online_bookings_business_name')).as('businessName'),
+        eb.fn
+          .coalesce(eb.ref('trainer.business_name'), eb.ref('trainer.online_bookings_business_name'))
+          .as('businessName'),
         eb.ref('trainer.online_bookings_contact_email').as('contactEmail'),
         eb.ref('trainer.online_bookings_contact_number').as('contactNumber'),
         eb.ref('trainer.brand_color').as('brandColor'),

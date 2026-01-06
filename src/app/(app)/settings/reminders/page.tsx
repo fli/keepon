@@ -146,6 +146,7 @@ function ReminderSection({
               <Button
                 size="sm"
                 variant="outline"
+                nativeButton={false}
                 render={<Link href={`/settings/reminders/edit/${targetSlug}/${item.slot}`} />}
               >
                 Edit
@@ -159,6 +160,7 @@ function ReminderSection({
         size="sm"
         variant="outline"
         disabled={!nextSlot}
+        nativeButton={nextSlot ? false : undefined}
         render={nextSlot ? <Link href={`/settings/reminders/add/${targetSlug}/${nextSlot}`} /> : undefined}
       >
         Add reminder

@@ -18,10 +18,7 @@ const nullableTrimmedString = z
     return trimmed.length > 0 ? trimmed : null
   })
 
-const isoDurationSchema = z
-  .string()
-  .trim()
-  .regex(/^P/i, 'Duration must be an ISO 8601 duration, e.g. PT1H')
+const isoDurationSchema = z.string().trim().regex(/^P/i, 'Duration must be an ISO 8601 duration, e.g. PT1H')
 
 const reminderSchema = z
   .object({

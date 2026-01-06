@@ -169,6 +169,7 @@ function ReminderFields({
                 type: event.target.value as (typeof value)['type'],
               })
             }
+            className="w-full"
           >
             {typeOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -188,6 +189,7 @@ function ReminderFields({
                 timeBeforeStart: event.target.value,
               })
             }
+            className="w-full"
           >
             {hasCustomTime ? <option value={value.timeBeforeStart}>Custom ({value.timeBeforeStart})</option> : null}
             {reminderOptions.map((option) => (

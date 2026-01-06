@@ -10,7 +10,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '@/components/ui/breadcrumbs'
+} from '@/components/ui/breadcrumb'
 
 import { loadClientsServer } from '../../clients/actions'
 import { loadCreditPacks } from '../../dashboard/sell/credit-pack/actions'
@@ -86,16 +86,12 @@ async function buildCrumbs(segments: string[]): Promise<Crumb[]> {
 async function buildSellCreditPackCrumbs(normalized: string[]): Promise<Crumb[]> {
   const [, , , clientId, maybePackKeyword, productId] = normalized
 
-  const clients = clientId ? (await loadClientsServer()) ?? [] : []
+  const clients = clientId ? ((await loadClientsServer()) ?? []) : []
   const packs = maybePackKeyword === 'pack' && productId ? await loadCreditPacks() : []
 
-  const clientName = clientId
-    ? clients.find((client) => client.id === clientId)
-    : undefined
+  const clientName = clientId ? clients.find((client) => client.id === clientId) : undefined
 
-  const packName = maybePackKeyword === 'pack' && productId
-    ? packs.find((pack) => pack.id === productId)
-    : undefined
+  const packName = maybePackKeyword === 'pack' && productId ? packs.find((pack) => pack.id === productId) : undefined
 
   const dashboard: Crumb = { href: '/dashboard' as Route, label: 'Dashboard' }
   const flowRoot: Crumb = { href: '/dashboard/sell/credit-pack' as Route, label: 'Sell credit pack' }
@@ -159,9 +155,7 @@ async function BreadcrumbsContent({ params }: { params: Promise<{ segments?: str
               <Fragment key={`${crumb.href}-${index}`}>
                 <BreadcrumbItem>
                   {!isLast || isRoot ? (
-                    <BreadcrumbLink asChild>
-                      <Link href={crumb.href}>{crumb.label}</Link>
-                    </BreadcrumbLink>
+                    <BreadcrumbLink render={<Link href={crumb.href} />}>{crumb.label}</BreadcrumbLink>
                   ) : (
                     <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                   )}
