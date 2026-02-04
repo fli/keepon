@@ -1,6 +1,7 @@
+import { addDays } from 'date-fns'
 import { z } from 'zod'
 import { APP_NAME, NO_REPLY_EMAIL } from '@/app/api/_lib/constants'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 
 const tailwind600: Record<string, string> = {
   amber: '#d97706',
@@ -204,9 +205,10 @@ export async function requestPaymentForSale(trainerId: string, saleId: string) {
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3001'
 
   await db.transaction().execute(async (trx) => {
+    const now = new Date()
     const saleRow = await trx
       .updateTable('sale')
-      .set({ payment_request_time: sql<Date>`NOW()`, updated_at: sql<Date>`NOW()` })
+      .set({ payment_request_time: now, updated_at: now })
       .where('id', '=', saleId)
       .where('trainer_id', '=', trainerId)
       .returning(['id', 'client_id'])
@@ -231,13 +233,10 @@ export async function requestPaymentForSale(trainerId: string, saleId: string) {
         eb.ref('client.id').as('clientId'),
         eb.ref('client.user_id').as('clientUserId'),
         eb.ref('client.email').as('clientEmail'),
-        sql<string>`
-          COALESCE(
-            trainer.online_bookings_business_name,
-            trainer.business_name,
-            trainer.first_name || COALESCE(' ' || trainer.last_name, '')
-          )
-        `.as('serviceProviderName'),
+        eb.ref('trainer.online_bookings_business_name').as('onlineBookingsBusinessName'),
+        eb.ref('trainer.business_name').as('businessName'),
+        eb.ref('trainer.first_name').as('firstName'),
+        eb.ref('trainer.last_name').as('lastName'),
         eb.ref('trainer.brand_color').as('brandColor'),
         eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
       ])
@@ -249,7 +248,20 @@ export async function requestPaymentForSale(trainerId: string, saleId: string) {
       throw new SaleNotFoundError()
     }
 
-    const details = saleDetailsSchema.parse(detailsRow)
+    const serviceProviderName =
+      detailsRow.onlineBookingsBusinessName ??
+      detailsRow.businessName ??
+      `${detailsRow.firstName}${detailsRow.lastName ? ` ${detailsRow.lastName}` : ''}`
+
+    const details = saleDetailsSchema.parse({
+      saleId: detailsRow.saleId,
+      clientId: detailsRow.clientId,
+      clientUserId: detailsRow.clientUserId,
+      clientEmail: detailsRow.clientEmail,
+      serviceProviderName,
+      brandColor: detailsRow.brandColor,
+      businessLogoUrl: detailsRow.businessLogoUrl,
+    })
 
     if (!details.clientEmail) {
       throw new ClientHasNoEmailError()
@@ -261,7 +273,7 @@ export async function requestPaymentForSale(trainerId: string, saleId: string) {
         user_id: details.clientUserId,
         user_type: 'client',
         type: 'client_dashboard',
-        expires_at: sql<Date>`NOW() + INTERVAL '7 days'`,
+        expires_at: addDays(now, 7),
       })
       .returning('id')
       .executeTakeFirst()

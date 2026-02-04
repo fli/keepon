@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 
 const taxSchema = z.object({
@@ -82,23 +82,22 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   }
 
   try {
-    const result = await sql<RawTaxRow>`
-      SELECT
-        id,
-        trainer_id AS "trainerId",
-        label,
-        percent,
-        enabled
-      FROM tax
-      WHERE trainer_id = ${authorization.trainerId}
-      ORDER BY id
-    `.execute(db)
-
-    const rows = result.rows
+    const rows = await db
+      .selectFrom('tax')
+      .select((eb) => [
+        eb.ref('id').as('id'),
+        eb.ref('trainer_id').as('trainerId'),
+        eb.ref('label').as('label'),
+        eb.ref('percent').as('percent'),
+        eb.ref('enabled').as('enabled'),
+      ])
+      .where('trainer_id', '=', authorization.trainerId)
+      .orderBy('id')
+      .execute()
 
     if (rows.length !== 3) {
       console.error('Unexpected number of tax records returned', {
-        trainerId,
+        trainerId: authorization.trainerId,
         count: rows.length,
       })
       return NextResponse.json(

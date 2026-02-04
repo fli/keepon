@@ -1,6 +1,7 @@
+import { addDays, startOfDay, subDays } from 'date-fns'
 import { jsonArrayFrom, jsonObjectFrom } from 'kysely/helpers/postgres'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 // Single-query dashboard fetch using Kysely + json helpers to keep everything in one round trip
 
 const missionSchema = z.object({
@@ -112,9 +113,15 @@ export type DashboardSummary = {
 }
 
 export async function getDashboardSummary(trainerId: string, userId: string): Promise<DashboardSummary> {
+  const now = new Date()
+  const sevenDaysAgo = subDays(now, 7)
+  const sevenDaysFromNow = addDays(now, 7)
+  const startToday = startOfDay(now)
+  const endToday = addDays(startToday, 1)
+
   const revenueCte = db
     .selectFrom('payment as p')
-    .select([sql`p.amount::numeric`.as('amount'), sql`p.created_at`.as('ts')])
+    .select((eb) => [eb.ref('p.amount').as('amount'), eb.ref('p.created_at').as('ts')])
     .where('p.trainer_id', '=', trainerId)
     .where('p.refunded_time', 'is', null)
     .where((eb) =>
@@ -129,14 +136,14 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
       db
         .selectFrom('payment_plan_payment as ppp')
         .innerJoin('payment_plan as pp', 'pp.id', 'ppp.payment_plan_id')
-        .select([sql`ppp.amount::numeric`.as('amount'), sql`ppp.date`.as('ts')])
+        .select((eb) => [eb.ref('ppp.amount').as('amount'), eb.ref('ppp.date').as('ts')])
         .where('pp.trainer_id', '=', trainerId)
         .where('ppp.status', '=', 'paid')
     )
     .unionAll(
       db
         .selectFrom('finance_item as fi')
-        .select([sql`fi.amount::numeric`.as('amount'), sql`fi.start_date`.as('ts')])
+        .select((eb) => [eb.ref('fi.amount').as('amount'), eb.ref('fi.start_date').as('ts')])
         .where('fi.trainer_id', '=', trainerId)
         .where('fi.amount', '>', '0')
     )
@@ -146,22 +153,69 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
     .innerJoin('payment_plan as pp', 'pp.id', 'ppp.payment_plan_id')
     .where('pp.trainer_id', '=', trainerId)
     .where('ppp.status', 'not in', ['paid', 'cancelled', 'refunded', 'paused'])
-    .select(() => [
-      sql`COALESCE(SUM(CASE WHEN ppp.date < NOW() THEN 1 ELSE 0 END), 0)::numeric`.as('overdueCount'),
-      sql`COALESCE(SUM(CASE WHEN ppp.date < NOW() THEN ppp.amount_outstanding ELSE 0 END), 0)::numeric`.as(
-        'overdueTotal'
-      ),
-      sql`COALESCE(SUM(CASE WHEN ppp.date >= NOW() AND ppp.date < NOW() + INTERVAL '7 days' THEN ppp.amount_outstanding ELSE 0 END), 0)::numeric`.as(
-        'pending7Total'
-      ),
-      sql`COALESCE(SUM(CASE WHEN ppp.date >= date_trunc('day', NOW()) AND ppp.date < date_trunc('day', NOW()) + INTERVAL '1 day' THEN ppp.amount_outstanding ELSE 0 END), 0)::numeric`.as(
-        'pendingTodayTotal'
-      ),
+    .select((eb) => [
+      eb
+        .fn('coalesce', [
+          eb.fn('sum', [
+            eb
+              .case()
+              .when(eb(eb.ref('ppp.date'), '<', now))
+              .then(1)
+              .else(0)
+              .end(),
+          ]),
+          eb.val(0),
+        ])
+        .as('overdueCount'),
+      eb
+        .fn('coalesce', [
+          eb.fn('sum', [
+            eb
+              .case()
+              .when(eb(eb.ref('ppp.date'), '<', now))
+              .then(eb.ref('ppp.amount_outstanding'))
+              .else(0)
+              .end(),
+          ]),
+          eb.val(0),
+        ])
+        .as('overdueTotal'),
+      eb
+        .fn('coalesce', [
+          eb.fn('sum', [
+            eb
+              .case()
+              .when(eb.and([eb(eb.ref('ppp.date'), '>=', now), eb(eb.ref('ppp.date'), '<', sevenDaysFromNow)]))
+              .then(eb.ref('ppp.amount_outstanding'))
+              .else(0)
+              .end(),
+          ]),
+          eb.val(0),
+        ])
+        .as('pending7Total'),
+      eb
+        .fn('coalesce', [
+          eb.fn('sum', [
+            eb
+              .case()
+              .when(eb.and([eb(eb.ref('ppp.date'), '>=', startToday), eb(eb.ref('ppp.date'), '<', endToday)]))
+              .then(eb.ref('ppp.amount_outstanding'))
+              .else(0)
+              .end(),
+          ]),
+          eb.val(0),
+        ])
+        .as('pendingTodayTotal'),
     ])
 
   const creditUsageCte = db
     .selectFrom('payment_credit_pack as pcp')
-    .select(['pcp.sale_credit_pack_id', sql`COALESCE(SUM(pcp.credits_used), 0)::int`.as('credits_used')])
+    .select((eb) => [
+      eb.ref('pcp.sale_credit_pack_id'),
+      eb
+        .cast<number>(eb.fn('coalesce', [eb.fn('sum', [eb.ref('pcp.credits_used')]), eb.val(0)]), 'int4')
+        .as('credits_used'),
+    ])
     .groupBy('pcp.sale_credit_pack_id')
 
   const row = await db
@@ -200,11 +254,11 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
           .leftJoin('reward', 'reward.id', 'mission.reward_id')
           .where('mission.trainer_id', '=', trainerId)
           .select((sub) => [
-            sql`mission.id::text`.as('id'),
-            sql`mission.display_order`.as('displayOrder'),
-            sql`mission.reward_id::text`.as('rewardId'),
-            sql`reward.claimed_at IS NOT NULL`.as('rewardClaimed'),
-            sql`mission.completed_at IS NOT NULL`.as('completed'),
+            sub.eb.cast<string>(sub.eb.ref('mission.id'), 'text').as('id'),
+            sub.eb.ref('mission.display_order').as('displayOrder'),
+            sub.eb.cast<string>(sub.eb.ref('mission.reward_id'), 'text').as('rewardId'),
+            sub.eb(sub.eb.ref('reward.claimed_at'), 'is not', null).as('rewardClaimed'),
+            sub.eb(sub.eb.ref('mission.completed_at'), 'is not', null).as('completed'),
             sub.eb.ref('mission_type.title').as('title'),
             sub.eb.ref('mission_type.description').as('description'),
             sub.eb.ref('mission_type.action_url').as('actionUrl'),
@@ -213,18 +267,38 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
       ).as('missions'),
       eb
         .selectFrom('revenue as r')
-        .select(() =>
-          sql`COALESCE(SUM(CASE WHEN r.ts >= NOW() - INTERVAL '7 days' THEN r.amount ELSE 0 END), 0)::numeric`.as(
-            'paymentsPaid7'
-          )
+        .select((sub) =>
+          sub
+            .fn('coalesce', [
+              sub.fn('sum', [
+                sub
+                  .case()
+                  .when(sub(sub.ref('r.ts'), '>=', sevenDaysAgo))
+                  .then(sub.ref('r.amount'))
+                  .else(0)
+                  .end(),
+              ]),
+              sub.val(0),
+            ])
+            .as('paymentsPaid7')
         )
         .as('paymentsPaid7'),
       eb
         .selectFrom('revenue as r')
-        .select(() =>
-          sql`COALESCE(SUM(CASE WHEN r.ts >= date_trunc('day', NOW()) THEN r.amount ELSE 0 END), 0)::numeric`.as(
-            'paymentsPaidToday'
-          )
+        .select((sub) =>
+          sub
+            .fn('coalesce', [
+              sub.fn('sum', [
+                sub
+                  .case()
+                  .when(sub(sub.ref('r.ts'), '>=', startToday))
+                  .then(sub.ref('r.amount'))
+                  .else(0)
+                  .end(),
+              ]),
+              sub.val(0),
+            ])
+            .as('paymentsPaidToday')
         )
         .as('paymentsPaidToday'),
       eb.selectFrom('pending').select('overdueCount').as('pendingOverdueCount'),
@@ -243,7 +317,9 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
         .leftJoin('credit_usage as cu', 'cu.sale_credit_pack_id', 'scp.id')
         .where('sp.trainer_id', '=', trainerId)
         .where('sp.is_credit_pack', '=', true)
-        .where(sql<boolean>`scp.total_credits > COALESCE(cu.credits_used, 0)`)
+        .where((sub) =>
+          sub(sub.ref('scp.total_credits'), '>', sub.fn('coalesce', [sub.ref('cu.credits_used'), sub.val(0)]))
+        )
         .select(() => eb.fn.countAll().as('count'))
         .as('activePacks'),
       eb
@@ -263,17 +339,19 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
         eb
           .selectFrom('session as s')
           .leftJoin('session_series as series', 'series.id', 's.session_series_id')
-          .select([
-            's.id',
-            sql`COALESCE(series.name, s.location, 'Appointment')`.as('title'),
-            sql`(EXTRACT(EPOCH FROM s.duration) / 60)::int`.as('durationMinutes'),
-            's.start as startTime',
-            's.location',
-            's.address',
-            's.timezone',
+          .select((sub) => [
+            sub.ref('s.id').as('id'),
+            sub.fn('coalesce', [sub.ref('series.name'), sub.ref('s.location'), sub.val('Appointment')]).as('title'),
+            sub
+              .cast<number>(sub(sub.fn('date_part', [sub.val('epoch'), sub.ref('s.duration')]), '/', 60), 'int4')
+              .as('durationMinutes'),
+            sub.ref('s.start').as('startTime'),
+            sub.ref('s.location').as('location'),
+            sub.ref('s.address').as('address'),
+            sub.ref('s.timezone').as('timezone'),
           ])
           .where('s.trainer_id', '=', trainerId)
-          .where('s.start', '>', sql<Date>`NOW()`)
+          .where('s.start', '>', now)
           .orderBy('s.start', 'asc')
           .limit(1)
       ).as('nextSession'),
@@ -282,7 +360,7 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
         .select(() => eb.fn.countAll().as('count'))
         .where('trainer_id', '=', trainerId)
         .where('bookable_online', '=', true)
-        .where('start', '>', sql<Date>`NOW()`)
+        .where('start', '>', now)
         .as('onlineBookableCount'),
       eb
         .selectFrom('product as p')
@@ -304,7 +382,6 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
     value instanceof Date ? value : value ? new Date(value) : null
 
   const trialEndsAt = toDate(parsed.trialEndTime)
-  const now = new Date()
   const trialDaysRemaining =
     trialEndsAt && trialEndsAt > now
       ? Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))

@@ -1,8 +1,9 @@
 import type { NextRequest } from 'next/server'
 import BigNumber from 'bignumber.js'
+import { addDays } from 'date-fns'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../_lib/constants'
 import { parseStrictJsonBody } from '../../../_lib/strictJson'
@@ -286,13 +287,10 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         eb.ref('client.id').as('clientId'),
         eb.ref('client.email').as('clientEmail'),
         eb.ref('client.user_id').as('clientUserId'),
-        sql<string>`
-          COALESCE(
-            trainer.online_bookings_business_name,
-            trainer.business_name,
-            trainer.first_name || COALESCE(' ' || trainer.last_name, '')
-          )
-        `.as('serviceProviderName'),
+        eb.ref('trainer.online_bookings_business_name').as('onlineBookingsBusinessName'),
+        eb.ref('trainer.business_name').as('businessName'),
+        eb.ref('trainer.first_name').as('firstName'),
+        eb.ref('trainer.last_name').as('lastName'),
         eb.ref('trainer.brand_color').as('brandColor'),
         eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
         eb.ref('currency.alpha_code').as('currency'),
@@ -306,7 +304,21 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       throw new ClientNotFoundError()
     }
 
-    const details = clientDetailsSchema.parse(detailsRow)
+    const serviceProviderName =
+      detailsRow.onlineBookingsBusinessName ??
+      detailsRow.businessName ??
+      `${detailsRow.firstName}${detailsRow.lastName ? ` ${detailsRow.lastName}` : ''}`
+
+    const details = clientDetailsSchema.parse({
+      clientId: detailsRow.clientId,
+      clientEmail: detailsRow.clientEmail,
+      clientUserId: detailsRow.clientUserId,
+      serviceProviderName,
+      brandColor: detailsRow.brandColor,
+      businessLogoUrl: detailsRow.businessLogoUrl,
+      currency: detailsRow.currency,
+      country: detailsRow.country,
+    })
 
     if (!details.clientEmail) {
       throw new ClientHasNoEmailError()
@@ -350,18 +362,19 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     const baseUrl = process.env.BASE_URL ?? 'http://localhost:3001'
 
     const plan = await db.transaction().execute(async (trx) => {
+      const now = new Date()
       const insertedPlan = await trx
         .insertInto('payment_plan')
         .values({
           trainer_id: authorization.trainerId,
           client_id: clientId,
           status: 'pending',
-          start: startDate.toISOString(),
-          end_: endDate === MAX_TIME ? sql<Date>`'infinity'::timestamp with time zone` : endDate.toISOString(),
+          start: startDate,
+          end_: endDate === MAX_TIME ? db.fn<Date>('infinity_timestamptz') : endDate,
           frequency_weekly_interval: frequencyWeeks,
           name: parsedBody.name,
           amount: amountStr,
-          acceptance_request_time: sql<Date>`NOW()`,
+          acceptance_request_time: now,
         })
         .returning('id')
         .executeTakeFirst()
@@ -389,7 +402,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
           user_id: details.clientUserId,
           user_type: 'client',
           type: 'client_dashboard',
-          expires_at: sql<Date>`NOW() + INTERVAL '7 days'`,
+          expires_at: addDays(now, 7),
         })
         .returning('id')
         .executeTakeFirst()

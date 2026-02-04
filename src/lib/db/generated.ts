@@ -1651,6 +1651,111 @@ export interface VwLegacyTrainer {
   timezone: string | null;
 }
 
+export interface VwOnlineBookingsProvider {
+  onlineBookingsEnabled: boolean | null;
+  providerName: string | null;
+  pageUrlSlug: string | null;
+  contactEmail: string | null;
+  contactNumber: string | null;
+  durationUntilBookingWindowOpens: string | null;
+  durationUntilBookingWindowCloses: string | null;
+  bookingNote: string | null;
+  availability: Json | null;
+  services: Json | null;
+  unavailability: Json | null;
+  currency: string | null;
+  country: string | null;
+  timezone: string | null;
+  brandColor: string | null;
+  businessLogoUrl: string | null;
+  coverImageUrl: string | null;
+  brandDarkMode: boolean | null;
+  termsAndConditions: string | null;
+  cancellationPolicy: string | null;
+  stripeAccountId: string | null;
+  stripeAccountType: string | null;
+}
+
+export interface VwAppStoreLatestReceipts {
+  encoded_receipt: string;
+  original_transaction_id: string;
+  trainer_id: string;
+}
+
+export interface VwDuePaymentReminders {
+  brand_color: string | null;
+  business_logo_url: string | null;
+  client_email: string | null;
+  client_first_name: string;
+  client_id: string;
+  client_last_name: string | null;
+  last_reminder: boolean;
+  latest_remind_time: Timestamp | null;
+  most_overdue: Timestamp;
+  overdue_count: number;
+  service_provider_name: string;
+  trainer_id: string;
+  trainer_user_id: string;
+}
+
+export interface VwDueSessionReminderSlots {
+  reminder_slot: string;
+  reminder_type: string;
+  session_id: string;
+  trainer_id: string;
+}
+
+export interface VwGeneratePaymentPlanPayments {
+  amount: Numeric;
+  amount_outstanding: Numeric;
+  created_at: Timestamp;
+  date: Timestamp;
+  fee: Numeric | null;
+  id: string;
+  last_retry_time: Timestamp | null;
+  payment_plan_id: string;
+  retry_count: number;
+  status: string;
+  trainer_id: string;
+  updated_at: Timestamp;
+}
+
+export interface VwSessionReminderDetails {
+  address: string | null;
+  brand_color: string;
+  business_logo_url: string | null;
+  cancelled: boolean;
+  client_reminders_enabled: boolean;
+  clients: Json;
+  contact_email: string;
+  contact_number: string | null;
+  country: string;
+  ends_at: Timestamp;
+  geo: Json | null;
+  google_place_id: string | null;
+  locale: string | null;
+  location: string | null;
+  mail_id: string;
+  name: string;
+  reminder_checked_at: Timestamp | null;
+  reminder_interval: Interval;
+  reminder_slot: string;
+  reminder_type: string;
+  service_provider_email: string;
+  service_provider_name: string;
+  session_id: string;
+  sms_credit_balance: Int8 | null;
+  sms_credit_checkout_id: string;
+  starts_at: Timestamp;
+  timezone: string;
+  trainer_id: string;
+  user_id: string;
+}
+
+export interface VwTrialledDidntSubTrainers {
+  trainer_id: string;
+}
+
 export interface VwValidAccessToken {
   access_token: string | null;
   member_id: string | null;
@@ -1767,7 +1872,11 @@ export interface DB {
   trial: Trial;
   user_: User;
   user_type: UserType;
+  vw_app_store_latest_receipts: VwAppStoreLatestReceipts;
+  vw_due_payment_reminders: VwDuePaymentReminders;
+  vw_due_session_reminder_slots: VwDueSessionReminderSlots;
   vw_first_card_payments: VwFirstCardPayments;
+  vw_generate_payment_plan_payments: VwGeneratePaymentPlanPayments;
   vw_legacy_app_notification: VwLegacyAppNotification;
   vw_legacy_client: VwLegacyClient;
   vw_legacy_client_session: VwLegacyClientSession;
@@ -1781,5 +1890,8 @@ export interface DB {
   vw_legacy_session_series: VwLegacySessionSeries;
   vw_legacy_session_series_2: VwLegacySessionSeries2;
   vw_legacy_trainer: VwLegacyTrainer;
+  vw_online_bookings_provider: VwOnlineBookingsProvider;
+  vw_session_reminder_details: VwSessionReminderDetails;
+  vw_trialled_didnt_sub_trainers: VwTrialledDidntSubTrainers;
   vw_valid_access_token: VwValidAccessToken;
 }

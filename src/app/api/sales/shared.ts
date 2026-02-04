@@ -1,5 +1,6 @@
+import type { ExpressionBuilder } from 'kysely'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db, type Database } from '@/lib/db'
 
 export const moneyString = z
   .string()
@@ -147,13 +148,10 @@ const buildSaleProductSummary = () =>
     .selectFrom('sale_product as saleProduct')
     .select((eb) => [
       eb.ref('saleProduct.sale_id').as('saleId'),
-      sql<string>`
-        TO_CHAR(
-          COALESCE(SUM(${sql.ref('saleProduct.price')}), 0.00),
-          'FM999999999990.00'
-        )
-      `.as('totalAmount'),
-      sql<Date | null>`MAX(${sql.ref('saleProduct.updated_at')})`.as('latestUpdatedAt'),
+      eb
+        .fn('to_char', [eb.fn.coalesce(eb.fn.sum('saleProduct.price'), 0), eb.val('FM999999999990.00')])
+        .as('totalAmount'),
+      eb.fn.max('saleProduct.updated_at').as('latestUpdatedAt'),
     ])
     .groupBy('saleProduct.sale_id')
     .as('saleProductSummary')
@@ -163,27 +161,19 @@ const buildPaymentSummary = () =>
     .selectFrom('payment as payment')
     .select((eb) => [
       eb.ref('payment.sale_id').as('saleId'),
-      sql<string>`
-        TO_CHAR(
-          COALESCE(SUM(${sql.ref('payment.amount')}), 0.00),
-          'FM999999999990.00'
-        )
-      `.as('totalPaid'),
-      sql<string>`
-        TO_CHAR(
-          COALESCE(
-            SUM(
-              CASE
-                WHEN ${sql.ref('payment.refunded_time')} IS NOT NULL THEN ${sql.ref('payment.amount')}
-                ELSE 0
-              END
+      eb.fn('to_char', [eb.fn.coalesce(eb.fn.sum('payment.amount'), 0), eb.val('FM999999999990.00')]).as('totalPaid'),
+      eb
+        .fn('to_char', [
+          eb.fn.coalesce(
+            eb.fn.sum(
+              eb.case().when('payment.refunded_time', 'is not', null).then(eb.ref('payment.amount')).else(0).end()
             ),
-            0.00
+            0
           ),
-          'FM999999999990.00'
-        )
-      `.as('totalRefunded'),
-      sql<Date | null>`MAX(${sql.ref('payment.updated_at')})`.as('latestUpdatedAt'),
+          eb.val('FM999999999990.00'),
+        ])
+        .as('totalRefunded'),
+      eb.fn.max('payment.updated_at').as('latestUpdatedAt'),
     ])
     .groupBy('payment.sale_id')
     .as('paymentSummary')
@@ -193,7 +183,7 @@ const buildClientSessionSummary = () =>
     .selectFrom('client_session as clientSession')
     .select((eb) => [
       eb.ref('clientSession.sale_id').as('saleId'),
-      sql<string | null>`MAX(${sql.ref('clientSession.id')}::text)`.as('clientSessionId'),
+      eb.fn.max(eb.cast<string>(eb.ref('clientSession.id'), 'text')).as('clientSessionId'),
     ])
     .groupBy('clientSession.sale_id')
     .as('clientSessionSummary')
@@ -208,13 +198,12 @@ export const fetchSales = async (options: {
   const paymentSummary = buildPaymentSummary()
   const clientSessionSummary = buildClientSessionSummary()
 
-  const combinedUpdatedAt = sql<Date>`
-    GREATEST(
-      ${sql.ref('sale.updated_at')},
-      COALESCE(${sql.ref('saleProductSummary.latestUpdatedAt')}, ${sql.ref('sale.updated_at')}),
-      COALESCE(${sql.ref('paymentSummary.latestUpdatedAt')}, ${sql.ref('sale.updated_at')})
-    )
-  `
+  const combinedUpdatedAt = (eb: ExpressionBuilder<Database, any>) =>
+    eb.fn('greatest', [
+      eb.ref('sale.updated_at'),
+      eb.fn.coalesce(eb.ref('saleProductSummary.latestUpdatedAt'), eb.ref('sale.updated_at')),
+      eb.fn.coalesce(eb.ref('paymentSummary.latestUpdatedAt'), eb.ref('sale.updated_at')),
+    ])
 
   let query = db
     .selectFrom('sale as sale')
@@ -233,7 +222,7 @@ export const fetchSales = async (options: {
       eb.ref('sale.client_id').as('clientId'),
       eb.ref('sale.due_time').as('dueAt'),
       eb.ref('sale.created_at').as('createdAt'),
-      combinedUpdatedAt.as('combinedUpdatedAt'),
+      combinedUpdatedAt(eb).as('combinedUpdatedAt'),
       eb.ref('sale.payment_request_time').as('paymentRequestTime'),
       eb.ref('sale.payment_request_pass_on_transaction_fee').as('paymentRequestPassOnTransactionFee'),
       eb.ref('sale.note').as('note'),
@@ -256,7 +245,7 @@ export const fetchSales = async (options: {
   const updatedAfter = options.updatedAfter
 
   if (updatedAfter) {
-    query = query.where(({ eb }) => eb(combinedUpdatedAt, '>', updatedAfter))
+    query = query.where(({ eb }) => eb(combinedUpdatedAt(eb), '>', updatedAfter))
   }
 
   return query.orderBy('sale.created_at', 'desc').execute() as Promise<RawSaleRow[]>

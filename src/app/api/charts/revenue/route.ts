@@ -1,6 +1,14 @@
+import type { ExpressionBuilder } from 'kysely'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import type { Database } from '@/lib/db'
+import {
+  addDaysToLocalDateTime,
+  compareLocalDateTimes,
+  localDateTimeToUtc,
+  type LocalDateTime,
+} from '@/lib/dates/timezone'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 
 const isValidTimeZone = (value: string) => {
@@ -67,25 +75,6 @@ const revenueResponseSchema = z.object({
   currency: z.string(),
 })
 
-const ensureIsoString = (value: unknown, label: string) => {
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) {
-      throw new TypeError(`Invalid ${label} value encountered in revenue record`)
-    }
-    return value.toISOString()
-  }
-
-  if (typeof value === 'string') {
-    const trimmed = value.trim()
-    if (trimmed.length === 0) {
-      throw new Error(`Missing ${label} in revenue record`)
-    }
-    return trimmed
-  }
-
-  throw new Error(`Invalid ${label} value encountered in revenue record`)
-}
-
 const parseNumeric = (value: unknown, label: string) => {
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
@@ -105,10 +94,62 @@ const parseNumeric = (value: unknown, label: string) => {
   throw new Error(`Invalid ${label} value encountered in revenue record`)
 }
 
-type RawRevenueRow = {
-  startTime: string | Date | null
-  endTime: string | Date | null
-  value: string | number | null
+const toLocalDateTime = (date: Date, timeZone: string): LocalDateTime => {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+
+  const parts = formatter.formatToParts(date)
+  const values: Record<string, string> = {}
+  for (const part of parts) {
+    if (part.type !== 'literal') {
+      values[part.type] = part.value
+    }
+  }
+
+  return {
+    year: Number(values.year),
+    month: Number(values.month),
+    day: Number(values.day),
+    hour: Number(values.hour),
+    minute: Number(values.minute),
+    second: Number(values.second),
+    millisecond: date.getUTCMilliseconds(),
+  }
+}
+
+const daysInMonth = (year: number, month: number) => new Date(Date.UTC(year, month, 0)).getUTCDate()
+
+const addMonthsToLocalDateTime = (parts: LocalDateTime, months: number): LocalDateTime => {
+  const monthIndex = parts.month - 1 + months
+  const year = parts.year + Math.floor(monthIndex / 12)
+  const normalizedMonth = ((monthIndex % 12) + 12) % 12
+  const month = normalizedMonth + 1
+  const day = Math.min(parts.day, daysInMonth(year, month))
+
+  return {
+    year,
+    month,
+    day,
+    hour: parts.hour,
+    minute: parts.minute,
+    second: parts.second,
+    millisecond: parts.millisecond,
+  }
+}
+
+const addUnitToLocalDateTime = (parts: LocalDateTime, unit: 'day' | 'week' | 'month'): LocalDateTime => {
+  if (unit === 'month') {
+    return addMonthsToLocalDateTime(parts, 1)
+  }
+  return addDaysToLocalDateTime(parts, unit === 'week' ? 7 : 1)
 }
 
 export async function GET(request: Request) {
@@ -180,83 +221,103 @@ export async function GET(request: Request) {
       )
     }
 
-    const intervalLiteral = `1 ${unit}`
-    const buildEndTimeExpression = () => (endTime ? sql`${endTime}::timestamptz` : sql`NOW()`)
+    const startDate = new Date(startTime)
+    const endDate = endTime ? new Date(endTime) : new Date()
 
-    const revenueResult = await sql<RawRevenueRow>`
-      WITH periods AS (
-        SELECT
-          tsrange(
-            generate_series,
-            generate_series + ${intervalLiteral}::interval
-          ) AS r
-        FROM generate_series(
-          timezone(${timezone}, ${startTime}::timestamptz),
-          timezone(${timezone}, ${buildEndTimeExpression()}) - '1 microsecond'::interval,
-          ${intervalLiteral}::interval
-        )
-      )
-      SELECT
-        to_json(timezone(${timezone}, lower(periods.r))) AS "startTime",
-        to_json(timezone(${timezone}, upper(periods.r))) AS "endTime",
-        COALESCE(results.value, 0)::numeric AS "value"
-      FROM periods
-      LEFT JOIN (
-        SELECT
-          periods.r,
-          SUM(payments.amount)::numeric AS value
-        FROM (
-          SELECT
-            timezone(${timezone}, date) AS date,
-            amount
-          FROM payment_plan_payment
-          WHERE status = 'paid'
-            AND trainer_id = ${authorization.trainerId}
-            AND date <@ tstzrange(${startTime}::timestamptz, ${buildEndTimeExpression()})
-          UNION ALL
-          SELECT
-            timezone(
-              ${timezone},
-              COALESCE(
-                payment_manual.transaction_time,
-                to_timestamp((stripe_charge.object ->> 'created')::int),
-                to_timestamp((stripe_payment_intent.object ->> 'created')::int),
-                payment.created_at
-              )
-            ) AS date,
-            amount
-          FROM payment
-          LEFT JOIN payment_stripe ON payment_stripe.id = payment.id
-          LEFT JOIN payment_manual ON payment_manual.id = payment.id
-          LEFT JOIN stripe_charge ON stripe_charge.id = payment_stripe.stripe_charge_id
-          LEFT JOIN stripe_payment_intent ON stripe_payment_intent.id = payment_stripe.stripe_payment_intent_id
-          WHERE refunded_time IS NULL
-            AND payment.trainer_id = ${authorization.trainerId}
-            AND (payment.is_manual OR payment.is_stripe)
-            AND COALESCE(
-              payment_manual.transaction_time,
-              to_timestamp((stripe_charge.object ->> 'created')::int),
-              to_timestamp((stripe_payment_intent.object ->> 'created')::int),
-              payment.created_at
-            ) <@ tstzrange(${startTime}::timestamptz, ${buildEndTimeExpression()})
-          UNION ALL
-          SELECT
-            timezone(${timezone}, start_date) AS date,
-            amount
-          FROM finance_item
-          WHERE amount > 0
-            AND trainer_id = ${authorization.trainerId}
-            AND start_date <@ tstzrange(${startTime}::timestamptz, ${buildEndTimeExpression()})
-        ) payments
-        JOIN periods ON payments.date <@ periods.r
-        GROUP BY periods.r
-      ) results ON results.r = periods.r
-    `.execute(db)
+    const startLocal = toLocalDateTime(startDate, timezone)
+    const endLocal = toLocalDateTime(endDate, timezone)
 
-    const data = revenueResult.rows.map((row) => ({
-      startTime: ensureIsoString(row.startTime, 'startTime'),
-      endTime: ensureIsoString(row.endTime, 'endTime'),
-      value: parseNumeric(row.value ?? 0, 'value'),
+    const buckets: { start: Date; end: Date; value: number }[] = []
+    let cursor = startLocal
+    while (compareLocalDateTimes(cursor, endLocal) < 0) {
+      const next = addUnitToLocalDateTime(cursor, unit)
+      const bucketStart = localDateTimeToUtc(cursor, timezone)
+      const bucketEnd = localDateTimeToUtc(next, timezone)
+      buckets.push({ start: bucketStart, end: bucketEnd, value: 0 })
+      cursor = next
+    }
+
+    const paymentDateExpr = (
+      eb: ExpressionBuilder<
+        Database,
+        'payment' | 'payment_stripe' | 'payment_manual' | 'stripe_charge' | 'stripe_payment_intent'
+      >
+    ) =>
+      eb.fn('coalesce', [
+        eb.ref('payment_manual.transaction_time'),
+        eb.fn('to_timestamp', [
+          eb.cast<number>(
+            eb.fn('json_extract_path_text', [eb.ref('stripe_charge.object'), eb.val('created')]),
+            'bigint'
+          ),
+        ]),
+        eb.fn('to_timestamp', [
+          eb.cast<number>(
+            eb.fn('json_extract_path_text', [eb.ref('stripe_payment_intent.object'), eb.val('created')]),
+            'bigint'
+          ),
+        ]),
+        eb.ref('payment.created_at'),
+      ])
+
+    const paymentRows = await db
+      .selectFrom('payment')
+      .leftJoin('payment_stripe', 'payment_stripe.id', 'payment.id')
+      .leftJoin('payment_manual', 'payment_manual.id', 'payment.id')
+      .leftJoin('stripe_charge', 'stripe_charge.id', 'payment_stripe.stripe_charge_id')
+      .leftJoin('stripe_payment_intent', 'stripe_payment_intent.id', 'payment_stripe.stripe_payment_intent_id')
+      .select((eb) => [paymentDateExpr(eb).as('date'), eb.ref('payment.amount').as('amount')])
+      .where('payment.refunded_time', 'is', null)
+      .where('payment.trainer_id', '=', authorization.trainerId)
+      .where((eb) => eb.or([eb(eb.ref('payment.is_manual'), '=', true), eb(eb.ref('payment.is_stripe'), '=', true)]))
+      .where((eb) => eb(paymentDateExpr(eb), '>=', startDate))
+      .where((eb) => eb(paymentDateExpr(eb), '<', endDate))
+      .execute()
+
+    const planPaymentRows = await db
+      .selectFrom('payment_plan_payment as ppp')
+      .innerJoin('payment_plan as pp', 'pp.id', 'ppp.payment_plan_id')
+      .select((eb) => [eb.ref('ppp.date').as('date'), eb.ref('ppp.amount').as('amount')])
+      .where('pp.trainer_id', '=', authorization.trainerId)
+      .where('ppp.status', '=', 'paid')
+      .where('ppp.date', '>=', startDate)
+      .where('ppp.date', '<', endDate)
+      .execute()
+
+    const financeRows = await db
+      .selectFrom('finance_item')
+      .select((eb) => [eb.ref('start_date').as('date'), eb.ref('amount').as('amount')])
+      .where('trainer_id', '=', authorization.trainerId)
+      .where('amount', '>', 0)
+      .where('start_date', '>=', startDate)
+      .where('start_date', '<', endDate)
+      .execute()
+
+    const events = [...paymentRows, ...planPaymentRows, ...financeRows]
+      .map((row) => ({
+        date: row.date instanceof Date ? row.date : new Date(row.date as string),
+        amount: parseNumeric(row.amount ?? 0, 'amount'),
+      }))
+      .filter((entry) => !Number.isNaN(entry.date.getTime()))
+      .toSorted((a, b) => a.date.getTime() - b.date.getTime())
+
+    let bucketIndex = 0
+    for (const event of events) {
+      while (bucketIndex < buckets.length && event.date >= buckets[bucketIndex].end) {
+        bucketIndex += 1
+      }
+      if (bucketIndex >= buckets.length) {
+        break
+      }
+      if (event.date >= buckets[bucketIndex].start && event.date < buckets[bucketIndex].end) {
+        buckets[bucketIndex].value += event.amount
+      }
+    }
+
+    const data = buckets.map((bucket) => ({
+      startTime: bucket.start.toISOString(),
+      endTime: bucket.end.toISOString(),
+      value: bucket.value,
     }))
 
     const responseBody = revenueResponseSchema.parse({

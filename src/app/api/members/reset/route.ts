@@ -1,6 +1,7 @@
+import { addMinutes } from 'date-fns'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { buildErrorResponse } from '../../_lib/accessToken'
 import { APP_EMAIL, APP_NAME, KEEPON_LOGO_COLOR_URL } from '../../_lib/constants'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
@@ -129,44 +130,48 @@ export async function POST(request: Request) {
 
   try {
     await db.transaction().execute(async (trx) => {
-      const result = await sql<{
-        accessToken: string
-        userId: string
-        firstName: string
-        trainerId: string
-      }>`
-        WITH inserted AS (
-          INSERT INTO access_token (user_id, user_type, type, expires_at)
-          SELECT
-            trainer.user_id,
-            trainer.user_type,
-            'password_reset',
-            NOW() + make_interval(mins => ${PASSWORD_RESET_TTL_MINUTES})
-          FROM trainer
-          WHERE trainer.email = ${email}
-          RETURNING id, user_id
-        )
-        SELECT
-          inserted.id AS "accessToken",
-          inserted.user_id AS "userId",
-          trainer.first_name AS "firstName",
-          trainer.id AS "trainerId"
-        FROM inserted
-        JOIN trainer ON trainer.user_id = inserted.user_id
-      `.execute(trx)
+      const trainerRow = await trx
+        .selectFrom('trainer')
+        .select(['user_id as userId', 'user_type as userType', 'first_name as firstName', 'id as trainerId'])
+        .where('email', '=', email)
+        .executeTakeFirst()
 
-      const details = result.rows[0]
+      if (!trainerRow) {
+        throw new MemberNotFoundError()
+      }
+
+      const expiresAt = addMinutes(new Date(), PASSWORD_RESET_TTL_MINUTES)
+
+      const inserted = await trx
+        .insertInto('access_token')
+        .values({
+          user_id: trainerRow.userId,
+          user_type: trainerRow.userType,
+          type: 'password_reset',
+          expires_at: expiresAt,
+        })
+        .returning('id')
+        .executeTakeFirst()
+
+      const details = inserted
+        ? {
+            accessToken: inserted.id,
+            userId: trainerRow.userId,
+            firstName: trainerRow.firstName,
+            trainerId: trainerRow.trainerId,
+          }
+        : null
 
       if (!details) {
         throw new MemberNotFoundError()
       }
 
-      await sql`
-        DELETE FROM access_token
-         WHERE user_id = ${details.userId}
-           AND type = 'password_reset'
-           AND id != ${details.accessToken}
-      `.execute(trx)
+      await trx
+        .deleteFrom('access_token')
+        .where('user_id', '=', details.userId)
+        .where('type', '=', 'password_reset')
+        .where('id', '!=', details.accessToken)
+        .execute()
 
       const resetUrl = new URL('/password-reset', baseUrl)
       resetUrl.hash = details.accessToken
@@ -174,30 +179,20 @@ export async function POST(request: Request) {
       const html = buildEmailHtml(details.firstName, resetUrl)
       const subject = `${APP_NAME} Password Reset`
 
-      await sql`
-        INSERT INTO mail (
-          trainer_id,
-          client_id,
-          from_email,
-          from_name,
-          to_email,
-          to_name,
+      await trx
+        .insertInto('mail')
+        .values({
+          trainer_id: details.trainerId,
+          client_id: null,
+          from_email: APP_EMAIL,
+          from_name: `${APP_NAME} Team`,
+          to_email: email,
+          to_name: null,
           subject,
           html,
-          reply_to
-        )
-        VALUES (
-          ${details.trainerId},
-          NULL,
-          ${APP_EMAIL},
-          ${`${APP_NAME} Team`},
-          ${email},
-          NULL,
-          ${subject},
-          ${html},
-          NULL
-        )
-      `.execute(trx)
+          reply_to: null,
+        })
+        .execute()
     })
   } catch (error) {
     if (error instanceof MemberNotFoundError) {

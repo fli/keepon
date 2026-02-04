@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import type { Point } from '@/lib/db/generated'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { toPoint } from '@/lib/db/values'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { getStripeClient } from '../../_lib/stripeClient'
 import { adaptClientRow, clientSchema } from '../shared'
@@ -119,6 +119,7 @@ const requestBodySchema = z
     geo: geoSchema,
     googlePlaceId: nullableTrimmedString,
   })
+  .partial()
   .strict()
 
 const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
@@ -355,7 +356,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           eb.ref('client.user_id').as('userId'),
           eb.ref('client.stripe_customer_id').as('stripeCustomerId'),
           eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
-          sql<string | null>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('stripeAccountType'),
+          eb.fn('json_extract_path_text', [eb.ref('stripeAccount.object'), 'type']).as('stripeAccountType'),
         ])
         .where('client.id', '=', clientId)
         .where('client.trainer_id', '=', authorization.trainerId)
@@ -438,9 +439,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
       if (parsedBody.geo !== undefined) {
         const geoValue =
-          !parsedBody.geo || parsedBody.geo.lat === null
-            ? null
-            : sql<Point>`point(${parsedBody.geo.lat}, ${parsedBody.geo.lng})`
+          !parsedBody.geo || parsedBody.geo.lat === null ? null : toPoint(parsedBody.geo.lat, parsedBody.geo.lng)
 
         updateBuilder = updateBuilder.set('geo', geoValue)
       }
@@ -600,19 +599,24 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         throw new ClientNotFoundError()
       }
 
-      await sql`
-        DELETE FROM session_series
-         WHERE event_type = 'single_session'
-           AND trainer_id = ${authorization.trainerId}
-           AND id IN (
-             SELECT session.session_series_id
-               FROM session
-               INNER JOIN client_session
-                 ON client_session.session_id = session.id
-              WHERE client_session.client_id = ${clientId}
-                AND session.trainer_id = ${authorization.trainerId}
-           )
-      `.execute(trx)
+      const sessionSeriesRows = await trx
+        .selectFrom('session')
+        .innerJoin('client_session', 'client_session.session_id', 'session.id')
+        .select('session.session_series_id as sessionSeriesId')
+        .where('client_session.client_id', '=', clientId)
+        .where('session.trainer_id', '=', authorization.trainerId)
+        .execute()
+
+      const sessionSeriesIds = Array.from(new Set(sessionSeriesRows.map((row) => row.sessionSeriesId)))
+
+      if (sessionSeriesIds.length > 0) {
+        await trx
+          .deleteFrom('session_series')
+          .where('event_type', '=', 'single_session')
+          .where('trainer_id', '=', authorization.trainerId)
+          .where('id', 'in', sessionSeriesIds)
+          .execute()
+      }
 
       const deleted = await trx
         .deleteFrom('client')

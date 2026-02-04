@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { buildErrorResponse } from '../../../_lib/accessToken'
 
 const paramsSchema = z.object({
@@ -57,43 +57,65 @@ export async function GET(_request: NextRequest, context: HandlerContext) {
   const { bookingId } = paramsResult.data
 
   try {
-    const bookingResult = await sql<BookingRow>`
-      SELECT
-        client_session.booking_icalendar_url AS "iCalendarUrl",
-        session.location,
-        session.address,
-        CASE
-          WHEN session.geo IS NOT NULL THEN json_build_object('lat', session.geo[0], 'lng', session.geo[1])
-          ELSE NULL
-        END AS geo,
-        session.google_place_id AS "googlePlaceId",
-        to_json(session.start) AS "startTime",
-        to_json(session.start + session.duration) AS "endTime",
-        CASE
-          WHEN session.booking_payment_type != 'hidePrice' THEN to_char(client_session.price, 'FMMI999999990.00')
-          ELSE NULL
-        END AS price,
-        currency.alpha_code AS currency,
-        session.timezone,
-        trainer.online_bookings_page_url_slug AS "serviceProviderPageUrlSlug",
-        session_series.name,
-        session.can_clients_cancel AS "canClientsCancel",
-        client_session.state,
-        session.cancellation_advance_notice_duration::text AS "cancellationAdvanceNoticeDuration",
-        to_json(payment.created_at) AS "paidAt",
-        to_json(payment.refunded_time) AS "refundedAt"
-      FROM client_session
-      JOIN session ON session.id = client_session.session_id
-      JOIN session_series ON session_series.id = session.session_series_id
-      JOIN trainer ON trainer.id = session_series.trainer_id
-      JOIN supported_country_currency ON supported_country_currency.country_id = trainer.country_id
-      JOIN currency ON currency.id = supported_country_currency.currency_id
-      LEFT JOIN sale ON sale.id = client_session.sale_id
-      LEFT JOIN payment ON payment.sale_id = sale.id
-      WHERE client_session.booking_id = ${bookingId}
-    `.execute(db)
+    const bookingRow = await db
+      .selectFrom('client_session')
+      .innerJoin('session', 'session.id', 'client_session.session_id')
+      .innerJoin('session_series', 'session_series.id', 'session.session_series_id')
+      .innerJoin('trainer', 'trainer.id', 'session_series.trainer_id')
+      .innerJoin('supported_country_currency', 'supported_country_currency.country_id', 'trainer.country_id')
+      .innerJoin('currency', 'currency.id', 'supported_country_currency.currency_id')
+      .leftJoin('sale', 'sale.id', 'client_session.sale_id')
+      .leftJoin('payment', 'payment.sale_id', 'sale.id')
+      .select((eb) => [
+        eb.ref('client_session.booking_icalendar_url').as('iCalendarUrl'),
+        eb.ref('session.location').as('location'),
+        eb.ref('session.address').as('address'),
+        eb.ref('session.geo').as('geo'),
+        eb.ref('session.google_place_id').as('googlePlaceId'),
+        eb.ref('session.start').as('startTime'),
+        eb(eb.ref('session.start'), '+', eb.ref('session.duration')).as('endTime'),
+        eb.ref('client_session.price').as('price'),
+        eb.ref('session.booking_payment_type').as('bookingPaymentType'),
+        eb.ref('currency.alpha_code').as('currency'),
+        eb.ref('session.timezone').as('timezone'),
+        eb.ref('trainer.online_bookings_page_url_slug').as('serviceProviderPageUrlSlug'),
+        eb.ref('session_series.name').as('name'),
+        eb.ref('session.can_clients_cancel').as('canClientsCancel'),
+        eb.ref('client_session.state').as('state'),
+        eb.ref('session.cancellation_advance_notice_duration').as('cancellationAdvanceNoticeDuration'),
+        eb.ref('payment.created_at').as('paidAt'),
+        eb.ref('payment.refunded_time').as('refundedAt'),
+      ])
+      .where('client_session.booking_id', '=', bookingId)
+      .executeTakeFirst()
 
-    const booking = bookingResult.rows[0]
+    const booking = bookingRow
+      ? {
+          iCalendarUrl: bookingRow.iCalendarUrl,
+          location: bookingRow.location,
+          address: bookingRow.address,
+          geo: bookingRow.geo ? { lat: bookingRow.geo.x, lng: bookingRow.geo.y } : null,
+          googlePlaceId: bookingRow.googlePlaceId,
+          startTime: new Date(bookingRow.startTime).toISOString(),
+          endTime: new Date(bookingRow.endTime).toISOString(),
+          price:
+            bookingRow.bookingPaymentType !== 'hidePrice' && bookingRow.price !== null
+              ? Number(bookingRow.price).toFixed(2)
+              : null,
+          paidAt: bookingRow.paidAt ? new Date(bookingRow.paidAt).toISOString() : null,
+          refundedAt: bookingRow.refundedAt ? new Date(bookingRow.refundedAt).toISOString() : null,
+          currency: bookingRow.currency,
+          timezone: bookingRow.timezone,
+          serviceProviderPageUrlSlug: bookingRow.serviceProviderPageUrlSlug,
+          name: bookingRow.name,
+          canClientsCancel: bookingRow.canClientsCancel,
+          cancellationAdvanceNoticeDuration:
+            typeof bookingRow.cancellationAdvanceNoticeDuration === 'string'
+              ? bookingRow.cancellationAdvanceNoticeDuration
+              : '',
+          state: bookingRow.state,
+        }
+      : null
 
     if (!booking) {
       return NextResponse.json(

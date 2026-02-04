@@ -4,7 +4,8 @@ import { NextResponse } from 'next/server'
 import { validate as validateUuid } from 'uuid'
 import { z } from 'zod'
 import type { Database } from '@/lib/db'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 import { buildErrorResponse } from '../../_lib/accessToken'
 import { nullableNumber } from '../../_lib/clientSessionsSchema'
 import { APP_EMAIL, APP_NAME, NO_REPLY_EMAIL } from '../../_lib/constants'
@@ -382,53 +383,52 @@ const sendTrainerNotification = async (
     clientId: details.clientId,
     userId: details.trainerUserId,
     messageType: payload.messageType,
-    notificationType: 'general',
+    notificationType: 'general' as const,
     title: payload.title,
     body: payload.body,
   }
 
-  await sql`
-    INSERT INTO task_queue (task_type, data)
-    VALUES ('user.notify', ${JSON.stringify(notificationPayload)}::jsonb)
-  `.execute(trx)
+  await enqueueWorkflowTask(trx, 'user.notify', notificationPayload, {
+    dedupeKey: `user.notify:sessionInvitation:${details.sessionId}:${details.clientId}:${payload.messageType}`,
+  })
 }
 
 const sendAcceptSideEffects = async (trx: DbTransaction, details: InvitationDetails) => {
   const tasks: Promise<unknown>[] = []
 
   tasks.push(
-    sql`
-      INSERT INTO mail (trainer_id, client_id, from_email, from_name, to_email, to_name, subject, html, reply_to)
-      VALUES (
-        ${details.trainerId},
-        ${details.clientId},
-        ${APP_EMAIL},
-        ${`${APP_NAME} Team`},
-        ${details.serviceProviderEmail},
-        NULL,
-        ${`${details.clientFullName} accepted your invitation to ${details.eventName} @ ${details.dateRange}`},
-        ${buildTrainerAcceptEmail(details)},
-        NULL
-      )
-    `.execute(trx)
+    trx
+      .insertInto('mail')
+      .values({
+        trainer_id: details.trainerId,
+        client_id: details.clientId,
+        from_email: APP_EMAIL,
+        from_name: `${APP_NAME} Team`,
+        to_email: details.serviceProviderEmail,
+        to_name: null,
+        subject: `${details.clientFullName} accepted your invitation to ${details.eventName} @ ${details.dateRange}`,
+        html: buildTrainerAcceptEmail(details),
+        reply_to: null,
+      })
+      .execute()
   )
 
   if (details.clientEmail) {
     tasks.push(
-      sql`
-        INSERT INTO mail (trainer_id, client_id, from_email, from_name, to_email, to_name, subject, html, reply_to)
-        VALUES (
-          ${details.trainerId},
-          ${details.clientId},
-          ${NO_REPLY_EMAIL},
-          ${`${details.serviceProviderName} via ${APP_NAME}`},
-          ${details.clientEmail},
-          ${details.clientFirstName ?? null},
-          ${`You're booked in for ${details.eventName}`},
-          ${buildClientAcceptEmail(details)},
-          ${details.serviceProviderEmail}
-        )
-      `.execute(trx)
+      trx
+        .insertInto('mail')
+        .values({
+          trainer_id: details.trainerId,
+          client_id: details.clientId,
+          from_email: NO_REPLY_EMAIL,
+          from_name: `${details.serviceProviderName} via ${APP_NAME}`,
+          to_email: details.clientEmail,
+          to_name: details.clientFirstName ?? null,
+          subject: `You're booked in for ${details.eventName}`,
+          html: buildClientAcceptEmail(details),
+          reply_to: details.serviceProviderEmail,
+        })
+        .execute()
     )
   }
 
@@ -447,20 +447,20 @@ const sendDeclineSideEffects = async (trx: DbTransaction, details: InvitationDet
   const tasks: Promise<unknown>[] = []
 
   tasks.push(
-    sql`
-      INSERT INTO mail (trainer_id, client_id, from_email, from_name, to_email, to_name, subject, html, reply_to)
-      VALUES (
-        ${details.trainerId},
-        ${details.clientId},
-        ${APP_EMAIL},
-        ${`${APP_NAME} Team`},
-        ${details.serviceProviderEmail},
-        NULL,
-        ${`${details.clientFullName} declined your invitation to ${details.eventName} @ ${details.dateRange}`},
-        ${buildTrainerDeclineEmail(details)},
-        NULL
-      )
-    `.execute(trx)
+    trx
+      .insertInto('mail')
+      .values({
+        trainer_id: details.trainerId,
+        client_id: details.clientId,
+        from_email: APP_EMAIL,
+        from_name: `${APP_NAME} Team`,
+        to_email: details.serviceProviderEmail,
+        to_name: null,
+        subject: `${details.clientFullName} declined your invitation to ${details.eventName} @ ${details.dateRange}`,
+        html: buildTrainerDeclineEmail(details),
+        reply_to: null,
+      })
+      .execute()
   )
 
   tasks.push(
@@ -479,20 +479,20 @@ const sendCapacityReachedSideEffects = async (
   details: InvitationDetails,
   maximumAttendance: number
 ) => {
-  await sql`
-    INSERT INTO mail (trainer_id, client_id, from_email, from_name, to_email, to_name, subject, html, reply_to)
-    VALUES (
-      ${details.trainerId},
-      ${details.clientId},
-      ${APP_EMAIL},
-      ${`${APP_NAME} Team`},
-      ${details.serviceProviderEmail},
-      NULL,
-      ${`${details.clientFullName} tried to accept an invitation but the appointment was full`},
-      ${buildCapacityReachedEmail(details, maximumAttendance)},
-      NULL
-    )
-  `.execute(trx)
+  await trx
+    .insertInto('mail')
+    .values({
+      trainer_id: details.trainerId,
+      client_id: details.clientId,
+      from_email: APP_EMAIL,
+      from_name: `${APP_NAME} Team`,
+      to_email: details.serviceProviderEmail,
+      to_name: null,
+      subject: `${details.clientFullName} tried to accept an invitation but the appointment was full`,
+      html: buildCapacityReachedEmail(details, maximumAttendance),
+      reply_to: null,
+    })
+    .execute()
 }
 
 const badRequestResponse = (_message: string) =>
@@ -524,56 +524,89 @@ export async function GET(request: NextRequest, context: HandlerContext) {
 
   try {
     const outcome = await db.transaction().execute(async (trx) => {
-      const result = await sql<InvitationRow>`
-        SELECT
-          CASE WHEN session.start < NOW() THEN 'expired' ELSE client_session.state END AS "invitationState",
-          client_session.client_id AS "clientId",
-          client_session.session_id AS "sessionId",
-          client_session.trainer_id AS "trainerId",
-          trainer.user_id AS "trainerUserId",
-          client.first_name AS "clientFirstName",
-          client.last_name AS "clientLastName",
-          client.email AS "clientEmail",
-          trainer.email AS "serviceProviderEmail",
-          COALESCE(trainer.online_bookings_contact_email, trainer.email) AS "publicEmail",
-          trainer.first_name AS "serviceProviderFirstName",
-          trainer.last_name AS "serviceProviderLastName",
-          COALESCE(trainer.online_bookings_business_name, trainer.business_name, trainer.first_name || COALESCE(' ' || trainer.last_name, '')) AS "serviceProviderName",
-          COALESCE(session_series.name, 'Group Appointment') AS "sessionName",
-          session_series.location AS "location",
-          session.start AS "start",
-          session.start + session.duration AS "end",
-          trainer.timezone AS "timezone",
-          trainer.locale AS "locale",
-          session.maximum_attendance AS "maximumAttendance",
-          session_series.price AS price,
-          currency.alpha_code AS currency
-        FROM client_session
-        INNER JOIN session ON session.id = client_session.session_id
-        INNER JOIN session_series ON session_series.id = session.session_series_id
-        INNER JOIN trainer ON trainer.id = client_session.trainer_id
-        INNER JOIN country ON country.id = trainer.country_id
-        LEFT JOIN supported_country_currency scc ON scc.country_id = trainer.country_id
-        LEFT JOIN currency ON currency.id = scc.currency_id
-        INNER JOIN client ON client.id = client_session.client_id
-       WHERE client_session.id = ${invitationId}
-         AND client_session.state IN ('invited', 'declined', 'accepted')
-       FOR NO KEY UPDATE
-      `.execute(trx)
-
-      const row = result.rows[0]
+      const now = new Date()
+      const row = await trx
+        .selectFrom('client_session')
+        .innerJoin('session', 'session.id', 'client_session.session_id')
+        .innerJoin('session_series', 'session_series.id', 'session.session_series_id')
+        .innerJoin('trainer', 'trainer.id', 'client_session.trainer_id')
+        .innerJoin('country', 'country.id', 'trainer.country_id')
+        .leftJoin('supported_country_currency as scc', 'scc.country_id', 'trainer.country_id')
+        .leftJoin('currency', 'currency.id', 'scc.currency_id')
+        .innerJoin('client', 'client.id', 'client_session.client_id')
+        .select((eb) => [
+          eb.ref('client_session.state').as('invitationStateRaw'),
+          eb.ref('client_session.client_id').as('clientId'),
+          eb.ref('client_session.session_id').as('sessionId'),
+          eb.ref('client_session.trainer_id').as('trainerId'),
+          eb.ref('trainer.user_id').as('trainerUserId'),
+          eb.ref('client.first_name').as('clientFirstName'),
+          eb.ref('client.last_name').as('clientLastName'),
+          eb.ref('client.email').as('clientEmail'),
+          eb.ref('trainer.email').as('serviceProviderEmail'),
+          eb
+            .fn('coalesce', [eb.ref('trainer.online_bookings_contact_email'), eb.ref('trainer.email')])
+            .as('publicEmail'),
+          eb.ref('trainer.first_name').as('serviceProviderFirstName'),
+          eb.ref('trainer.last_name').as('serviceProviderLastName'),
+          eb.ref('trainer.online_bookings_business_name').as('onlineBookingsBusinessName'),
+          eb.ref('trainer.business_name').as('businessName'),
+          eb.ref('session_series.name').as('sessionSeriesName'),
+          eb.ref('session_series.location').as('location'),
+          eb.ref('session.start').as('start'),
+          eb(eb.ref('session.start'), '+', eb.ref('session.duration')).as('end'),
+          eb.ref('trainer.timezone').as('timezone'),
+          eb.ref('trainer.locale').as('locale'),
+          eb.ref('session.maximum_attendance').as('maximumAttendance'),
+          eb.ref('session_series.price').as('price'),
+          eb.ref('currency.alpha_code').as('currency'),
+        ])
+        .where('client_session.id', '=', invitationId)
+        .where('client_session.state', 'in', ['invited', 'declined', 'accepted'])
+        .forNoKeyUpdate()
+        .executeTakeFirst()
       if (!row) {
         return { type: 'not-found' as OutcomeType }
       }
 
-      const parsed = invitationRowSchema.parse(row)
+      const startDate = row.start instanceof Date ? row.start : new Date(row.start)
+      const invitationState = startDate.getTime() < now.getTime() ? 'expired' : row.invitationStateRaw
+      const serviceProviderName =
+        row.onlineBookingsBusinessName ??
+        row.businessName ??
+        `${row.serviceProviderFirstName}${row.serviceProviderLastName ? ` ${row.serviceProviderLastName}` : ''}`
+
+      const parsed = invitationRowSchema.parse({
+        invitationState,
+        clientId: row.clientId,
+        sessionId: row.sessionId,
+        trainerId: row.trainerId,
+        trainerUserId: row.trainerUserId,
+        clientFirstName: row.clientFirstName,
+        clientLastName: row.clientLastName,
+        clientEmail: row.clientEmail,
+        serviceProviderEmail: row.serviceProviderEmail,
+        publicEmail: row.publicEmail,
+        serviceProviderFirstName: row.serviceProviderFirstName,
+        serviceProviderLastName: row.serviceProviderLastName,
+        serviceProviderName,
+        sessionName: row.sessionSeriesName ?? 'Group Appointment',
+        location: row.location,
+        start: row.start,
+        end: row.end,
+        timezone: row.timezone,
+        locale: row.locale,
+        maximumAttendance: row.maximumAttendance,
+        price: row.price,
+        currency: row.currency,
+      })
 
       const details: InvitationDetails = {
         ...parsed,
         dateRange: formatDateRange(parsed.start, parsed.end, parsed.locale, parsed.timezone),
         priceText: formatEventPrice(parsed.price, parsed.locale, parsed.currency),
         clientFullName: joinNames(parsed.clientFirstName, parsed.clientLastName) || 'A client',
-        eventName: parsed.sessionName,
+        eventName: parsed.sessionName ?? 'Untitled session',
       }
 
       if (parsed.invitationState === 'expired') {
@@ -606,7 +639,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
             .updateTable('client_session')
             .set({
               state: 'accepted',
-              accept_time: sql<Date>`NOW()`,
+              accept_time: new Date(),
               decline_time: null,
             })
             .where('id', '=', invitationId)
@@ -627,7 +660,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
           .updateTable('client_session')
           .set({
             state: 'declined',
-            decline_time: sql<Date>`NOW()`,
+            decline_time: new Date(),
           })
           .where('id', '=', invitationId)
           .executeTakeFirst()

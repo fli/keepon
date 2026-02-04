@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { buildErrorResponse } from '../_lib/accessToken'
 import { parseStrictJsonBody } from '../_lib/strictJson'
 
@@ -51,53 +51,68 @@ export async function POST(request: Request) {
   const { email, code, clientId } = parsedBody
 
   try {
-    const updateResult = await sql<{ success: true }>`
-      UPDATE client_login_request
-         SET authenticated = TRUE
-       WHERE email = ${email}
-         AND code = ${code}
-         AND expires_at > NOW()
-         AND NOT authenticated
-         AND failed_authentication_count < 3
-       RETURNING TRUE AS success
-    `.execute(db)
+    const now = new Date()
+    const updateResult = await db
+      .updateTable('client_login_request')
+      .set({ authenticated: true })
+      .where('email', '=', email)
+      .where('code', '=', code)
+      .where('expires_at', '>', now)
+      .where('authenticated', '=', false)
+      .where('failed_authentication_count', '<', 3)
+      .returning('id')
+      .execute()
 
-    if (updateResult.rows.length === 0) {
-      await sql`
-        UPDATE client_login_request
-           SET failed_authentication_count = failed_authentication_count + 1
-         WHERE email = ${email}
-           AND expires_at > NOW()
-           AND NOT authenticated
-      `.execute(db)
+    if (updateResult.length === 0) {
+      await db
+        .updateTable('client_login_request')
+        .set((eb) => ({
+          failed_authentication_count: eb('failed_authentication_count', '+', 1),
+        }))
+        .where('email', '=', email)
+        .where('expires_at', '>', now)
+        .where('authenticated', '=', false)
+        .execute()
 
       return createTemporaryCodeInvalidResponse()
     }
 
     const tokenRow = await db.transaction().execute(async (trx) => {
-      await sql`
-          UPDATE client_login_request
-             SET expires_at = NOW()
-           WHERE expires_at > NOW()
-             AND email = ${email}
-             AND NOT authenticated
-        `.execute(trx)
+      await trx
+        .updateTable('client_login_request')
+        .set({ expires_at: now })
+        .where('expires_at', '>', now)
+        .where('email', '=', email)
+        .where('authenticated', '=', false)
+        .execute()
 
-      const inserted = await sql<{ id: string }>`
-          INSERT INTO access_token (user_id, user_type, expires_at, type)
-          SELECT client.user_id, 'client', NOW() + INTERVAL '7 days', 'client_dashboard'
-            FROM client
-           WHERE id = ${clientId}
-             AND email = ${email}
-          RETURNING id
-        `.execute(trx)
+      const clientRow = await trx
+        .selectFrom('client')
+        .select('user_id')
+        .where('id', '=', clientId)
+        .where('email', '=', email)
+        .executeTakeFirst()
 
-      const row = inserted.rows[0]
-      if (!row) {
+      if (!clientRow) {
+        throw new Error('No client record for dashboard login request')
+      }
+
+      const inserted = await trx
+        .insertInto('access_token')
+        .values({
+          user_id: clientRow.user_id,
+          user_type: 'client',
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          type: 'client_dashboard',
+        })
+        .returning('id')
+        .executeTakeFirst()
+
+      if (!inserted) {
         throw new Error('No access token created for client dashboard login request')
       }
 
-      return row
+      return inserted
     })
 
     const responseBody = responseSchema.parse({ id: tokenRow.id })

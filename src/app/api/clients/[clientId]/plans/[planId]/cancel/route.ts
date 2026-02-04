@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z, ZodError } from 'zod'
-import { db, sql, type Selectable, type VwLegacyPayment } from '@/lib/db'
+import { db, type Selectable, type VwLegacyPayment } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../../_lib/accessToken'
 import { paymentSchema } from '../../../../../_lib/clientSessionsSchema'
 import { normalizePlanRow, type RawPlanRow } from '../../../../../plans/shared'
@@ -183,11 +183,12 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         throw new SubscriptionAlreadyEndedError()
       }
 
+      const now = new Date()
       const updatedPlanRow = await trx
         .updateTable('payment_plan')
         .set({
           status: 'cancelled',
-          end_: sql<Date>`NOW()`,
+          end_: now,
         })
         .where('id', '=', planId)
         .where('client_id', '=', clientId)
@@ -200,39 +201,33 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       }
 
       await Promise.all([
-        sql`
-          UPDATE payment_plan_pause
-             SET end_ = NOW()
-           WHERE payment_plan_id = ${planId}
-        `.execute(trx),
-        sql`
-          UPDATE payment_plan_payment
-             SET status = 'cancelled'
-           WHERE payment_plan_id = ${planId}
-             AND status IN ('rejected', 'pending', 'paused')
-        `.execute(trx),
+        trx.updateTable('payment_plan_pause').set({ end_: now }).where('payment_plan_id', '=', planId).execute(),
+        trx
+          .updateTable('payment_plan_payment')
+          .set({ status: 'cancelled' })
+          .where('payment_plan_id', '=', planId)
+          .where('status', 'in', ['rejected', 'pending', 'paused'])
+          .execute(),
       ])
 
-      const clientSessionUpdate = await sql<{ id: string }>`
-        UPDATE client_session
-           SET sale_id = NULL
-          FROM session
-          JOIN sale ON sale.id = client_session.sale_id
-          JOIN payment ON payment.sale_id = sale.id
-          JOIN payment_subscription ON payment_subscription.id = payment.id
-         WHERE payment_subscription.subscription_id = ${planId}
-           AND session.id = client_session.session_id
-           AND session.start >= NOW()
-           AND client_session.trainer_id = ${authorization.trainerId}
-           AND client_session.client_id = ${clientId}
-         RETURNING client_session.id
-      `.execute(trx)
+      const clientSessions = await trx
+        .selectFrom('client_session')
+        .innerJoin('session', 'session.id', 'client_session.session_id')
+        .innerJoin('sale', 'sale.id', 'client_session.sale_id')
+        .innerJoin('payment', 'payment.sale_id', 'sale.id')
+        .innerJoin('payment_subscription', 'payment_subscription.id', 'payment.id')
+        .select('client_session.id')
+        .where('payment_subscription.subscription_id', '=', planId)
+        .where('session.start', '>=', now)
+        .where('client_session.trainer_id', '=', authorization.trainerId)
+        .where('client_session.client_id', '=', clientId)
+        .execute()
 
-      const clientSessionIds = Array.from(
-        new Set(
-          clientSessionUpdate.rows.map((row) => row.id).filter((value): value is string => typeof value === 'string')
-        )
-      )
+      const clientSessionIds = clientSessions.map((row) => row.id)
+
+      if (clientSessionIds.length > 0) {
+        await trx.updateTable('client_session').set({ sale_id: null }).where('id', 'in', clientSessionIds).execute()
+      }
 
       const rawPlanRow = (await trx
         .selectFrom('vw_legacy_plan as v')

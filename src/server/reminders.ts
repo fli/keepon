@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import type { ClientReminder, ServiceProviderReminder } from '@/lib/reminders'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 
 const serviceProviderReminderSchema = z.object({
   type: z.enum(['email', 'notification', 'emailAndNotification']),
@@ -21,6 +21,9 @@ export const reminderSettingsSchema = z.object({
 })
 
 export type ReminderSettings = z.infer<typeof reminderSettingsSchema>
+
+const DEFAULT_SERVICE_PROVIDER_REMINDER_TYPE = 'emailAndNotification'
+const DEFAULT_CLIENT_REMINDER_TYPE = 'email'
 
 let clientReminderTypeCache: string[] | null = null
 
@@ -42,7 +45,7 @@ const normalizeClientTypeFromDb = (type: string | null | undefined) => {
 
 const mapClientTypeToDb = async (type: string | null | undefined) => {
   if (!type) {
-    return sql`DEFAULT`
+    return DEFAULT_CLIENT_REMINDER_TYPE
   }
   if (type !== 'emailAndSms') {
     return type
@@ -126,8 +129,10 @@ export async function updateReminderSettings(
     default_service_provider_appointment_reminder_2: parsed.serviceProviderReminder2?.timeBeforeStart ?? null,
     default_client_appointment_reminder_1: parsed.clientReminder1?.timeBeforeStart ?? null,
     default_client_appointment_reminder_2: parsed.clientReminder2?.timeBeforeStart ?? null,
-    default_service_provider_appointment_reminder_1_type: parsed.serviceProviderReminder1?.type ?? sql`DEFAULT`,
-    default_service_provider_appointment_reminder_2_type: parsed.serviceProviderReminder2?.type ?? sql`DEFAULT`,
+    default_service_provider_appointment_reminder_1_type:
+      parsed.serviceProviderReminder1?.type ?? DEFAULT_SERVICE_PROVIDER_REMINDER_TYPE,
+    default_service_provider_appointment_reminder_2_type:
+      parsed.serviceProviderReminder2?.type ?? DEFAULT_SERVICE_PROVIDER_REMINDER_TYPE,
     default_client_appointment_reminder_1_type: clientType1,
     default_client_appointment_reminder_2_type: clientType2,
   }

@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import type { Database } from '@/lib/db'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import type { RawClientSessionRow } from '../../../_lib/clientSessionsSchema'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { adaptClientSessionRow } from '../../../_lib/clientSessionsSchema'
@@ -192,41 +192,51 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         throw new ClientNotFoundError()
       }
 
-      const futureCondition = parsedBody.future ? sql`` : sql`AND session.id = selected_session.id`
+      const selectedSession = await trx
+        .selectFrom('session')
+        .innerJoin('session_series', 'session.session_series_id', 'session_series.id')
+        .select(['session.id', 'session.start', 'session.session_series_id'])
+        .where('session.id', '=', sessionId)
+        .where('session_series.trainer_id', '=', authorization.trainerId)
+        .executeTakeFirst()
 
-      const insertResult = await sql<{ id: string }>`
-        INSERT INTO client_session (trainer_id, client_id, session_id, price, note)
-        SELECT
-          ${authorization.trainerId},
-          ${parsedBody.clientId},
-          session.id,
-          ${parsedBody.price ?? 0},
-          ${parsedBody.note ?? null}
-        FROM
-          session_series
-          JOIN session ON session.session_series_id = session_series.id
-          JOIN (
-            SELECT
-              session.start,
-              session.trainer_id,
-              session_series_id,
-              session.id
-            FROM
-              session
-              JOIN session_series ON session.session_series_id = session_series.id
-            WHERE
-              session.id = ${sessionId}
-              AND session_series.trainer_id = ${authorization.trainerId}
-          ) selected_session ON selected_session.session_series_id = session_series.id
-        WHERE
-          session_series.id = selected_session.session_series_id
-          AND session.start >= selected_session.start
-          ${futureCondition}
-        ON CONFLICT (session_id, client_id) DO UPDATE SET price = ${parsedBody.price ?? 0}
-        RETURNING client_session.id
-      `.execute(trx)
+      if (!selectedSession) {
+        throw new SessionNotFoundError()
+      }
 
-      const insertedIds = insertResult.rows?.map((row) => row.id).filter((id): id is string => Boolean(id)) ?? []
+      let sessionsQuery = trx
+        .selectFrom('session')
+        .select('session.id')
+        .where('session.session_series_id', '=', selectedSession.session_series_id)
+        .where('session.start', '>=', selectedSession.start)
+
+      if (!parsedBody.future) {
+        sessionsQuery = sessionsQuery.where('session.id', '=', selectedSession.id)
+      }
+
+      const sessions = await sessionsQuery.execute()
+      const sessionIds = sessions.map((row) => row.id)
+
+      if (sessionIds.length === 0) {
+        throw new SessionNotFoundError()
+      }
+
+      const insertResult = await trx
+        .insertInto('client_session')
+        .values(
+          sessionIds.map((sessionIdValue) => ({
+            trainer_id: authorization.trainerId,
+            client_id: parsedBody.clientId,
+            session_id: sessionIdValue,
+            price: parsedBody.price ?? 0,
+            note: parsedBody.note ?? null,
+          }))
+        )
+        .onConflict((oc) => oc.columns(['session_id', 'client_id']).doUpdateSet({ price: parsedBody.price ?? 0 }))
+        .returning('id')
+        .execute()
+
+      const insertedIds = insertResult.map((row) => row.id).filter((id): id is string => Boolean(id))
 
       if (insertedIds.length === 0) {
         throw new SessionNotFoundError()

@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../../_lib/strictJson'
 
@@ -72,36 +73,52 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
   try {
     await db.transaction().execute(async (trx) => {
-      await sql`
-        INSERT INTO installation (user_id, user_type, device_token, device_type)
-        VALUES (${authorization.userId}, 'trainer', ${parsedBody.deviceToken}, ${parsedBody.deviceType})
-        ON CONFLICT (user_id, device_token) DO NOTHING
-      `.execute(trx)
+      await trx
+        .insertInto('installation')
+        .values({
+          user_id: authorization.userId,
+          user_type: 'trainer',
+          device_token: parsedBody.deviceToken,
+          device_type: parsedBody.deviceType,
+        })
+        .onConflict((oc) => oc.columns(['user_id', 'device_token']).doNothing())
+        .execute()
 
-      const missionResult = await sql<{ id: string }>`
-        UPDATE mission
-           SET completed_at = NOW()
-         WHERE trainer_id = ${authorization.trainerId}
-           AND completed_at IS NULL
-           AND id = 'enableNotifications'
-        RETURNING id
-      `.execute(trx)
+      const missionRow = await trx
+        .updateTable('mission')
+        .set({ completed_at: new Date() })
+        .where('trainer_id', '=', authorization.trainerId)
+        .where('completed_at', 'is', null)
+        .where('id', '=', 'enableNotifications')
+        .returning('id')
+        .executeTakeFirst()
 
-      const missionRow = missionResult.rows[0]
       if (!missionRow) {
         return
       }
 
-      const rewardResult = await sql<{ id: string }>`
-        INSERT INTO reward (trainer_id, type)
-        SELECT id, '1DayTrial'
-          FROM vw_legacy_trainer
-         WHERE subscription->>'status' != 'subscribed'
-           AND id = ${authorization.trainerId}
-        RETURNING id
-      `.execute(trx)
+      const trainerRow = await trx
+        .selectFrom('vw_legacy_trainer')
+        .select(['id', 'subscription'])
+        .where('id', '=', authorization.trainerId)
+        .executeTakeFirst()
 
-      const rewardRow = rewardResult.rows[0] ?? null
+      const subscriptionValue = trainerRow?.subscription
+      const subscriptionStatus =
+        subscriptionValue && typeof subscriptionValue === 'object' && 'status' in subscriptionValue
+          ? typeof (subscriptionValue as { status?: unknown }).status === 'string'
+            ? (subscriptionValue as { status?: unknown }).status
+            : null
+          : null
+
+      const rewardRow =
+        subscriptionStatus === 'subscribed'
+          ? null
+          : await trx
+              .insertInto('reward')
+              .values({ trainer_id: authorization.trainerId, type: '1DayTrial' })
+              .returning('id')
+              .executeTakeFirst()
 
       const notificationPayload = {
         title: "You've enabled notifications! 🎉",
@@ -113,22 +130,20 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
       await Promise.all([
         rewardRow
-          ? sql`
-              UPDATE mission
-                 SET reward_id = ${rewardRow.id}
-               WHERE trainer_id = ${authorization.trainerId}
-                 AND id = ${missionRow.id}
-            `.execute(trx)
+          ? trx
+              .updateTable('mission')
+              .set({ reward_id: rewardRow.id })
+              .where('trainer_id', '=', authorization.trainerId)
+              .where('id', '=', missionRow.id)
+              .execute()
           : Promise.resolve(),
-        sql`
-          INSERT INTO task_queue (task_type, data)
-          VALUES ('user.notify', ${JSON.stringify(notificationPayload)}::jsonb)
-        `.execute(trx),
+        enqueueWorkflowTask(trx, 'user.notify', notificationPayload, {
+          dedupeKey: `user.notify:mission:${missionRow.id}:enableNotifications`,
+        }),
       ])
     })
   } catch (error) {
     console.error('Failed to register device for member', {
-      memberId,
       userId: authorization.userId,
       trainerId: authorization.trainerId,
       error,

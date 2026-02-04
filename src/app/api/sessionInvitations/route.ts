@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z, ZodError } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../_lib/constants'
 import { parseStrictJsonBody } from '../_lib/strictJson'
@@ -263,18 +263,19 @@ export async function POST(request: NextRequest) {
         .select((eb) => [
           eb.ref('ss.name').as('sessionName'),
           eb.ref('s.start').as('start'),
-          sql<Date>`s.start + s.duration`.as('end'),
-          sql<boolean>`s.start <= NOW()`.as('isPastAppointment'),
+          eb(eb.ref('s.start'), '+', eb.ref('s.duration')).as('end'),
+          eb(eb.ref('s.start'), '<=', eb.fn('now')).as('isPastAppointment'),
           eb.ref('ss.location').as('location'),
           eb.ref('ss.price').as('price'),
           eb.ref('s.maximum_attendance').as('maximumAttendance'),
           eb.ref('client.email').as('email'),
           eb.ref('client.first_name').as('firstName'),
           eb.ref('client.last_name').as('lastName'),
-          sql<string>`COALESCE(trainer.online_bookings_contact_email, trainer.email)`.as('serviceProviderEmail'),
-          sql<string>`COALESCE(trainer.business_name, trainer.first_name || COALESCE(' ' || trainer.last_name, ''))`.as(
-            'serviceProviderBusinessName'
-          ),
+          eb.ref('trainer.online_bookings_contact_email').as('onlineBookingsContactEmail'),
+          eb.ref('trainer.email').as('trainerEmail'),
+          eb.ref('trainer.business_name').as('businessName'),
+          eb.ref('trainer.first_name').as('trainerFirstName'),
+          eb.ref('trainer.last_name').as('trainerLastName'),
           eb.ref('trainer.locale').as('locale'),
           eb.ref('trainer.timezone').as('timezone'),
           eb.ref('country.alpha_2_code').as('countryCode'),
@@ -290,7 +291,34 @@ export async function POST(request: NextRequest) {
         throw new ClientOrSessionNotFoundError()
       }
 
-      const details = detailsSchema.parse(detailsRow)
+      const serviceProviderEmail = detailsRow.onlineBookingsContactEmail ?? detailsRow.trainerEmail
+      const serviceProviderBusinessName =
+        detailsRow.businessName ??
+        [detailsRow.trainerFirstName, detailsRow.trainerLastName]
+          .map((part) => part?.trim())
+          .filter(Boolean)
+          .join(' ')
+
+      const details = detailsSchema.parse({
+        sessionName: detailsRow.sessionName,
+        start: detailsRow.start,
+        end: detailsRow.end,
+        isPastAppointment: detailsRow.isPastAppointment,
+        location: detailsRow.location,
+        price: detailsRow.price,
+        maximumAttendance: detailsRow.maximumAttendance,
+        email: detailsRow.email,
+        firstName: detailsRow.firstName,
+        lastName: detailsRow.lastName,
+        serviceProviderEmail: serviceProviderEmail || '',
+        serviceProviderBusinessName: serviceProviderBusinessName || '',
+        locale: detailsRow.locale,
+        timezone: detailsRow.timezone,
+        countryCode: detailsRow.countryCode,
+        clientId: detailsRow.clientId,
+        sessionId: detailsRow.sessionId,
+        currency: detailsRow.currency,
+      })
 
       if (!details.email) {
         throw new ClientHasNoEmailError()
@@ -308,12 +336,12 @@ export async function POST(request: NextRequest) {
           session_id: parsedBody.sessionId,
           price: details.price ?? null,
           state: 'invited',
-          invite_time: sql<Date>`NOW()`,
+          invite_time: new Date(),
         })
         .onConflict((oc) =>
           oc.columns(['session_id', 'client_id']).doUpdateSet({
             state: 'invited',
-            invite_time: sql<Date>`NOW()`,
+            invite_time: new Date(),
           })
         )
         .returning((eb) => [

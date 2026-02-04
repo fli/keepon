@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../../_lib/accessToken'
 import { normalizePlanRow, type RawPlanRow } from '../../../../../plans/shared'
 
@@ -106,7 +106,10 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     const plan = await db.transaction().execute(async (trx) => {
       const planDetails = (await trx
         .selectFrom('payment_plan as plan')
-        .select((eb) => [eb.ref('plan.status').as('status'), sql<boolean>`plan.end_ < NOW()`.as('isPastEnd')])
+        .select((eb) => [
+          eb.ref('plan.status').as('status'),
+          eb(eb.ref('plan.end_'), '<', eb.fn('now')).as('isPastEnd'),
+        ])
         .where('plan.id', '=', planId)
         .where('plan.client_id', '=', clientId)
         .where('plan.trainer_id', '=', authorization.trainerId)
@@ -134,13 +137,15 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         throw new SubscriptionPendingAcceptanceError()
       }
 
+      const now = new Date()
+
       await trx
         .insertInto('payment_plan_pause')
         .values({
           trainer_id: authorization.trainerId,
           payment_plan_id: planId,
-          start: sql<Date>`NOW()`,
-          end_: sql<Date>`'infinity'::timestamp with time zone`,
+          start: now,
+          end_: db.fn<Date>('infinity_timestamptz'),
         })
         .execute()
 

@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'node:crypto'
 import { z, ZodError } from 'zod'
-import { db, sql, type Selectable, type VwLegacyPayment } from '@/lib/db'
+import { db, type Selectable, type VwLegacyPayment } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../../../_lib/accessToken'
 import { paymentSchema } from '../../../../../../_lib/clientSessionsSchema'
 import { normalizePlanRow, type RawPlanRow } from '../../../../../../plans/shared'
@@ -300,27 +301,28 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
   try {
     const result = await db.transaction().execute(async (trx) => {
-      const sessionDetailsResult = await sql<SessionDetailRow>`
-        SELECT
-          client_session.id AS client_session_id,
-          session.start AS session_start,
-          sale_payment_status.payment_status = 'paid' AS paid,
-          sale_payment_status.sale_id,
-          session.duration::text AS duration,
-          COALESCE(session_series.location, '') AS location,
-          COALESCE(sale_product.price, client_session.price, 0) AS price
-        FROM session_series
-        LEFT JOIN session ON session_series.id = session.session_series_id
-        LEFT JOIN client_session ON client_session.session_id = session.id
-        LEFT JOIN sale_payment_status ON client_session.sale_id = sale_payment_status.sale_id
-        LEFT JOIN sale ON sale.id = client_session.sale_id
-        LEFT JOIN sale_product ON sale_product.sale_id = sale.id
-       WHERE session_series.id = ${sessionSeriesId}
-         AND session_series.trainer_id = ${authorization.trainerId}
-         AND client_session.client_id = ${clientId}
-      `.execute(trx)
+      const sessionDetailsRows = (await trx
+        .selectFrom('session_series')
+        .leftJoin('session', 'session_series.id', 'session.session_series_id')
+        .leftJoin('client_session', 'client_session.session_id', 'session.id')
+        .leftJoin('sale_payment_status', 'client_session.sale_id', 'sale_payment_status.sale_id')
+        .leftJoin('sale', 'sale.id', 'client_session.sale_id')
+        .leftJoin('sale_product', 'sale_product.sale_id', 'sale.id')
+        .select((eb) => [
+          eb.ref('client_session.id').as('client_session_id'),
+          eb.ref('session.start').as('session_start'),
+          eb(eb.ref('sale_payment_status.payment_status'), '=', eb.val('paid')).as('paid'),
+          eb.ref('sale_payment_status.sale_id').as('sale_id'),
+          eb.ref('session.duration').as('duration'),
+          eb.fn('coalesce', [eb.ref('session_series.location'), eb.val('')]).as('location'),
+          eb.fn('coalesce', [eb.ref('sale_product.price'), eb.ref('client_session.price'), eb.val(0)]).as('price'),
+        ])
+        .where('session_series.id', '=', sessionSeriesId)
+        .where('session_series.trainer_id', '=', authorization.trainerId)
+        .where('client_session.client_id', '=', clientId)
+        .execute()) as SessionDetailRow[]
 
-      const sessionDetails = sessionDetailsResult.rows.map((row, index) => normalizeSessionDetail(row, index))
+      const sessionDetails = sessionDetailsRows.map((row, index) => normalizeSessionDetail(row, index))
 
       if (sessionDetails.length === 0) {
         throw new AppointmentSeriesNotFoundError()
@@ -383,7 +385,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           const saleProductRow = await trx
             .insertInto('sale_product')
             .values({
-              id: sql`uuid_generate_v1mc()`,
+              id: randomUUID(),
               trainer_id: authorization.trainerId,
               is_item: null,
               is_credit_pack: null,
@@ -623,23 +625,19 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
 
   try {
     const result = await db.transaction().execute(async (trx) => {
-      const clientSessionsResult = await sql<ClientSessionPaymentRow>`
-        SELECT
-          client_session.id AS client_session_id,
-          payment.id AS payment_id
-        FROM payment_subscription
-        JOIN payment ON payment_subscription.id = payment.id
-        JOIN sale ON sale.id = payment.sale_id
-        JOIN client_session ON client_session.sale_id = sale.id
-        JOIN session ON session.id = client_session.session_id
-        JOIN session_series ON session_series.id = session.session_series_id
-       WHERE payment_subscription.subscription_id = ${planId}
-         AND payment.trainer_id = ${authorization.trainerId}
-         AND payment.client_id = ${clientId}
-         AND session_series.id = ${sessionSeriesId}
-      `.execute(trx)
-
-      const clientSessions = clientSessionsResult.rows
+      const clientSessions = (await trx
+        .selectFrom('payment_subscription')
+        .innerJoin('payment', 'payment_subscription.id', 'payment.id')
+        .innerJoin('sale', 'sale.id', 'payment.sale_id')
+        .innerJoin('client_session', 'client_session.sale_id', 'sale.id')
+        .innerJoin('session', 'session.id', 'client_session.session_id')
+        .innerJoin('session_series', 'session_series.id', 'session.session_series_id')
+        .select((eb) => [eb.ref('client_session.id').as('client_session_id'), eb.ref('payment.id').as('payment_id')])
+        .where('payment_subscription.subscription_id', '=', planId)
+        .where('payment.trainer_id', '=', authorization.trainerId)
+        .where('payment.client_id', '=', clientId)
+        .where('session_series.id', '=', sessionSeriesId)
+        .execute()) as ClientSessionPaymentRow[]
 
       if (clientSessions.length > 0) {
         const paymentIds = clientSessions
@@ -666,6 +664,10 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         .selectAll('v')
         .where('v.id', '=', planId)
         .executeTakeFirst()) as RawPlanRow | undefined
+
+      if (!rawPlanRow) {
+        throw new SubscriptionNotFoundError()
+      }
 
       const plan = normalizePlanRow(rawPlanRow)
 

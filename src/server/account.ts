@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 
 const nullableString = z
   .string()
@@ -74,7 +74,7 @@ export async function updateTrainerAccount(trainerId: string, payload: UpdateAcc
   const emailTaken = await db
     .selectFrom('trainer')
     .select('id')
-    .where(sql<boolean>`LOWER(email) = LOWER(${parsed.email})`)
+    .where((eb) => eb(eb.fn('lower', [eb.ref('email')]), '=', parsed.email.toLowerCase()))
     .where('id', '!=', trainerId)
     .executeTakeFirst()
 
@@ -113,17 +113,17 @@ export async function updateTrainerAccount(trainerId: string, payload: UpdateAcc
 export async function changeTrainerPassword(trainerId: string, payload: ChangePasswordPayload): Promise<void> {
   const { currentPassword, newPassword } = changePasswordSchema.parse(payload)
 
-  const result = await sql<{ changed: boolean }>`
-    UPDATE trainer
-       SET password_hash = crypt(${newPassword}, gen_salt('bf', 10))
-     WHERE id = ${trainerId}
-       AND password_hash = crypt(${currentPassword}, password_hash)
-     RETURNING TRUE as changed
-  `.execute(db)
+  const updated = await db
+    .updateTable('trainer')
+    .set((eb) => ({
+      password_hash: eb.fn('crypt', [eb.val(newPassword), eb.fn('gen_salt', [eb.val('bf'), eb.val(10)])]),
+    }))
+    .where('id', '=', trainerId)
+    .where((eb) => eb(eb.ref('password_hash'), '=', eb.fn('crypt', [eb.val(currentPassword), eb.ref('password_hash')])))
+    .returning('id')
+    .executeTakeFirst()
 
-  const row = result.rows[0]
-
-  if (!row) {
+  if (!updated) {
     throw new Error('Current password is incorrect.')
   }
 }

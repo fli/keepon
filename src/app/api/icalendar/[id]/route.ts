@@ -1,8 +1,10 @@
+import type { IPostgresInterval } from 'postgres-interval'
 import { NextResponse } from 'next/server'
 import fs from 'node:fs'
 import path from 'node:path'
+import parseInterval from 'postgres-interval'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { buildErrorResponse } from '../../_lib/accessToken'
 
 const paramsSchema = z.object({
@@ -130,6 +132,56 @@ const wrapLines = (input: string) => {
 
 const escapeNewlines = (value: string) => value.replaceAll(/\n/g, '\\n')
 
+const padNumber = (value: number, size = 2) => value.toString().padStart(size, '0')
+
+const formatIcsUtc = (date: Date) =>
+  `${date.getUTCFullYear()}${padNumber(date.getUTCMonth() + 1)}${padNumber(date.getUTCDate())}T${padNumber(
+    date.getUTCHours()
+  )}${padNumber(date.getUTCMinutes())}${padNumber(date.getUTCSeconds())}Z`
+
+const formatIcsLocal = (date: Date, timeZone: string) => {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+
+  const parts = formatter.formatToParts(date)
+  const values: Record<string, string> = {}
+  for (const part of parts) {
+    if (part.type !== 'literal') {
+      values[part.type] = part.value
+    }
+  }
+
+  return `${values.year}${values.month}${values.day}T${values.hour}${values.minute}${values.second}`
+}
+
+const intervalToMilliseconds = (value: unknown) => {
+  if (!value) {
+    return 0
+  }
+
+  const interval: IPostgresInterval = typeof value === 'string' ? parseInterval(value) : (value as IPostgresInterval)
+
+  const years = interval.years ?? 0
+  const months = interval.months ?? 0
+  const days = interval.days ?? 0
+  const hours = interval.hours ?? 0
+  const minutes = interval.minutes ?? 0
+  const seconds = interval.seconds ?? 0
+  const milliseconds = interval.milliseconds ?? 0
+
+  const totalDays = years * 365 + months * 30 + days
+
+  return totalDays * 24 * 60 * 60 * 1000 + hours * 60 * 60 * 1000 + minutes * 60 * 1000 + seconds * 1000 + milliseconds
+}
+
 const buildEventBlock = (row: CalendarRow) => `BEGIN:VEVENT
 DTSTAMP:${escapeNewlines(row.dtstamp)}
 UID:${escapeNewlines(row.id)}
@@ -187,46 +239,95 @@ export async function GET(_request: Request, context: HandlerContext) {
       )
     }
 
-    const calendarRowsResult = await sql<CalendarRow>`
-      SELECT
-        session.timezone,
-        to_char(timezone('UTC', NOW()), 'YYYYMMDD"T"HH24MISS"Z"') AS dtstamp,
-        session.id,
-        to_char(timezone('UTC', session.created_at), 'YYYYMMDD"T"HH24MISS"Z"') AS created,
-        COALESCE(session.location, '') AS location,
-        to_char(timezone(session.timezone, session.start), 'YYYYMMDD"T"HH24MISS') AS dtstart,
-        to_char(timezone(session.timezone, session.start + session.duration), 'YYYYMMDD"T"HH24MISS') AS dtend,
-        COALESCE(session.note, '') || '\nThis is a Keepon appointment, please edit this event in the Keepon app.' AS description,
-        COALESCE(session_series.name,
-          CASE session_series.event_type
-            WHEN 'single_session' THEN
-              COALESCE(
-                (
-                  SELECT first_name || CASE WHEN last_name IS NULL THEN '' ELSE ' ' || last_name END || ' - Appointment'
-                    FROM client
-                    JOIN (
-                      SELECT *
-                        FROM (
-                          SELECT session_id, (array_agg(client_id))[1] AS client_id, count(*) AS count
-                            FROM client_session
-                           GROUP BY session_id
-                        ) cs_
-                       WHERE count = 1
-                    ) cs ON client.id = cs.client_id
-                   WHERE cs.session_id = session.id
-                ),
-                'Appointment'
-              )
-            WHEN 'group_session' THEN 'Group Appointment'
-            WHEN 'event' THEN 'Event'
-          END
-        ) AS summary
-      FROM session
-      JOIN session_series ON session_series.id = session.session_series_id
-      WHERE session_series.trainer_id = ${trainer.id}
-    `.execute(db)
+    const sessions = await db
+      .selectFrom('session')
+      .innerJoin('session_series', 'session_series.id', 'session.session_series_id')
+      .select((eb) => [
+        eb.ref('session.id').as('id'),
+        eb.ref('session.timezone').as('timezone'),
+        eb.ref('session.created_at').as('createdAt'),
+        eb.ref('session.start').as('start'),
+        eb.ref('session.duration').as('duration'),
+        eb.ref('session.location').as('location'),
+        eb.ref('session.note').as('note'),
+        eb.ref('session_series.name').as('seriesName'),
+        eb.ref('session_series.event_type').as('eventType'),
+      ])
+      .where('session_series.trainer_id', '=', trainer.id)
+      .execute()
 
-    const calendarRows = z.array(calendarRowSchema).parse(calendarRowsResult.rows)
+    const sessionIds = sessions.map((session) => session.id)
+    const clientNameBySessionId = new Map<string, string>()
+
+    if (sessionIds.length > 0) {
+      const counts = await db
+        .selectFrom('client_session')
+        .select((eb) => [eb.ref('client_session.session_id').as('sessionId'), eb.fn.countAll<number>().as('count')])
+        .where('client_session.session_id', 'in', sessionIds)
+        .groupBy('client_session.session_id')
+        .execute()
+
+      const singleSessionIds = counts
+        .filter((row) => Number(row.count) === 1)
+        .map((row) => row.sessionId)
+        .filter((value): value is string => Boolean(value))
+
+      if (singleSessionIds.length > 0) {
+        const clientRows = await db
+          .selectFrom('client_session')
+          .innerJoin('client', 'client.id', 'client_session.client_id')
+          .select((eb) => [
+            eb.ref('client_session.session_id').as('sessionId'),
+            eb.ref('client.first_name').as('firstName'),
+            eb.ref('client.last_name').as('lastName'),
+          ])
+          .where('client_session.session_id', 'in', singleSessionIds)
+          .execute()
+
+        for (const row of clientRows) {
+          const name = [row.firstName, row.lastName].filter(Boolean).join(' ').trim()
+          if (row.sessionId && name) {
+            clientNameBySessionId.set(row.sessionId, name)
+          }
+        }
+      }
+    }
+
+    const dtstamp = formatIcsUtc(new Date())
+
+    const calendarRows = z.array(calendarRowSchema).parse(
+      sessions.map((session) => {
+        const start = session.start instanceof Date ? session.start : new Date(session.start)
+        const createdAt = session.createdAt instanceof Date ? session.createdAt : new Date(session.createdAt)
+        const durationMs = intervalToMilliseconds(session.duration)
+        const end = new Date(start.getTime() + durationMs)
+
+        const clientName = clientNameBySessionId.get(session.id)
+        const summary =
+          session.seriesName ??
+          (session.eventType === 'single_session'
+            ? clientName
+              ? `${clientName} - Appointment`
+              : 'Appointment'
+            : session.eventType === 'group_session'
+              ? 'Group Appointment'
+              : 'Event')
+
+        const description = `${session.note ?? ''}\nThis is a Keepon appointment, please edit this event in the Keepon app.`
+
+        return {
+          timezone: session.timezone,
+          dtstamp,
+          id: session.id,
+          created: formatIcsUtc(createdAt),
+          location: session.location ?? '',
+          dtstart: formatIcsLocal(start, session.timezone),
+          dtend: formatIcsLocal(end, session.timezone),
+          description,
+          summary,
+        }
+      })
+    )
 
     const timeZoneInfo = loadTimeZoneInfo()
     const uniqueTimeZones = Array.from(new Set(calendarRows.map((row) => row.timezone)))

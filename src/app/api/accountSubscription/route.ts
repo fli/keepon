@@ -3,7 +3,7 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { getAccountSubscriptionPricingForCountry } from '../_lib/accountSubscriptionPricing'
 import { parseStrictJsonBody } from '../_lib/strictJson'
@@ -224,12 +224,12 @@ export async function PATCH(request: Request) {
         .insertInto('stripe.subscription')
         .values({
           id: stripeSubscription.id,
-          api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+          api_version: stripeApiVersionDate,
           object: JSON.stringify(stripeSubscription),
         })
         .onConflict((oc) =>
           oc.column('id').doUpdateSet({
-            api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+            api_version: stripeApiVersionDate,
             object: JSON.stringify(stripeSubscription),
           })
         )
@@ -702,12 +702,12 @@ export async function PUT(request: Request) {
         .insertInto('stripe.customer')
         .values({
           id: stripeCustomer.id,
-          api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+          api_version: stripeApiVersionDate,
           object: JSON.stringify(stripeCustomer),
         })
         .onConflict((oc) =>
           oc.column('id').doUpdateSet({
-            api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+            api_version: stripeApiVersionDate,
             object: JSON.stringify(stripeCustomer),
           })
         )
@@ -717,12 +717,12 @@ export async function PUT(request: Request) {
         .insertInto('stripe.subscription')
         .values({
           id: stripeSubscription.id,
-          api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+          api_version: stripeApiVersionDate,
           object: JSON.stringify(stripeSubscription),
         })
         .onConflict((oc) =>
           oc.column('id').doUpdateSet({
-            api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+            api_version: stripeApiVersionDate,
             object: JSON.stringify(stripeSubscription),
           })
         )

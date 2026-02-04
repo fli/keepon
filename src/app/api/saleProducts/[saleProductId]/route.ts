@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { intervalFromMinutes, toPoint } from '@/lib/db/values'
 import { uuidOrNil } from '@/lib/uuid'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
@@ -73,7 +74,7 @@ const normalizeDeletedCount = (value: unknown) => {
 const moneyRegex = /^(?:-\d)?\d*?(?:\.\d+)?$/
 
 const moneyAmountSchema = z
-  .string({ invalid_type_error: 'price  should be string' })
+  .string({ message: 'price  should be string' })
   .transform((value) => value.trim())
   .refine((value) => moneyRegex.test(value), { message: 'price  should be Money' })
   .refine((value) => Number.parseFloat(value) >= 0, {
@@ -97,17 +98,17 @@ const patchRequestBodySchema = z
     price: moneyAmountSchema.optional(),
     name: z.string().trim().min(1, 'name must not be empty').optional(),
     quantity: z
-      .number({ invalid_type_error: 'quantity  should be number' })
+      .number({ message: 'quantity  should be number' })
       .int()
       .min(1, 'quantity  should be greater than or equal to 1')
       .optional(),
     totalCredits: z
-      .number({ invalid_type_error: 'totalCredits  should be number' })
+      .number({ message: 'totalCredits  should be number' })
       .int()
       .min(0, 'totalCredits  should be greater than or equal to 0')
       .optional(),
     durationMinutes: z
-      .number({ invalid_type_error: 'durationMinutes  should be number' })
+      .number({ message: 'durationMinutes  should be number' })
       .int()
       .min(1, 'durationMinutes  should be greater than or equal to 1')
       .optional(),
@@ -263,7 +264,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         }
 
         if (Object.keys(saleProductUpdate).length > 0) {
-          saleProductUpdate.updated_at = sql`now()`
+          saleProductUpdate.updated_at = new Date()
           await trx
             .updateTable('sale_product')
             .set(saleProductUpdate)
@@ -277,7 +278,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
             .updateTable('payment')
             .set({
               amount: parsedBody.price,
-              updated_at: sql`now()`,
+              updated_at: new Date(),
             })
             .where('payment.id', '=', paymentId)
             .where('payment.trainer_id', '=', authorization.trainerId)
@@ -291,7 +292,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
                 .updateTable('sale_credit_pack')
                 .set({
                   total_credits: parsedBody.totalCredits,
-                  updated_at: sql`now()`,
+                  updated_at: new Date(),
                 })
                 .where('sale_credit_pack.id', '=', saleProductId)
                 .where('sale_credit_pack.trainer_id', '=', authorization.trainerId)
@@ -305,7 +306,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
                 .updateTable('sale_item')
                 .set({
                   quantity: parsedBody.quantity,
-                  updated_at: sql`now()`,
+                  updated_at: new Date(),
                 })
                 .where('sale_item.id', '=', saleProductId)
                 .where('sale_item.trainer_id', '=', authorization.trainerId)
@@ -317,7 +318,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
             const serviceUpdate: Record<string, unknown> = {}
 
             if (parsedBody.durationMinutes !== undefined) {
-              serviceUpdate.duration = sql`make_interval(mins := ${parsedBody.durationMinutes})`
+              serviceUpdate.duration = intervalFromMinutes(parsedBody.durationMinutes)
             }
 
             if (parsedBody.location !== undefined) {
@@ -333,12 +334,11 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
             }
 
             if (parsedBody.geo !== undefined) {
-              serviceUpdate.geo =
-                parsedBody.geo === null ? null : sql`point(${parsedBody.geo.lat}, ${parsedBody.geo.lng})`
+              serviceUpdate.geo = parsedBody.geo === null ? null : toPoint(parsedBody.geo.lat, parsedBody.geo.lng)
             }
 
             if (Object.keys(serviceUpdate).length > 0) {
-              serviceUpdate.updated_at = sql`now()`
+              serviceUpdate.updated_at = new Date()
               await trx
                 .updateTable('sale_service')
                 .set(serviceUpdate)
@@ -440,7 +440,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         .leftJoin('sale_payment_status as salePaymentStatus', 'salePaymentStatus.sale_id', 'sale.id')
         .select((eb) => [
           eb.ref('sale.id').as('saleId'),
-          sql<boolean>`COALESCE(${sql.ref('salePaymentStatus.payment_status')} = 'paid', FALSE)`.as('paid'),
+          eb.fn.coalesce(eb('salePaymentStatus.payment_status', '=', 'paid'), false).as('paid'),
         ])
         .where('saleProduct.id', '=', saleProductId)
         .where('saleProduct.trainer_id', '=', authorization.trainerId)

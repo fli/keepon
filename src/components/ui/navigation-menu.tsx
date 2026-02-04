@@ -17,7 +17,9 @@ function NavigationMenu({ className, children, ...props }: NavigationMenuPrimiti
   )
 }
 
-function NavigationMenuList({ className, ...props }: NavigationMenuPrimitive.List.Props) {
+type NavigationMenuListProps = Omit<NavigationMenuPrimitive.List.Props, 'ref'>
+
+function NavigationMenuList({ className, ...props }: NavigationMenuListProps) {
   return (
     <NavigationMenuPrimitive.List
       data-slot="navigation-menu-list"
@@ -27,7 +29,9 @@ function NavigationMenuList({ className, ...props }: NavigationMenuPrimitive.Lis
   )
 }
 
-function NavigationMenuItem({ className, ...props }: NavigationMenuPrimitive.Item.Props) {
+type NavigationMenuItemProps = Omit<NavigationMenuPrimitive.Item.Props, 'ref'>
+
+function NavigationMenuItem({ className, ...props }: NavigationMenuItemProps) {
   return (
     <NavigationMenuPrimitive.Item data-slot="navigation-menu-item" className={cn('relative', className)} {...props} />
   )
@@ -108,7 +112,9 @@ function NavigationMenuLink({ className, ...props }: NavigationMenuPrimitive.Lin
   )
 }
 
-function NavigationMenuIndicator({ className, ...props }: NavigationMenuPrimitive.Icon.Props) {
+type NavigationMenuIndicatorProps = Omit<NavigationMenuPrimitive.Icon.Props, 'ref'>
+
+function NavigationMenuIndicator({ className, ...props }: NavigationMenuIndicatorProps) {
   return (
     <NavigationMenuPrimitive.Icon
       data-slot="navigation-menu-indicator"

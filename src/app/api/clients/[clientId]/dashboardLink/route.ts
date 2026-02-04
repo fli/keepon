@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../_lib/constants'
 import { createLegacyInvalidJsonResponse, parseStrictJsonBody } from '../../../_lib/strictJson'
@@ -159,13 +159,10 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           eb.ref('client.id').as('clientId'),
           eb.ref('client.email').as('email'),
           eb.ref('client.user_id').as('userId'),
-          sql<string>`
-            COALESCE(
-              trainer.online_bookings_business_name,
-              trainer.business_name,
-              trainer.first_name || COALESCE(' ' || trainer.last_name, '')
-            )
-          `.as('serviceProviderName'),
+          eb.ref('trainer.online_bookings_business_name').as('onlineBookingsBusinessName'),
+          eb.ref('trainer.business_name').as('businessName'),
+          eb.ref('trainer.first_name').as('firstName'),
+          eb.ref('trainer.last_name').as('lastName'),
           eb.ref('trainer.brand_color').as('brandColor'),
           eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
         ])
@@ -177,11 +174,16 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         throw new ClientNotFoundError()
       }
 
+      const serviceProviderName =
+        row.onlineBookingsBusinessName ??
+        row.businessName ??
+        [row.firstName, row.lastName].filter((value) => value && value.length > 0).join(' ')
+
       const details = clientDetailsSchema.parse({
         clientId: row.clientId,
         email: row.email,
         userId: row.userId,
-        serviceProviderName: row.serviceProviderName ?? '',
+        serviceProviderName: serviceProviderName ?? '',
         brandColor: row.brandColor ?? null,
         businessLogoUrl: row.businessLogoUrl ?? null,
       })
@@ -196,7 +198,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           user_id: details.userId,
           user_type: 'client',
           type: 'client_dashboard',
-          expires_at: sql`NOW() + INTERVAL '7 days'`,
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         })
         .returning('id')
         .executeTakeFirst()

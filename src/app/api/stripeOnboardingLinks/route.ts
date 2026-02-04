@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { parseStrictJsonBody } from '../_lib/strictJson'
 import { getStripeClient } from '../_lib/stripeClient'
@@ -122,11 +122,7 @@ export async function POST(request: Request) {
       .leftJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
       .select((eb) => [
         eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
-        sql<boolean>`(${sql.ref('stripeAccount.object')} #>> '{capabilities,card_payments}') IS NOT NULL`.as(
-          'cardPayments'
-        ),
-        sql<boolean>`(${sql.ref('stripeAccount.object')} #>> '{capabilities,transfers}') IS NOT NULL`.as('transfers'),
-        sql<string | null>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('stripeAccountType'),
+        eb.ref('stripeAccount.object').as('stripeAccountObject'),
       ])
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()
@@ -135,7 +131,22 @@ export async function POST(request: Request) {
       return createTrainerNotFoundResponse()
     }
 
-    const parsedRow = trainerStripeRowSchema.safeParse(row)
+    const stripeAccountValue = row.stripeAccountObject
+    const capabilities =
+      stripeAccountValue && typeof stripeAccountValue === 'object' && 'capabilities' in stripeAccountValue
+        ? ((stripeAccountValue as { capabilities?: Record<string, unknown> }).capabilities ?? null)
+        : null
+    const stripeAccountType =
+      stripeAccountValue && typeof stripeAccountValue === 'object' && 'type' in stripeAccountValue
+        ? ((stripeAccountValue as { type?: string }).type ?? null)
+        : null
+
+    const parsedRow = trainerStripeRowSchema.safeParse({
+      stripeAccountId: row.stripeAccountId,
+      cardPayments: Boolean(capabilities && 'card_payments' in capabilities && capabilities.card_payments !== null),
+      transfers: Boolean(capabilities && 'transfers' in capabilities && capabilities.transfers !== null),
+      stripeAccountType,
+    })
 
     if (!parsedRow.success) {
       const detail = parsedRow.error.issues.map((issue) => issue.message).join('; ')

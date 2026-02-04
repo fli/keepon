@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { buildErrorResponse, extractAccessToken } from '../../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../../_lib/strictJson'
 
@@ -65,28 +65,36 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
   try {
     const result = await db.transaction().execute(async (trx) => {
-      const update = await sql<{ userId: string }>`
-          UPDATE trainer
-             SET password_hash = crypt(${password}, gen_salt('bf', 10))
-            FROM access_token
-           WHERE access_token.user_id = trainer.user_id
-             AND access_token.user_type = trainer.user_type
-             AND access_token.type = 'password_reset'
-             AND access_token.expires_at >= NOW()
-             AND access_token.id = ${accessToken}
-           RETURNING trainer.user_id AS "userId"
-        `.execute(trx)
+      const row = await trx
+        .selectFrom('trainer')
+        .innerJoin('access_token', (join) =>
+          join
+            .onRef('access_token.user_id', '=', 'trainer.user_id')
+            .onRef('access_token.user_type', '=', 'trainer.user_type')
+        )
+        .select((eb) => eb.ref('trainer.user_id').as('userId'))
+        .where('access_token.type', '=', 'password_reset')
+        .where((eb) => eb('access_token.expires_at', '>=', eb.fn('now')))
+        .where('access_token.id', '=', accessToken)
+        .executeTakeFirst()
 
-      const row = update.rows[0]
       if (!row) {
         return { ok: false as const }
       }
 
-      await sql`
-          DELETE FROM access_token
-           WHERE user_id = ${row.userId}
-             AND type IN ('api', 'password_reset')
-        `.execute(trx)
+      await trx
+        .updateTable('trainer')
+        .set((eb) => ({
+          password_hash: eb.fn('crypt', [eb.val(password), eb.fn('gen_salt', [eb.val('bf'), eb.val(10)])]),
+        }))
+        .where('user_id', '=', row.userId)
+        .execute()
+
+      await trx
+        .deleteFrom('access_token')
+        .where('user_id', '=', row.userId)
+        .where('type', 'in', ['api', 'password_reset'])
+        .execute()
 
       return { ok: true as const }
     })

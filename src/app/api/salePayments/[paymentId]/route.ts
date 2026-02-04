@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import {
   authenticateTrainerOrClientRequest,
   authenticateTrainerRequest,
@@ -418,7 +418,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
           }
 
           if (Object.keys(updatePayload).length > 0) {
-            updatePayload.updated_at = sql<Date>`NOW()`
+            updatePayload.updated_at = new Date()
 
             await trx
               .updateTable('payment_manual')
@@ -445,7 +445,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
           }
 
           if (Object.keys(updatePayload).length > 0) {
-            updatePayload.updated_at = sql<Date>`NOW()`
+            updatePayload.updated_at = new Date()
 
             await trx
               .updateTable('payment_credit_pack')
@@ -462,7 +462,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
               .updateTable('payment_subscription')
               .set({
                 subscription_id: parsedBody.paymentPlanId,
-                updated_at: sql<Date>`NOW()`,
+                updated_at: new Date(),
               })
               .where('payment_subscription.id', '=', paymentId)
               .where('payment_subscription.trainer_id', '=', authorization.trainerId)

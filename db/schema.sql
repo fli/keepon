@@ -7616,6 +7616,465 @@ ALTER TABLE ONLY public.user_
 ALTER TABLE ONLY stripe.payout
     ADD CONSTRAINT payout_account_fkey FOREIGN KEY (account) REFERENCES stripe.account(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
+--
+-- Name: vw_generate_payment_plan_payments; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.vw_generate_payment_plan_payments AS
+ SELECT *
+   FROM public.generate_payment_plan_payments();
+
+
+--
+-- Name: vw_app_store_latest_receipts; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.vw_app_store_latest_receipts AS
+ SELECT DISTINCT ON (original_transaction_id, trainer_id) original_transaction_id,
+    encoded_receipt,
+    trainer_id
+   FROM app_store_transaction
+  WHERE (expires_date + '60 days'::interval) > now()
+  ORDER BY original_transaction_id, trainer_id, expires_date DESC;
+
+
+--
+-- Name: vw_trialled_didnt_sub_trainers; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.vw_trialled_didnt_sub_trainers AS
+ SELECT trainer.id AS trainer_id
+   FROM trainer
+     JOIN vw_legacy_trainer ON (vw_legacy_trainer.id = trainer.id)
+  WHERE ((vw_legacy_trainer.subscription ->> 'status'::text) = 'limited'::text) AND (NOT trainer.trialled_didnt_sub_mailchimp_tag_applied);
+
+
+--
+-- Name: vw_due_payment_reminders; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.vw_due_payment_reminders AS
+ SELECT reminder.latest_remind_time,
+    remind_me.most_overdue,
+    (now() - remind_me.most_overdue) >= '13 days'::interval AS last_reminder,
+    trainer.id AS trainer_id,
+    trainer.user_id AS trainer_user_id,
+    COALESCE(trainer.online_bookings_business_name, trainer.business_name, trainer.first_name || COALESCE(' '::text || trainer.last_name, ''::text)) AS service_provider_name,
+    trainer.brand_color,
+    trainer.business_logo_url,
+    client.id AS client_id,
+    client.first_name AS client_first_name,
+    client.last_name AS client_last_name,
+    client.email AS client_email,
+    remind_me.overdue_count
+   FROM (( SELECT due.trainer_id,
+            due.client_id,
+            max(due.due_date) AS most_overdue,
+            count(*)::integer AS overdue_count
+           FROM ( SELECT sale.trainer_id,
+                    sale.client_id,
+                    COALESCE(sale.payment_request_time, sale.created_at) AS due_date
+                   FROM sale
+                     JOIN sale_payment_status ON (sale_payment_status.sale_id = sale.id)
+                     JOIN ( VALUES ('rejected'::text), ('requested'::text)) vals(v) ON ((vals.v = sale_payment_status.payment_status))
+                UNION ALL
+                 SELECT payment_plan_payment.trainer_id,
+                    payment_plan.client_id,
+                    payment_plan_payment.date AS due_date
+                   FROM payment_plan_payment
+                     JOIN payment_plan ON ((payment_plan.id = payment_plan_payment.payment_plan_id))
+                  WHERE (payment_plan_payment.status = 'rejected'::text)
+                UNION ALL
+                 SELECT payment_plan.trainer_id,
+                    payment_plan.client_id,
+                    CASE
+                        WHEN payment_plan.start > payment_plan.acceptance_request_time THEN payment_plan.start
+                        ELSE (payment_plan.start + (ceil((EXTRACT(epoch FROM (payment_plan.acceptance_request_time - payment_plan.start)) / EXTRACT(epoch FROM (((payment_plan.frequency_weekly_interval * 7) * '1 day'::interval))))) * ((payment_plan.frequency_weekly_interval * 7) * '1 day'::interval)))
+                    END AS due_date
+                   FROM payment_plan
+                  WHERE (payment_plan.status = 'pending'::text)) due
+          WHERE (due.due_date < (now() - '2 days'::interval))
+          GROUP BY due.trainer_id, due.client_id) remind_me
+     JOIN trainer ON (trainer.id = remind_me.trainer_id)
+     JOIN client ON (client.id = remind_me.client_id)
+     LEFT JOIN ( SELECT max(client_payment_reminder.send_time) AS latest_remind_time,
+            client_payment_reminder.trainer_id,
+            client_payment_reminder.client_id
+           FROM client_payment_reminder
+          GROUP BY client_payment_reminder.client_id, client_payment_reminder.trainer_id) reminder ON ((reminder.trainer_id = trainer.id) AND (reminder.client_id = client.id)))
+  WHERE (EXTRACT(hour FROM timezone(trainer.timezone, now())) >= (8)::numeric) AND (EXTRACT(hour FROM timezone(trainer.timezone, now())) < (20)::numeric) AND (now() >= (remind_me.most_overdue + '2 days'::interval)) AND (now() < (remind_me.most_overdue + '15 days'::interval)) AND ((now() > (reminder.latest_remind_time + '47 hours'::interval)) OR (reminder.latest_remind_time IS NULL));
+
+
+--
+-- Name: vw_session_reminder_details; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.vw_session_reminder_details AS
+ SELECT session.id AS session_id,
+    trainer.id AS trainer_id,
+    r.reminder_slot,
+    r.reminder_type,
+    r.reminder_interval,
+    r.reminder_checked_at,
+    uuid_generate_v1mc() AS mail_id,
+    COALESCE(trainer.online_bookings_business_name, trainer.business_name, trainer.first_name || COALESCE(' '::text || trainer.last_name, ''::text)) AS service_provider_name,
+    trainer.email AS service_provider_email,
+    trainer.brand_color AS brand_color,
+    trainer.business_logo_url AS business_logo_url,
+    trainer.user_id AS user_id,
+    trainer.sms_credit_checkout_id AS sms_credit_checkout_id,
+    sms_balance.credit_balance AS sms_credit_balance,
+    ((vw_legacy_trainer.subscription ->> 'status'::text) = 'trialling'::text) OR ((vw_legacy_trainer.subscription ->> 'status'::text) = 'subscribed'::text) AS client_reminders_enabled,
+    country.alpha_2_code AS country,
+    session.start AS starts_at,
+    (session.start + session.duration) AS ends_at,
+    session.timezone,
+    session.location,
+    session.address,
+        CASE
+            WHEN (session.geo IS NOT NULL) THEN json_build_object('lat', session.geo[0], 'lng', session.geo[1])
+            ELSE NULL::json
+        END AS geo,
+    session.google_place_id AS google_place_id,
+    trainer.locale,
+    COALESCE(((session_series.event_type = 'single_session'::text) AND ( SELECT (client_session.state = 'cancelled'::text) AS "state = 'cancelled'"
+           FROM client_session
+          WHERE (session.id = client_session.session_id)
+         LIMIT 1)), false) AS cancelled,
+    COALESCE(session_series.name, 'Appointment'::text) AS name,
+    COALESCE(trainer.online_bookings_contact_email, trainer.email) AS contact_email,
+        CASE
+            WHEN trainer.online_bookings_show_contact_number THEN COALESCE(trainer.online_bookings_contact_number, trainer.phone_number)
+            ELSE NULL::text
+        END AS contact_number,
+    ( SELECT COALESCE(json_agg(c), '[]'::json)
+           FROM ( SELECT client.id,
+                    client.first_name,
+                    client.last_name,
+                    client.email,
+                    client.mobile_number,
+                    uuid_generate_v1mc() AS mail_id,
+                    client_session.id AS client_session_id,
+                    client_session.booking_id AS booking_id
+                   FROM client
+                     JOIN client_session ON (client_session.client_id = client.id)
+                     JOIN ( VALUES ('maybe'::text), ('invited'::text), ('confirmed'::text), ('accepted'::text)) vals(v) ON ((vals.v = client_session.state))
+                  WHERE (client_session.session_id = session.id)) c) AS clients
+   FROM session
+     JOIN session_series ON (session_series.id = session.session_series_id)
+     JOIN trainer ON (session.trainer_id = trainer.id)
+     JOIN vw_legacy_trainer ON (vw_legacy_trainer.id = trainer.id)
+     JOIN country ON (country.id = trainer.country_id)
+     JOIN sms_balance ON (sms_balance.trainer_id = trainer.id)
+     CROSS JOIN LATERAL ( VALUES ('service_provider_reminder_1'::text, (session.service_provider_reminder_1_type || 'ServiceProvider'::text), session.service_provider_reminder_1, session.service_provider_reminder_1_checked_at), ('service_provider_reminder_2'::text, (session.service_provider_reminder_2_type || 'ServiceProvider'::text), session.service_provider_reminder_2, session.service_provider_reminder_2_checked_at), ('client_reminder_1'::text, (session.client_reminder_1_type || 'Client'::text), session.client_reminder_1, session.client_reminder_1_checked_at), ('client_reminder_2'::text, (session.client_reminder_2_type || 'Client'::text), session.client_reminder_2, session.client_reminder_2_checked_at)) r(reminder_slot, reminder_type, reminder_interval, reminder_checked_at)
+  WHERE (r.reminder_interval IS NOT NULL);
+
+
+--
+-- Name: vw_due_session_reminder_slots; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.vw_due_session_reminder_slots AS
+ SELECT vw_session_reminder_details.session_id,
+    vw_session_reminder_details.trainer_id,
+    vw_session_reminder_details.reminder_slot,
+    vw_session_reminder_details.reminder_type
+   FROM vw_session_reminder_details
+  WHERE (vw_session_reminder_details.reminder_checked_at IS NULL) AND (now() <@ tstzrange((vw_session_reminder_details.starts_at - vw_session_reminder_details.reminder_interval), (vw_session_reminder_details.starts_at + '10 minutes'::interval)));
+
+--
+-- Name: vw_online_bookings_provider; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE OR REPLACE VIEW public.vw_online_bookings_provider AS
+SELECT
+  CASE
+    WHEN vw_legacy_trainer.subscription->>'status' IN ('subscribed', 'trialling') THEN trainer.online_bookings_enabled
+    ELSE false
+  END AS "onlineBookingsEnabled",
+  COALESCE(
+    trainer.online_bookings_business_name,
+    trainer.business_name,
+    trainer.first_name || COALESCE(' ' || trainer.last_name, '')
+  ) AS "providerName",
+  trainer.online_bookings_page_url_slug AS "pageUrlSlug",
+  COALESCE(trainer.online_bookings_contact_email, trainer.email) AS "contactEmail",
+  CASE
+    WHEN trainer.online_bookings_show_contact_number THEN COALESCE(trainer.online_bookings_contact_number, trainer.phone_number)
+    ELSE NULL
+  END AS "contactNumber",
+  trainer.online_bookings_duration_until_booking_window_opens::text AS "durationUntilBookingWindowOpens",
+  trainer.online_bookings_duration_until_booking_window_closes::text AS "durationUntilBookingWindowCloses",
+  trainer.online_bookings_booking_note AS "bookingNote",
+  json_build_object(
+    'defaults',
+    json_build_object(
+      'monday',
+      json_build_object(
+        'acceptingBookings',
+        trainer.online_bookings_monday_accepting_bookings,
+        'availableIntervals',
+        (
+          SELECT
+            COALESCE(
+              json_agg(ARRAY [to_char(lower(intervals), 'HH24:MI'), to_char(upper(intervals), 'HH24:MI')]),
+              '[]'
+            )
+          FROM (
+            SELECT unnest(a.online_bookings_monday_available_intervals) intervals
+            FROM trainer a
+            WHERE a.id = trainer.id
+          ) i
+          WHERE NOT isempty(intervals)
+        )
+      ),
+      'tuesday',
+      json_build_object(
+        'acceptingBookings',
+        online_bookings_tuesday_accepting_bookings,
+        'availableIntervals',
+        (
+          SELECT
+            COALESCE(
+              json_agg(ARRAY [to_char(lower(intervals), 'HH24:MI'), to_char(upper(intervals), 'HH24:MI')]),
+              '[]'
+            )
+          FROM (
+            SELECT unnest(a.online_bookings_tuesday_available_intervals) intervals
+            FROM trainer a
+            WHERE a.id = trainer.id
+          ) i
+          WHERE NOT isempty(intervals)
+        )
+      ),
+      'wednesday',
+      json_build_object(
+        'acceptingBookings',
+        trainer.online_bookings_wednesday_accepting_bookings,
+        'availableIntervals',
+        (
+          SELECT
+            COALESCE(
+              json_agg(ARRAY [to_char(lower(intervals), 'HH24:MI'), to_char(upper(intervals), 'HH24:MI')]),
+              '[]'
+            )
+          FROM (
+            SELECT unnest(a.online_bookings_wednesday_available_intervals) intervals
+            FROM trainer a
+            WHERE a.id = trainer.id
+          ) i
+          WHERE NOT isempty(intervals)
+        )
+      ),
+      'thursday',
+      json_build_object(
+        'acceptingBookings',
+        trainer.online_bookings_thursday_accepting_bookings,
+        'availableIntervals',
+        (
+          SELECT
+            COALESCE(
+              json_agg(ARRAY [to_char(lower(intervals), 'HH24:MI'), to_char(upper(intervals), 'HH24:MI')]),
+              '[]'
+            )
+          FROM (
+            SELECT unnest(a.online_bookings_thursday_available_intervals) intervals
+            FROM trainer a
+            WHERE a.id = trainer.id
+          ) i
+          WHERE NOT isempty(intervals)
+        )
+      ),
+      'friday',
+      json_build_object(
+        'acceptingBookings',
+        trainer.online_bookings_friday_accepting_bookings,
+        'availableIntervals',
+        (
+          SELECT
+            COALESCE(
+              json_agg(ARRAY [to_char(lower(intervals), 'HH24:MI'), to_char(upper(intervals), 'HH24:MI')]),
+              '[]'
+            )
+          FROM (
+            SELECT unnest(a.online_bookings_friday_available_intervals) intervals
+            FROM trainer a
+            WHERE a.id = trainer.id
+          ) i
+          WHERE NOT isempty(intervals)
+        )
+      ),
+      'saturday',
+      json_build_object(
+        'acceptingBookings',
+        trainer.online_bookings_saturday_accepting_bookings,
+        'availableIntervals',
+        (
+          SELECT
+            COALESCE(
+              json_agg(ARRAY [to_char(lower(intervals), 'HH24:MI'), to_char(upper(intervals), 'HH24:MI')]),
+              '[]'
+            )
+          FROM (
+            SELECT unnest(a.online_bookings_saturday_available_intervals) intervals
+            FROM trainer a
+            WHERE a.id = trainer.id
+          ) i
+          WHERE NOT isempty(intervals)
+        )
+      ),
+      'sunday',
+      json_build_object(
+        'acceptingBookings',
+        trainer.online_bookings_sunday_accepting_bookings,
+        'availableIntervals',
+        (
+          SELECT
+            COALESCE(
+              json_agg(ARRAY [to_char(lower(intervals), 'HH24:MI'), to_char(upper(intervals), 'HH24:MI')]),
+              '[]'
+            )
+          FROM (
+            SELECT unnest(a.online_bookings_sunday_available_intervals) intervals
+            FROM trainer a
+            WHERE a.id = trainer.id
+          ) i
+          WHERE NOT isempty(intervals)
+        )
+      )
+    ),
+    'overrides',
+    (
+      SELECT
+        COALESCE(
+          json_object_agg(
+            trainer_online_booking_override.date,
+            json_build_object(
+              'acceptingBookings',
+              trainer_online_booking_override.accepting_bookings,
+              'availableIntervals',
+              CASE
+                WHEN trainer_online_booking_override.available_intervals IS NULL THEN NULL
+                ELSE (
+                  SELECT
+                    COALESCE(
+                      json_agg(ARRAY [to_char(lower(intervals), 'HH24:MI'), to_char(upper(intervals), 'HH24:MI')]),
+                      '[]'
+                    )
+                  FROM (SELECT unnest(trainer_online_booking_override.available_intervals) intervals) i
+                  WHERE NOT isempty(intervals)
+                )
+              END
+            )
+          ),
+          '{}'::json
+        )
+      FROM trainer_online_booking_override
+      WHERE trainer_online_booking_override.trainer_id = trainer.id
+    )
+  ) AS availability,
+  (
+    SELECT
+      COALESCE(json_agg(s), '[]')
+    FROM (
+      SELECT
+        service.id,
+        product.name,
+        product.price,
+        EXTRACT(EPOCH FROM service.duration) / 60 AS "durationMinutes",
+        service.location,
+        service.address,
+        service.geo,
+        service.google_place_id AS "googlePlaceId",
+        product.description,
+        service.booking_payment_type AS "bookingPaymentType",
+        service.cover_image_url AS "coverImageUrl",
+        service.icon_url AS "iconUrl",
+        service.image_0_url AS "image0Url",
+        service.image_1_url AS "image1Url",
+        service.image_2_url AS "image2Url",
+        service.image_3_url AS "image3Url",
+        service.image_4_url AS "image4Url",
+        service.image_5_url AS "image5Url",
+        service.buffer_minutes_before AS "bufferMinutesBefore",
+        service.buffer_minutes_after AS "bufferMinutesAfter",
+        service.time_slot_frequency_minutes AS "timeSlotFrequencyMinutes",
+        product.display_order AS "displayOrder",
+        service.request_client_address_online AS "requestClientAddressOnline",
+        service.booking_question AS "bookingQuestion",
+        service.booking_question_state AS "bookingQuestionState"
+      FROM service
+      JOIN product ON service.id = product.id
+      WHERE service.trainer_id = trainer.id
+        AND service.bookable_online
+      ORDER BY product.display_order, service.created_at
+    ) s
+  ) AS services,
+  (
+    SELECT
+      COALESCE(json_agg(json_build_array(start_time, end_time)), '[]')
+    FROM (
+      SELECT
+        COALESCE(start_time, timezone(trainer.timezone, start_date)) AS start_time,
+        COALESCE(end_time, timezone(trainer.timezone, end_date)) AS end_time
+      FROM busy_time
+      WHERE trainer.id = busy_time.trainer_id
+      UNION ALL
+      SELECT
+        session.start - make_interval(mins => session.buffer_minutes_before),
+        session.start + session.duration + make_interval(mins => session.buffer_minutes_after)
+      FROM session
+      JOIN session_series ON session_series.id = session.session_series_id
+      WHERE trainer.id = session.trainer_id
+        AND session_series.event_type != 'single_session'
+      UNION ALL
+      SELECT
+        session.start - make_interval(mins => session.buffer_minutes_before),
+        session.start + session.duration + make_interval(mins => session.buffer_minutes_after)
+      FROM session
+      JOIN session_series ON session_series.id = session.session_series_id
+      LEFT JOIN client_session ON client_session.session_id = session.id
+      WHERE trainer.id = session.trainer_id
+        AND session_series.event_type = 'single_session'
+        AND client_session.state != 'cancelled'
+        AND client_session.state != 'declined'
+    ) u
+    WHERE (u.start_time, u.end_time) OVERLAPS (
+      NOW() + trainer.online_bookings_duration_until_booking_window_opens,
+      NOW() + trainer.online_bookings_duration_until_booking_window_closes + '1 hour'::interval
+    )
+  ) AS unavailability,
+  currency.alpha_code AS "currency",
+  country.alpha_2_code AS "country",
+  trainer.timezone,
+  trainer.brand_color AS "brandColor",
+  trainer.business_logo_url AS "businessLogoUrl",
+  trainer.cover_image_url AS "coverImageUrl",
+  trainer.brand_dark_mode AS "brandDarkMode",
+  trainer.online_bookings_terms_and_conditions AS "termsAndConditions",
+  trainer.online_bookings_cancellation_policy AS "cancellationPolicy",
+  trainer.stripe_account_id AS "stripeAccountId",
+  stripe.account.object->>'type' AS "stripeAccountType"
+FROM trainer
+JOIN country ON country.id = trainer.country_id
+JOIN supported_country_currency ON country.id = supported_country_currency.country_id
+JOIN currency ON currency.id = supported_country_currency.currency_id
+JOIN vw_legacy_trainer ON trainer.id = vw_legacy_trainer.id
+LEFT JOIN stripe.account ON stripe.account.id = trainer.stripe_account_id
+WHERE trainer.online_bookings_page_url_slug IS NOT NULL;
+
+--
+-- Name: infinity_timestamptz(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE OR REPLACE FUNCTION public.infinity_timestamptz()
+RETURNS timestamptz
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT 'infinity'::timestamptz;
+$$;
+
 
 --
 -- PostgreSQL database dump complete

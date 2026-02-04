@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { validate as validateUuid, NIL as NIL_UUID } from 'uuid'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import {
   authenticateTrainerOrClientRequest,
   authenticateTrainerRequest,
@@ -142,8 +142,8 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         .leftJoin('payment as payment', 'payment.sale_id', 'sale.id')
         .select((eb) => [
           eb.ref('sale.id').as('id'),
-          sql<boolean>`COALESCE(${sql.ref('salePaymentStatus.payment_status')} = 'paid', FALSE)`.as('paidFor'),
-          sql<boolean>`COALESCE(BOOL_OR(${sql.ref('payment.is_stripe')}), FALSE)`.as('paidByStripe'),
+          eb.fn.coalesce(eb('salePaymentStatus.payment_status', '=', 'paid'), false).as('paidFor'),
+          eb.fn.coalesce(eb.fn.agg('bool_or', [eb.ref('payment.is_stripe')]), false).as('paidByStripe'),
         ])
         .where('sale.id', '=', saleId)
         .where('sale.trainer_id', '=', auth.trainerId)

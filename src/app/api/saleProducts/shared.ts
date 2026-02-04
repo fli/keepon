@@ -1,5 +1,6 @@
+import type { ExpressionBuilder } from 'kysely'
 import { z } from 'zod'
-import { db, sql, type Point } from '@/lib/db'
+import { db, type Database, type Point } from '@/lib/db'
 
 const moneyString = z.string().regex(/^-?\d+(?:\.\d{2})$/, 'Money values must be formatted with two decimal places')
 
@@ -193,22 +194,19 @@ export const fetchSaleProducts = async (
   trainerId: string,
   filters: FetchSaleProductFilters = {}
 ): Promise<RawSaleProductRow[]> => {
-  const combinedUpdatedAt = sql<Date>`
-    GREATEST(
-      ${sql.ref('saleProduct.updated_at')},
-      COALESCE(${sql.ref('saleCreditPack.updated_at')}, ${sql.ref('saleProduct.updated_at')}),
-      COALESCE(${sql.ref('saleService.updated_at')}, ${sql.ref('saleProduct.updated_at')}),
-      COALESCE(${sql.ref('saleItem.updated_at')}, ${sql.ref('saleProduct.updated_at')})
-    )
-  `
+  const combinedUpdatedAt = (eb: ExpressionBuilder<Database, any>) =>
+    eb.fn('greatest', [
+      eb.ref('saleProduct.updated_at'),
+      eb.fn.coalesce(eb.ref('saleCreditPack.updated_at'), eb.ref('saleProduct.updated_at')),
+      eb.fn.coalesce(eb.ref('saleService.updated_at'), eb.ref('saleProduct.updated_at')),
+      eb.fn.coalesce(eb.ref('saleItem.updated_at'), eb.ref('saleProduct.updated_at')),
+    ])
 
   const creditUsage = db
     .selectFrom('payment_credit_pack as paymentCreditPack')
     .select((eb) => [
       eb.ref('paymentCreditPack.sale_credit_pack_id').as('saleCreditPackId'),
-      sql<number>`
-        COALESCE(SUM(${sql.ref('paymentCreditPack.credits_used')}), 0)::int4
-      `.as('creditsUsed'),
+      eb.cast<number>(eb.fn.coalesce(eb.fn.sum('paymentCreditPack.credits_used'), 0), 'int4').as('creditsUsed'),
     ])
     .groupBy('paymentCreditPack.sale_credit_pack_id')
     .as('creditUsage')
@@ -236,18 +234,19 @@ export const fetchSaleProducts = async (
       eb.ref('saleProduct.price').as('price'),
       eb.ref('currency.alpha_code').as('currency'),
       eb.ref('saleProduct.created_at').as('createdAt'),
-      combinedUpdatedAt.as('combinedUpdatedAt'),
+      combinedUpdatedAt(eb).as('combinedUpdatedAt'),
       eb.ref('saleProduct.is_credit_pack').as('isCreditPack'),
       eb.ref('saleProduct.is_item').as('isItem'),
       eb.ref('saleProduct.is_service').as('isService'),
       eb.ref('saleProduct.is_membership').as('isMembership'),
       eb.ref('saleCreditPack.total_credits').as('totalCredits'),
-      sql<number | null>`
-        CASE
-          WHEN ${sql.ref('saleService.duration')} IS NULL THEN NULL
-          ELSE EXTRACT(EPOCH FROM ${sql.ref('saleService.duration')}) / 60
-        END
-      `.as('durationMinutes'),
+      eb
+        .case()
+        .when('saleService.duration', 'is', null)
+        .then(null)
+        .else(eb(eb.fn('date_part', [eb.val('epoch'), eb.ref('saleService.duration')]), '/', 60))
+        .end()
+        .as('durationMinutes'),
       eb.ref('saleService.location').as('location'),
       eb.ref('saleService.address').as('address'),
       eb.ref('saleService.google_place_id').as('googlePlaceId'),
@@ -281,7 +280,7 @@ export const fetchSaleProducts = async (
 
   if (filters.updatedAfter) {
     const updatedAfterDate = filters.updatedAfter
-    query = query.where(({ eb }) => eb(combinedUpdatedAt, '>', updatedAfterDate))
+    query = query.where(({ eb }) => eb(combinedUpdatedAt(eb), '>', updatedAfterDate))
   }
 
   return query.orderBy('saleProduct.created_at', 'desc').execute() as Promise<RawSaleProductRow[]>

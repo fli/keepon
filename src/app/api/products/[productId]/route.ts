@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { intervalFromMinutes, toPoint } from '@/lib/db/values'
 import { getProductById, moneyString } from '@/server/products'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
@@ -379,7 +380,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         const serviceUpdate: Record<string, unknown> = {}
 
         if (durationMinutes !== undefined) {
-          serviceUpdate.duration = sql`make_interval(mins := ${durationMinutes})`
+          serviceUpdate.duration = intervalFromMinutes(durationMinutes)
         }
 
         if (location !== undefined) {
@@ -395,7 +396,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         }
 
         if (geo !== undefined) {
-          serviceUpdate.geo = geo === null ? null : sql`point(${geo.lat}, ${geo.lng})`
+          serviceUpdate.geo = geo === null ? null : toPoint(geo.lat, geo.lng)
         }
 
         if (bookableOnline !== undefined) {

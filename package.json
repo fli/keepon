@@ -4,23 +4,26 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "check:workflow-parity": "tsx scripts/check-workflow-parity.ts",
     "codegen": "kysely-codegen",
     "dev": "next dev --turbo -p 3001",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint --type-aware .",
     "start": "next start -p 3001",
-    "sync:reference-data": "tsx scripts/sync-reference-data.ts",
-    "typecheck": "tsgo --noEmit"
+    "sync:reference-data": "tsx scripts/sync-reference-data.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.1.0",
     "@google-cloud/storage": "^7.18.0",
+    "@mailchimp/mailchimp_marketing": "^3.0.80",
     "@orpc/client": "1.13.4",
     "@orpc/server": "1.13.4",
     "@orpc/tanstack-query": "1.13.4",
+    "@parse/node-apn": "^6.0.0",
     "@stripe/react-stripe-js": "^5.6.0",
     "@stripe/stripe-js": "^8.7.0",
+    "@workflow/world-postgres": "4.1.0-beta.30",
     "bignumber.js": "^9.3.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -38,6 +41,7 @@
     "stripe": "20.3.0",
     "tailwind-merge": "^3.4.0",
     "uuid": "^13.0.0",
+    "workflow": "4.1.0-beta.52",
     "zod": "4.3.6"
   },
   "devDependencies": {

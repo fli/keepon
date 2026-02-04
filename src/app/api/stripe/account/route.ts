@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerOrClientRequest, buildErrorResponse } from '../../_lib/accessToken'
 
 const stripeAccountSchema = z.object({
@@ -139,15 +139,25 @@ export async function GET(request: Request) {
       .selectFrom('client')
       .innerJoin('trainer', 'trainer.id', 'client.trainer_id')
       .innerJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
-      .select(() => [
-        sql<string>`${sql.ref('stripeAccount.id')}`.as('id'),
-        sql<string>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('type'),
-      ])
+      .select((eb) => [eb.ref('stripeAccount.id').as('id'), eb.ref('stripeAccount.object').as('stripeAccountObject')])
       .where('client.id', '=', authorization.clientId)
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()
 
-    const parsedRow = clientStripeAccountRowSchema.safeParse(row)
+    const stripeAccountValue = row?.stripeAccountObject
+    const stripeAccountType =
+      stripeAccountValue && typeof stripeAccountValue === 'object' && 'type' in stripeAccountValue
+        ? ((stripeAccountValue as { type?: string }).type ?? null)
+        : null
+
+    const parsedRow = clientStripeAccountRowSchema.safeParse(
+      row
+        ? {
+            id: row.id,
+            type: stripeAccountType,
+          }
+        : row
+    )
     if (!parsedRow.success) {
       if (!row) {
         return stripeAccountNotFoundResponse()

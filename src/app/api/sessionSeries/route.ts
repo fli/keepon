@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import {
+  addDaysToLocalDateTime,
+  compareLocalDateTimes,
+  isoLocalDateTimeToUtc,
+  localDateTimeToUtc,
+  parseIsoLocalDateTime,
+} from '@/lib/dates/timezone'
+import { db } from '@/lib/db'
+import { intervalFromDays, intervalFromMinutes, toPoint } from '@/lib/db/values'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { parseStrictJsonBody } from '../_lib/strictJson'
 import { normalizeSessionSeriesRow, type RawSessionSeriesRow } from './shared'
@@ -173,6 +181,39 @@ class ClientNotFoundError extends Error {
     super('Client not found for trainer')
     this.name = 'ClientNotFoundError'
   }
+}
+
+const buildSessionStarts = (options: {
+  startDate: string
+  endDate: string | null | undefined
+  repeatsEvery: number | null | undefined
+  timeZone: string
+}): Date[] => {
+  const startParts = parseIsoLocalDateTime(options.startDate)
+  const endParts = options.endDate ? parseIsoLocalDateTime(options.endDate) : null
+  const stepDays = options.repeatsEvery ?? null
+
+  if (!stepDays && !endParts) {
+    return [isoLocalDateTimeToUtc(options.startDate, options.timeZone)]
+  }
+
+  if (stepDays && !endParts) {
+    return []
+  }
+
+  if (!stepDays) {
+    return [isoLocalDateTimeToUtc(options.startDate, options.timeZone)]
+  }
+
+  const starts: Date[] = []
+  let current = startParts
+
+  while (compareLocalDateTimes(current, endParts) <= 0) {
+    starts.push(localDateTimeToUtc(current, options.timeZone))
+    current = addDaysToLocalDateTime(current, stepDays)
+  }
+
+  return starts
 }
 
 const querySchema = z.object({
@@ -352,150 +393,111 @@ export async function POST(request: Request) {
       const eventType =
         data.sessionType === 'event' ? 'event' : data.sessionType === 'single' ? 'single_session' : 'group_session'
 
-      const seriesInsert = await sql<{ id: string; timezone: string }>`
-        INSERT INTO session_series (
-          trainer_id,
-          event_type,
-          duration,
-          start,
-          end_,
-          daily_recurrence_interval,
-          location,
-          timezone,
-          price,
-          name,
-          color,
-          session_icon_id
-        )
-        SELECT
-          trainer.id,
-          ${eventType},
-          make_interval(mins => ${Math.round(data.sessionLength * 60)}),
-          timezone(${data.timezone ?? sql`trainer.timezone`}, ${data.startDate}::timestamp),
-          ${data.endDate ? sql`timezone(${data.timezone ?? sql`trainer.timezone`}, ${data.endDate}::timestamp)` : sql`NULL`},
-          ${data.repeatsEvery ? sql`${data.repeatsEvery} * '1 day'::interval` : sql`NULL`},
-          ${data.location ?? null},
-          ${data.timezone ?? sql`trainer.timezone`},
-          ${data.price ?? null},
-          ${data.sessionName ?? null},
-          ${data.sessionColor ?? null},
-          ${data.avatarName ?? null}
-        FROM trainer
-        WHERE trainer.id = ${authorization.trainerId}
-        RETURNING id, timezone
-      `.execute(trx)
+      const trainerRow = await trx
+        .selectFrom('trainer')
+        .select(['id', 'timezone'])
+        .where('id', '=', authorization.trainerId)
+        .executeTakeFirst()
 
-      const sessionSeriesId = seriesInsert.rows[0]?.id
+      if (!trainerRow) {
+        throw new Error('Failed to load trainer data for session series')
+      }
+
+      const seriesTimezone = data.timezone ?? trainerRow.timezone ?? 'UTC'
+      const duration = intervalFromMinutes(Math.round(data.sessionLength * 60))
+
+      const seriesInsert = await trx
+        .insertInto('session_series')
+        .values({
+          trainer_id: authorization.trainerId,
+          event_type: eventType,
+          duration,
+          start: isoLocalDateTimeToUtc(data.startDate, seriesTimezone),
+          end_: data.endDate ? isoLocalDateTimeToUtc(data.endDate, seriesTimezone) : null,
+          daily_recurrence_interval: data.repeatsEvery ? intervalFromDays(data.repeatsEvery) : null,
+          location: data.location ?? null,
+          timezone: seriesTimezone,
+          price: data.price ?? null,
+          name: data.sessionName ?? null,
+          color: data.sessionColor ?? null,
+          session_icon_id: data.avatarName ?? null,
+        })
+        .returning(['id', 'timezone'])
+        .executeTakeFirst()
+
+      const sessionSeriesId = seriesInsert?.id
 
       if (!sessionSeriesId) {
         throw new Error('Failed to create session series')
       }
 
-      const spReminder1Interval = data.serviceProviderReminder1?.timeBeforeStart
-        ? sql`${data.serviceProviderReminder1.timeBeforeStart}::interval`
-        : appReminderTriggerMinutes !== null
-          ? sql`make_interval(mins => ${appReminderTriggerMinutes})`
-          : sql`NULL`
+      const spReminder1Interval =
+        data.serviceProviderReminder1?.timeBeforeStart ??
+        (appReminderTriggerMinutes !== null ? intervalFromMinutes(appReminderTriggerMinutes) : null)
 
       const spReminder1Type =
         data.serviceProviderReminder1?.type ??
         (appReminderTriggerMinutes !== null ? 'notification' : 'emailAndNotification')
 
-      const spReminder2Interval = data.serviceProviderReminder2?.timeBeforeStart
-        ? sql`${data.serviceProviderReminder2.timeBeforeStart}::interval`
-        : sql`NULL`
+      const spReminder2Interval = data.serviceProviderReminder2?.timeBeforeStart ?? null
       const spReminder2Type = data.serviceProviderReminder2?.type ?? 'emailAndNotification'
 
-      const clientReminder1Interval = data.clientReminder1?.timeBeforeStart
-        ? sql`${data.clientReminder1.timeBeforeStart}::interval`
-        : sql`NULL`
+      const clientReminder1Interval = data.clientReminder1?.timeBeforeStart ?? null
       const clientReminder1Type = data.clientReminder1?.type ?? 'email'
 
-      const clientReminder2Interval = data.clientReminder2?.timeBeforeStart
-        ? sql`${data.clientReminder2.timeBeforeStart}::interval`
-        : sql`NULL`
+      const clientReminder2Interval = data.clientReminder2?.timeBeforeStart ?? null
       const clientReminder2Type = data.clientReminder2?.type ?? 'email'
 
-      const cancellationInterval = sql`${data.cancellationAdvanceNoticeDuration ?? 'P1D'}::interval`
+      const sessionStarts = buildSessionStarts({
+        startDate: data.startDate,
+        endDate: data.endDate,
+        repeatsEvery: data.repeatsEvery,
+        timeZone: seriesTimezone,
+      })
 
-      const sessionInsert = await sql<{ id: string; start: Date }>`
-        INSERT INTO session (
-          session_series_id,
-          start,
-          duration,
-          timezone,
-          maximum_attendance,
-          trainer_id,
-          location,
-          address,
-          geo,
-          google_place_id,
-          service_id,
-          service_provider_reminder_1,
-          service_provider_reminder_2,
-          service_provider_reminder_1_type,
-          service_provider_reminder_2_type,
-          client_reminder_1,
-          client_reminder_2,
-          client_reminder_1_type,
-          client_reminder_2_type,
-          buffer_minutes_before,
-          buffer_minutes_after,
-          bookable_online,
-          description,
-          booking_payment_type,
-          can_clients_cancel,
-          cancellation_advance_notice_duration,
-          request_client_address_online,
-          booking_question,
-          booking_question_state
-        )
-        SELECT
-          ss.id,
-          timezone(ss.timezone, generate_series(
-            timezone(ss.timezone, ss.start),
-            CASE
-              WHEN ss.daily_recurrence_interval IS NOT NULL THEN timezone(ss.timezone, ss.end_)
-              ELSE timezone(ss.timezone, ss.start)
-            END,
-            coalesce(ss.daily_recurrence_interval, '1 day'::interval)
-          )),
-          ss.duration,
-          ss.timezone,
-          ${data.maximumAttendance ?? null},
-          ss.trainer_id,
-          ${data.location ?? null},
-          ${data.address ?? null},
-          ${data.geo ? sql`point(${data.geo.lat}, ${data.geo.lng})` : sql`NULL`}::point,
-          ${data.googlePlaceId ?? null},
-          ${data.serviceId ?? null},
-          ${spReminder1Interval},
-          ${spReminder2Interval},
-          ${spReminder1Type},
-          ${spReminder2Type},
-          ${clientReminder1Interval},
-          ${clientReminder2Interval},
-          ${clientReminder1Type},
-          ${clientReminder2Type},
-          ${data.bufferMinutesBefore ?? 0},
-          ${data.bufferMinutesAfter ?? 0},
-          ${data.bookableOnline ?? false},
-          ${data.description ?? null},
-          ${data.bookingPaymentType ?? 'noPrepayment'},
-          ${data.canClientsCancel ?? false},
-          ${cancellationInterval},
-          ${data.requestClientAddressOnline ?? null},
-          ${data.bookingQuestion ?? null},
-          ${data.bookingQuestionState ?? null}
-        FROM session_series ss
-        WHERE ss.id = ${sessionSeriesId}
-        RETURNING id, start
-      `.execute(trx)
-
-      const sessionRows = sessionInsert.rows
-      if (sessionRows.length === 0) {
+      if (sessionStarts.length === 0) {
         throw new Error('Failed to create sessions for session series')
       }
+
+      const sessionInsert = await trx
+        .insertInto('session')
+        .values(
+          sessionStarts.map((start) => ({
+            session_series_id: sessionSeriesId,
+            start,
+            duration,
+            timezone: seriesTimezone,
+            maximum_attendance: data.maximumAttendance ?? null,
+            trainer_id: authorization.trainerId,
+            location: data.location ?? null,
+            address: data.address ?? null,
+            geo: data.geo ? toPoint(data.geo.lat, data.geo.lng) : null,
+            google_place_id: data.googlePlaceId ?? null,
+            service_id: data.serviceId ?? null,
+            service_provider_reminder_1: spReminder1Interval,
+            service_provider_reminder_2: spReminder2Interval,
+            service_provider_reminder_1_type: spReminder1Type,
+            service_provider_reminder_2_type: spReminder2Type,
+            client_reminder_1: clientReminder1Interval,
+            client_reminder_2: clientReminder2Interval,
+            client_reminder_1_type: clientReminder1Type,
+            client_reminder_2_type: clientReminder2Type,
+            buffer_minutes_before: data.bufferMinutesBefore ?? 0,
+            buffer_minutes_after: data.bufferMinutesAfter ?? 0,
+            bookable_online: data.bookableOnline ?? false,
+            description: data.description ?? null,
+            booking_payment_type: data.bookingPaymentType ?? 'noPrepayment',
+            can_clients_cancel: data.canClientsCancel ?? false,
+            cancellation_advance_notice_duration: data.cancellationAdvanceNoticeDuration ?? 'P1D',
+            request_client_address_online: data.requestClientAddressOnline ?? null,
+            booking_question: data.bookingQuestion ?? null,
+            booking_question_state: data.bookingQuestionState ?? null,
+          }))
+        )
+        .returning(['id', 'start'])
+        .execute()
+
+      const sessionRows = sessionInsert
 
       const sessionIds = sessionRows.map((row) => row.id)
       const earliestStart = sessionRows.reduce<Date>((earliest, row) => {
@@ -584,10 +586,10 @@ export async function POST(request: Request) {
                 .values({
                   id: saleProductId,
                   trainer_id: authorization.trainerId,
-                  duration: sql`make_interval(mins => ${saleProduct.durationMinutes})`,
+                  duration: intervalFromMinutes(saleProduct.durationMinutes),
                   location: saleProduct.location ?? null,
                   address: saleProduct.address ?? null,
-                  geo: saleProduct.geo ? sql`point(${saleProduct.geo.lat}, ${saleProduct.geo.lng})` : null,
+                  geo: saleProduct.geo ? toPoint(saleProduct.geo.lat, saleProduct.geo.lng) : null,
                   google_place_id: saleProduct.googlePlaceId ?? null,
                 })
                 .executeTakeFirst()

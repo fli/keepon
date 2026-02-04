@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 
 const paramsSchema = z.object({
@@ -124,31 +124,47 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
 
   try {
     const transactionResult = await db.transaction().execute(async (trx) => {
-      const detailsResult = await sql<RawDetailRow>`
-        SELECT
-          session.id AS session_id,
-          client_session.id AS client_session_id,
-          COALESCE(sale_payment_status.payment_status = 'paid', FALSE) AS paid_for,
-          deletable_payments.sale_id AS deletable_sale_id
-        FROM session
-        JOIN session_series ON session_series.id = session.session_series_id
-        LEFT JOIN client_session ON client_session.session_id = session.id
-        LEFT JOIN sale_payment_status
-          ON sale_payment_status.sale_id = client_session.sale_id
-        LEFT JOIN (
-          SELECT sale_id
-            FROM payment
-           WHERE payment.is_credit_pack OR payment.is_subscription
-        ) AS deletable_payments
-          ON deletable_payments.sale_id = client_session.sale_id
-       WHERE session_series.id = ${sessionSeriesId}
-         AND session_series.trainer_id = ${authorization.trainerId}
-         AND session.start >= (
-           SELECT start FROM session WHERE id = ${sessionId}
-         )
-      `.execute(trx)
+      const referenceSession = await trx
+        .selectFrom('session')
+        .select('start')
+        .where('id', '=', sessionId)
+        .executeTakeFirst()
 
-      const details = normalizeDetails(detailsResult.rows)
+      if (!referenceSession) {
+        throw new SessionSeriesNotFoundError()
+      }
+
+      const deletablePayments = trx
+        .selectFrom('payment')
+        .select('sale_id')
+        .where((eb) => eb.or([eb('payment.is_credit_pack', '=', true), eb('payment.is_subscription', '=', true)]))
+        .as('deletable_payments')
+
+      const detailRows = await trx
+        .selectFrom('session')
+        .innerJoin('session_series', 'session_series.id', 'session.session_series_id')
+        .leftJoin('client_session', 'client_session.session_id', 'session.id')
+        .leftJoin('sale_payment_status', 'sale_payment_status.sale_id', 'client_session.sale_id')
+        .leftJoin(deletablePayments, 'deletable_payments.sale_id', 'client_session.sale_id')
+        .select((eb) => [
+          eb.ref('session.id').as('session_id'),
+          eb.ref('client_session.id').as('client_session_id'),
+          eb.ref('sale_payment_status.payment_status').as('payment_status'),
+          eb.ref('deletable_payments.sale_id').as('deletable_sale_id'),
+        ])
+        .where('session_series.id', '=', sessionSeriesId)
+        .where('session_series.trainer_id', '=', authorization.trainerId)
+        .where('session.start', '>=', referenceSession.start)
+        .execute()
+
+      const details = normalizeDetails(
+        detailRows.map((row) => ({
+          session_id: row.session_id,
+          client_session_id: row.client_session_id ?? null,
+          paid_for: row.payment_status === 'paid',
+          deletable_sale_id: row.deletable_sale_id ?? null,
+        }))
+      )
 
       if (details.length === 0) {
         throw new SessionSeriesNotFoundError()
@@ -195,17 +211,21 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         throw new Error(`Deleted ${deletedSessions.length} of ${sessionIds.length} sessions`)
       }
 
-      const deletedSessionSeriesResult = await sql<{ id: string }>`
-        DELETE FROM session_series
-         WHERE id = ${sessionSeriesId}
-           AND trainer_id = ${authorization.trainerId}
-           AND NOT EXISTS (
-             SELECT 1
-               FROM session
-              WHERE session.session_series_id = ${sessionSeriesId}
-           )
-         RETURNING id
-      `.execute(trx)
+      const remainingSession = await trx
+        .selectFrom('session')
+        .select('id')
+        .where('session_series_id', '=', sessionSeriesId)
+        .limit(1)
+        .executeTakeFirst()
+
+      const deletedSessionSeriesResult = remainingSession
+        ? []
+        : await trx
+            .deleteFrom('session_series')
+            .where('id', '=', sessionSeriesId)
+            .where('trainer_id', '=', authorization.trainerId)
+            .returning('id')
+            .execute()
 
       const deletedClientSessions = details
         .map((detail) => detail.clientSessionId)
@@ -216,7 +236,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         deletedClientSessions,
         deletedPayments: deletedClientSessions,
         deletedSessions: deletedSessions.map((row) => row.id),
-        deletedSessionSeries: deletedSessionSeriesResult.rows.map((row) => row.id),
+        deletedSessionSeries: deletedSessionSeriesResult.map((row) => row.id),
       }
     })
 

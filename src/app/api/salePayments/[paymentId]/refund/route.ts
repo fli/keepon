@@ -3,7 +3,7 @@ import BigNumber from 'bignumber.js'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { z, ZodError } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { adaptSalePaymentRow, salePaymentSchema, type SalePaymentRow } from '../../../_lib/salePayments'
 import { getStripeClient, STRIPE_API_VERSION } from '../../../_lib/stripeClient'
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       const updateResult = await trx
         .updateTable('payment')
         .set({
-          refunded_time: sql<Date>`NOW()`,
+          refunded_time: new Date(),
         })
         .where('id', '=', paymentId)
         .where('trainer_id', '=', authorization.trainerId)
@@ -164,13 +164,26 @@ export async function POST(request: NextRequest, context: HandlerContext) {
             eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
             eb.ref('paymentStripe.fee').as('fee'),
             eb.ref('payment.amount').as('amount'),
-            sql<string | null>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('stripeAccountType'),
+            eb.ref('stripeAccount.object').as('stripeAccountObject'),
           ])
           .where('paymentStripe.id', '=', paymentId)
           .where('paymentStripe.trainer_id', '=', authorization.trainerId)
           .executeTakeFirst()
 
-        const stripeDetailsResult = stripeDetailsSchema.safeParse(stripeDetailsRow)
+        const stripeAccountValue = stripeDetailsRow?.stripeAccountObject
+        const stripeAccountTypeValue =
+          stripeAccountValue && typeof stripeAccountValue === 'object' && 'type' in stripeAccountValue
+            ? ((stripeAccountValue as { type?: string }).type ?? null)
+            : null
+
+        const stripeDetailsResult = stripeDetailsSchema.safeParse(
+          stripeDetailsRow
+            ? {
+                ...stripeDetailsRow,
+                stripeAccountType: stripeAccountTypeValue,
+              }
+            : stripeDetailsRow
+        )
 
         if (!stripeDetailsResult.success) {
           throw new StripePaymentsDisabledError()
@@ -223,7 +236,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
             .insertInto('stripe_resource')
             .values({
               id: refund.id,
-              api_version: sql<Date>`cast(${STRIPE_API_VERSION} as date)`,
+              api_version: STRIPE_API_VERSION,
               object: JSON.stringify(refund),
             })
             .execute()

@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { intervalFromMinutes } from '@/lib/db/values'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { normalizeSessionSeriesRow, type RawSessionSeriesRow } from '../shared'
 
@@ -234,17 +235,17 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
       if (parsedBody.reminderHours !== undefined) {
         const reminderInterval =
-          parsedBody.reminderHours === -1
-            ? sql`NULL`
-            : sql`${Math.round(parsedBody.reminderHours * 60)} * '1 minute'::interval`
+          parsedBody.reminderHours === -1 ? null : intervalFromMinutes(Math.round(parsedBody.reminderHours * 60))
 
-        await sql`
-          UPDATE session
-             SET service_provider_reminder_1 = ${reminderInterval},
-                 service_provider_reminder_1_type = 'notification'
-           WHERE session_series_id = ${sessionSeriesId}
-             AND trainer_id = ${authorization.trainerId}
-        `.execute(trx)
+        await trx
+          .updateTable('session')
+          .set({
+            service_provider_reminder_1: reminderInterval,
+            service_provider_reminder_1_type: 'notification',
+          })
+          .where('session_series_id', '=', sessionSeriesId)
+          .where('trainer_id', '=', authorization.trainerId)
+          .execute()
       }
 
       const updatedRow = await trx

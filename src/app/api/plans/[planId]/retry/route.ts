@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 import { authenticateClientRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../../_lib/strictJson'
 
@@ -43,6 +44,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         throw new SubscriptionNotFoundError()
       }
 
+      const now = new Date()
       const outstandingPayments = await trx
         .selectFrom('payment_plan_payment as paymentPlanPayment')
         .innerJoin('payment_plan as planRecord', 'planRecord.id', 'paymentPlanPayment.payment_plan_id')
@@ -54,25 +56,26 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
             eb.and([
               eb(eb.ref('paymentPlanPayment.status'), '=', 'pending'),
               eb(eb.ref('planRecord.status'), '=', 'active'),
-              eb(eb.ref('planRecord.end_'), '>', sql<Date>`NOW()`),
+              eb(eb.ref('planRecord.end_'), '>', now),
             ]),
             eb(eb.ref('paymentPlanPayment.status'), '=', 'rejected'),
           ])
         )
-        .where('paymentPlanPayment.date', '<=', sql<Date>`NOW()`)
+        .where('paymentPlanPayment.date', '<=', now)
         .where('paymentPlanPayment.amount_outstanding', '>', '0')
         .execute()
 
-      await sql`
-        INSERT INTO task_queue (task_type, data)
-        VALUES (
-          'payment-plan.charge-outstanding',
-          ${JSON.stringify({
-            paymentPlanId: planId,
-            forScheduledTask: false,
-          })}::jsonb
-        )
-      `.execute(trx)
+      await enqueueWorkflowTask(
+        trx,
+        'payment-plan.charge-outstanding',
+        {
+          paymentPlanId: planId,
+          forScheduledTask: false,
+        },
+        {
+          dedupeKey: `payment-plan.charge-outstanding:${planId}`,
+        }
+      )
 
       return { attempted: outstandingPayments.length }
     })

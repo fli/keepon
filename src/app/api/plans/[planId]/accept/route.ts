@@ -2,7 +2,8 @@ import type { NextRequest } from 'next/server'
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 import { authenticateClientRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../../_lib/strictJson'
 import { normalizePlanRow, type RawPlanRow } from '../../shared'
@@ -139,46 +140,36 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       const clientName = joinName(details.clientFirstName, details.clientLastName)
       const planName = details.name ?? 'Subscription'
 
-      const missionResultPromise = sql<{ id: string }>`
-        UPDATE mission
-           SET completed_at = NOW()
-         WHERE trainer_id = ${details.trainerId}
-           AND completed_at IS NULL
-           AND id = 'createActiveSubscription'
-        RETURNING id
-      `.execute(trx)
+      const now = new Date()
 
-      const acceptancePromise = sql`
-        INSERT INTO payment_plan_acceptance (
-          trainer_id,
-          payment_plan_id,
-          date,
-          ip_address,
-          amount,
-          end_
-        )
-        SELECT
-          trainer_id,
-          id,
-          NOW(),
-          ${ipAddress ?? null},
-          amount,
-          end_
-        FROM payment_plan
-        WHERE id = ${planId}
-          AND client_id = ${authorization.clientId}
-          AND trainer_id = ${authorization.trainerId}
-      `.execute(trx)
+      const missionResultPromise = trx
+        .updateTable('mission')
+        .set({ completed_at: now })
+        .where('trainer_id', '=', details.trainerId)
+        .where('completed_at', 'is', null)
+        .where('id', '=', 'createActiveSubscription')
+        .returning('id')
+        .execute()
 
-      const updatePlanPromise = sql`
-        UPDATE payment_plan
-           SET status = CASE status WHEN 'pending' THEN 'active' ELSE status END,
-               accepted_amount = amount,
-               accepted_end = end_
-         WHERE id = ${planId}
-           AND client_id = ${authorization.clientId}
-           AND trainer_id = ${authorization.trainerId}
-      `.execute(trx)
+      const planRowPromise = trx
+        .selectFrom('payment_plan')
+        .select(['trainer_id', 'id', 'amount', 'end_', 'status'])
+        .where('id', '=', planId)
+        .where('client_id', '=', authorization.clientId)
+        .where('trainer_id', '=', authorization.trainerId)
+        .executeTakeFirst()
+
+      const updatePlanPromise = trx
+        .updateTable('payment_plan')
+        .set((eb) => ({
+          status: details.status === 'pending' ? 'active' : details.status,
+          accepted_amount: eb.ref('amount'),
+          accepted_end: eb.ref('end_'),
+        }))
+        .where('id', '=', planId)
+        .where('client_id', '=', authorization.clientId)
+        .where('trainer_id', '=', authorization.trainerId)
+        .execute()
 
       const primaryNotification = {
         paymentPlanId: planId,
@@ -189,70 +180,91 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         userId: details.trainerUserId,
       }
 
-      const notifyPromise = sql`
-        INSERT INTO task_queue (task_type, data)
-        VALUES ('user.notify', ${JSON.stringify(primaryNotification)}::jsonb)
-      `.execute(trx)
+      const notifyPromise = enqueueWorkflowTask(trx, 'user.notify', primaryNotification, {
+        dedupeKey: `user.notify:planAccept:${planId}:termsAccepted`,
+      })
 
-      const [missionResult] = await Promise.all([
+      const [missionResult, planRowSnapshot] = await Promise.all([
         missionResultPromise,
-        acceptancePromise,
+        planRowPromise,
         updatePlanPromise,
         notifyPromise,
       ])
 
+      if (!planRowSnapshot) {
+        throw new SubscriptionNotFoundError()
+      }
+
+      await trx
+        .insertInto('payment_plan_acceptance')
+        .values({
+          trainer_id: planRowSnapshot.trainer_id,
+          payment_plan_id: planRowSnapshot.id,
+          date: now,
+          ip_address: ipAddress ?? null,
+          amount: planRowSnapshot.amount,
+          end_: planRowSnapshot.end_,
+        })
+        .execute()
+
       const missionRow = missionResult.rows[0] ?? null
 
       if (missionRow) {
-        const rewardResult = await sql<{ id: string }>`
-          INSERT INTO reward (trainer_id, type)
-          SELECT id, '3TextCredits'
-            FROM vw_legacy_trainer
-           WHERE subscription->>'status' != 'subscribed'
-             AND id = ${details.trainerId}
-          RETURNING id
-        `.execute(trx)
+        const trainerStatusRow = await trx
+          .selectFrom('vw_legacy_trainer')
+          .select((eb) => eb.fn('json_extract_path_text', [eb.ref('subscription'), 'status']).as('status'))
+          .where('id', '=', details.trainerId)
+          .executeTakeFirst()
 
-        const rewardRow = rewardResult.rows[0] ?? null
+        const isSubscribed = trainerStatusRow?.status === 'subscribed'
+        const rewardRow = !isSubscribed
+          ? await trx
+              .insertInto('reward')
+              .values({ trainer_id: details.trainerId, type: '3TextCredits' })
+              .returning('id')
+              .executeTakeFirst()
+          : null
 
         await Promise.all([
           rewardRow
-            ? sql`
-                UPDATE mission
-                   SET reward_id = ${rewardRow.id}
-                 WHERE trainer_id = ${details.trainerId}
-                   AND id = ${missionRow.id}
-              `.execute(trx)
+            ? trx
+                .updateTable('mission')
+                .set({ reward_id: rewardRow.id })
+                .where('trainer_id', '=', details.trainerId)
+                .where('id', '=', missionRow.id)
+                .execute()
             : Promise.resolve(),
-          sql`
-            INSERT INTO task_queue (task_type, data)
-            VALUES (
-              'user.notify',
-              ${JSON.stringify({
-                title: "You've sold your first subscription! 🎉",
-                body: rewardRow
-                  ? 'Yay for recurring income! Claim your reward for completing a mission! 🎁'
-                  : "Yay, you've completed a mission!",
-                userId: details.trainerUserId,
-                messageType: 'success',
-                notificationType: 'general',
-              })}::jsonb
-            )
-          `.execute(trx),
+          enqueueWorkflowTask(
+            trx,
+            'user.notify',
+            {
+              title: "You've sold your first subscription! 🎉",
+              body: rewardRow
+                ? 'Yay for recurring income! Claim your reward for completing a mission! 🎁'
+                : "Yay, you've completed a mission!",
+              userId: details.trainerUserId,
+              messageType: 'success',
+              notificationType: 'general',
+            },
+            {
+              dedupeKey: `user.notify:planAccept:${planId}:firstSubscription`,
+            }
+          ),
         ])
       }
 
       try {
-        await sql`
-          INSERT INTO task_queue (task_type, data)
-          VALUES (
-            'payment-plan.charge-outstanding',
-            ${JSON.stringify({
-              paymentPlanId: planId,
-              forScheduledTask: false,
-            })}::jsonb
-          )
-        `.execute(trx)
+        await enqueueWorkflowTask(
+          trx,
+          'payment-plan.charge-outstanding',
+          {
+            paymentPlanId: planId,
+            forScheduledTask: false,
+          },
+          {
+            dedupeKey: `payment-plan.charge-outstanding:${planId}`,
+          }
+        )
       } catch (chargeError) {
         console.warn('Failed to enqueue outstanding charge for subscription acceptance', {
           planId,

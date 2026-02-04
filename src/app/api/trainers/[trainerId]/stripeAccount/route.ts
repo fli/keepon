@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { getStripeClient } from '../../../_lib/stripeClient'
 
@@ -154,40 +154,21 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const authTrainerId = authorization.trainerId
 
   try {
-    const rowResult = await sql<{
-      stripeAccountId: string | null
-      account: unknown
-      balance: unknown
-      persons: unknown
-      firstCardPaymentProcessed: Date | string | number | null
-      stripeAccountType: string | null
-    }>`
-      SELECT
-        trainer.stripe_account_id AS "stripeAccountId",
-        stripe_account.object AS account,
-        stripe_balance.object AS balance,
-        COALESCE(
-          (
-            SELECT json_agg(object)
-              FROM "stripe".account
-             WHERE "stripe".account.object ->> 'object' = 'person'
-               AND "stripe".account.object ->> 'account' = trainer.stripe_account_id
-          ),
-          '[]'::json
-        ) AS persons,
-        vw_first_card_payments.first_card_payment_processed AS "firstCardPaymentProcessed",
-        stripe_account.object ->> 'type' AS "stripeAccountType"
-      FROM trainer
-      LEFT JOIN vw_first_card_payments
-        ON vw_first_card_payments.trainer_id = trainer.id
-      LEFT JOIN "stripe".account AS stripe_account
-        ON stripe_account.id = trainer.stripe_account_id
-      LEFT JOIN stripe_balance
-        ON stripe_balance.account_id = trainer.stripe_account_id
-     WHERE trainer.id = ${authTrainerId}
-    `.execute(db)
+    const row = await db
+      .selectFrom('trainer')
+      .leftJoin('vw_first_card_payments', 'vw_first_card_payments.trainer_id', 'trainer.id')
+      .leftJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
+      .leftJoin('stripe_balance', 'stripe_balance.account_id', 'trainer.stripe_account_id')
+      .select((eb) => [
+        eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
+        eb.ref('stripeAccount.object').as('account'),
+        eb.ref('stripe_balance.object').as('balance'),
+        eb.ref('vw_first_card_payments.first_card_payment_processed').as('firstCardPaymentProcessed'),
+      ])
+      .where('trainer.id', '=', authTrainerId)
+      .executeTakeFirst()
 
-    if (rowResult.rows.length === 0) {
+    if (!row) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
@@ -199,9 +180,30 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       )
     }
 
-    const parsedRow = trainerStripeRowSchema.parse(rowResult.rows[0])
+    const stripeAccountId = row.stripeAccountId
 
-    const stripeAccountId = parsedRow.stripeAccountId
+    const rawPersons = stripeAccountId
+      ? (
+          await db
+            .selectFrom('stripe.account')
+            .select('object')
+            .where((eb) => eb(eb.fn('json_extract_path_text', [eb.ref('object'), eb.val('object')]), '=', 'person'))
+            .where((eb) =>
+              eb(eb.fn('json_extract_path_text', [eb.ref('object'), eb.val('account')]), '=', stripeAccountId)
+            )
+            .execute()
+        ).map((personRow) => personRow.object)
+      : []
+
+    const parsedRow = trainerStripeRowSchema.parse({
+      ...row,
+      persons: rawPersons,
+      stripeAccountType:
+        row.account && typeof (row.account as Record<string, unknown>).type === 'string'
+          ? ((row.account as Record<string, unknown>).type as string)
+          : null,
+    })
+
     const stripeAccountTypeRaw = parsedRow.stripeAccountType
 
     if (!stripeAccountId || !stripeAccountTypeRaw) {

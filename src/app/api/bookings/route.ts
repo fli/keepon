@@ -4,7 +4,9 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import type { Database, Interval } from '@/lib/db'
 import type { Point } from '@/lib/db/generated'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { toPoint } from '@/lib/db/values'
+import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 import { buildErrorResponse } from '../_lib/accessToken'
 import { parseStrictJsonBody } from '../_lib/strictJson'
 
@@ -71,6 +73,72 @@ const makeError = (status: number, title: string, type: string, detail?: string)
 const invalidBodyResponse = (detail?: string) =>
   makeError(400, 'Invalid request body', '/invalid-body', detail ?? 'Request body did not match the expected schema.')
 
+const joinIgnoreEmpty = (...parts: Array<string | null | undefined>) =>
+  parts
+    .map((part) => (typeof part === 'string' ? part.trim() : ''))
+    .filter((part) => part.length > 0)
+    .join(' ')
+
+const formatBookingRange = (start: Date, end: Date, locale: string, timezone: string) => {
+  const formatter = new Intl.DateTimeFormat(locale, {
+    weekday: 'short',
+    month: 'short',
+    hour: 'numeric',
+    minute: 'numeric',
+    timeZoneName: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: timezone,
+  })
+
+  return formatter.formatRange(start, end)
+}
+
+const formatCurrency = (amount: number, locale: string, currency?: string | null) => {
+  if (!currency) {
+    return undefined
+  }
+
+  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount)
+}
+
+const buildBookingNotificationPayload = (params: {
+  userId: string
+  clientId: string
+  clientFirstName: string | null
+  clientLastName: string | null
+  bookingName: string | null
+  bookingStartsAt: Date
+  bookingEndsAt: Date
+  locale: string
+  timezone: string
+  paymentAmount?: number
+  currency?: string | null
+}) => {
+  const bookingRangeString = formatBookingRange(
+    params.bookingStartsAt,
+    params.bookingEndsAt,
+    params.locale,
+    params.timezone
+  )
+  const clientName = joinIgnoreEmpty(params.clientFirstName, params.clientLastName)
+  const amountString =
+    params.paymentAmount && params.paymentAmount > 0
+      ? formatCurrency(params.paymentAmount, params.locale, params.currency)
+      : undefined
+  const bookingName = params.bookingName ?? 'an appointment'
+  const paidText = amountString ? ` paid ${amountString} and` : ''
+
+  return {
+    clientId: params.clientId,
+    userId: params.userId,
+    title: 'New online booking',
+    body: `${clientName || 'A client'} has${paidText} booked ${bookingName} at ${bookingRangeString}`,
+    messageType: 'default' as const,
+    notificationType: 'general' as const,
+  }
+}
+
 type ServiceBookingDetails = {
   bookingTimeAvailable: boolean
   afterWindowOpens: boolean
@@ -106,6 +174,8 @@ type ServiceBookingDetails = {
 type SessionBookingDetails = {
   sessionId: string
   trainerId: string
+  userId: string
+  locale: string | null
   bookableOnline: boolean
   onlineBookingsEnabled: boolean
   bookingStartsAt: Date | string
@@ -160,6 +230,8 @@ const fetchExistingClients = async (
   trainerId: string,
   email: string
 ): Promise<ExistingClient[]> => {
+  const normalizedEmail = email.trim().toLowerCase()
+
   return executor
     .selectFrom('client')
     .select((eb) => [
@@ -175,7 +247,7 @@ const fetchExistingClients = async (
       eb.ref('client.google_place_id').as('googlePlaceId'),
     ])
     .where('client.trainer_id', '=', trainerId)
-    .where(sql<boolean>`LOWER(client.email) = LOWER(${email})`)
+    .where((eb) => eb(eb.fn('lower', [eb.ref('client.email')]), '=', normalizedEmail))
     .execute()
 }
 
@@ -202,7 +274,7 @@ const createClient = async (executor: DbExecutor, trainerId: string, data: z.inf
       status: 'current',
       location: data.location ?? null,
       address: data.address ?? null,
-      geo: data.geo ? sql`point(${data.geo.lat}, ${data.geo.lng})` : null,
+      geo: data.geo ? toPoint(data.geo.lat, data.geo.lng) : null,
       google_place_id: data.googlePlaceId ?? null,
     })
     .returning((eb) => [
@@ -300,54 +372,97 @@ export async function POST(request: Request) {
 const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) => {
   try {
     const result = await db.transaction().execute(async (trx) => {
-      const detailsResult = await sql<ServiceBookingDetails>`
-        SELECT
-          is_booking_time_available(service.id, ${data.bookingTime}::timestamptz) AS "bookingTimeAvailable",
-          (${data.bookingTime}::timestamptz >= NOW() + trainer.online_bookings_duration_until_booking_window_opens) AS "afterWindowOpens",
-          (${data.bookingTime}::timestamptz < NOW() + trainer.online_bookings_duration_until_booking_window_closes) AS "beforeWindowCloses",
-          service.bookable_online AS "bookableOnline",
-          trainer.online_bookings_enabled AS "onlineBookingsEnabled",
-          trainer.id AS "trainerId",
-          trainer.timezone AS "timezone",
-          trainer.locale AS "locale",
-          trainer.user_id AS "userId",
-          COALESCE(
-            trainer.business_name,
-            trainer.first_name || COALESCE(' ' || trainer.last_name, '')
-          ) AS "serviceProviderBusinessName",
-          COALESCE(trainer.online_bookings_contact_email, trainer.email) AS "serviceProviderContactEmail",
-          CASE
-            WHEN trainer.online_bookings_show_contact_number THEN COALESCE(trainer.online_bookings_contact_number, trainer.phone_number)
-            ELSE NULL
-          END AS "serviceProviderContactNumber",
-          product.name AS "bookingName",
-          product.description AS "serviceDescription",
-          product.price::text AS "bookingPrice",
-          service.duration AS "serviceDuration",
-          ${data.bookingTime}::timestamptz AS "bookingStartsAt",
-          ${data.bookingTime}::timestamptz + service.duration AS "bookingEndsAt",
-          service.location AS "bookingLocation",
-          service.address AS "bookingAddress",
-          service.google_place_id AS "bookingGooglePlaceId",
-          CASE
-            WHEN service.geo IS NOT NULL THEN json_build_object('lat', service.geo[0], 'lng', service.geo[1])
-            ELSE NULL
-          END AS "bookingGeo",
-          service.booking_payment_type AS "bookingPaymentType",
-          service.request_client_address_online AS "bookingRequestClientAddressOnline",
-          service.booking_question AS "bookingQuestion",
-          service.booking_question_state AS "bookingQuestionState",
-          service.buffer_minutes_before AS "bufferMinutesBefore",
-          service.buffer_minutes_after AS "bufferMinutesAfter",
-          currency.alpha_code AS "currency"
-        FROM service
-        JOIN product ON product.id = service.id
-        JOIN trainer ON trainer.id = service.trainer_id
-        JOIN currency ON currency.id = product.currency_id
-        WHERE service.id = ${data.serviceId}
-      `.execute(trx)
+      const bookingTime = new Date(data.bookingTime)
+      const detailsRow = await trx
+        .selectFrom('service')
+        .innerJoin('product', 'product.id', 'service.id')
+        .innerJoin('trainer', 'trainer.id', 'service.trainer_id')
+        .innerJoin('currency', 'currency.id', 'product.currency_id')
+        .select((eb) => [
+          eb
+            .fn<boolean>('is_booking_time_available', [eb.ref('service.id'), eb.val(bookingTime)])
+            .as('bookingTimeAvailable'),
+          eb(
+            eb.val(bookingTime),
+            '>=',
+            eb(eb.fn('now'), '+', eb.ref('trainer.online_bookings_duration_until_booking_window_opens'))
+          ).as('afterWindowOpens'),
+          eb(
+            eb.val(bookingTime),
+            '<',
+            eb(eb.fn('now'), '+', eb.ref('trainer.online_bookings_duration_until_booking_window_closes'))
+          ).as('beforeWindowCloses'),
+          eb.ref('service.bookable_online').as('bookableOnline'),
+          eb.ref('trainer.online_bookings_enabled').as('onlineBookingsEnabled'),
+          eb.ref('trainer.id').as('trainerId'),
+          eb.ref('trainer.timezone').as('timezone'),
+          eb.ref('trainer.locale').as('locale'),
+          eb.ref('trainer.user_id').as('userId'),
+          eb.ref('trainer.business_name').as('businessName'),
+          eb.ref('trainer.first_name').as('trainerFirstName'),
+          eb.ref('trainer.last_name').as('trainerLastName'),
+          eb.ref('trainer.online_bookings_contact_email').as('onlineBookingsContactEmail'),
+          eb.ref('trainer.email').as('trainerEmail'),
+          eb.ref('trainer.online_bookings_show_contact_number').as('onlineBookingsShowContactNumber'),
+          eb.ref('trainer.online_bookings_contact_number').as('onlineBookingsContactNumber'),
+          eb.ref('trainer.phone_number').as('trainerPhoneNumber'),
+          eb.ref('product.name').as('bookingName'),
+          eb.ref('product.description').as('serviceDescription'),
+          eb.ref('product.price').as('bookingPrice'),
+          eb.ref('service.duration').as('serviceDuration'),
+          eb.val(bookingTime).as('bookingStartsAt'),
+          eb(eb.val(bookingTime), '+', eb.ref('service.duration')).as('bookingEndsAt'),
+          eb.ref('service.location').as('bookingLocation'),
+          eb.ref('service.address').as('bookingAddress'),
+          eb.ref('service.google_place_id').as('bookingGooglePlaceId'),
+          eb.ref('service.geo').as('serviceGeo'),
+          eb.ref('service.booking_payment_type').as('bookingPaymentType'),
+          eb.ref('service.request_client_address_online').as('bookingRequestClientAddressOnline'),
+          eb.ref('service.booking_question').as('bookingQuestion'),
+          eb.ref('service.booking_question_state').as('bookingQuestionState'),
+          eb.ref('service.buffer_minutes_before').as('bufferMinutesBefore'),
+          eb.ref('service.buffer_minutes_after').as('bufferMinutesAfter'),
+          eb.ref('currency.alpha_code').as('currency'),
+        ])
+        .where('service.id', '=', data.serviceId)
+        .executeTakeFirst()
 
-      const details = detailsResult.rows[0]
+      const details = detailsRow
+        ? {
+            bookingTimeAvailable: detailsRow.bookingTimeAvailable,
+            afterWindowOpens: detailsRow.afterWindowOpens,
+            beforeWindowCloses: detailsRow.beforeWindowCloses,
+            bookableOnline: detailsRow.bookableOnline,
+            onlineBookingsEnabled: detailsRow.onlineBookingsEnabled,
+            trainerId: detailsRow.trainerId,
+            timezone: detailsRow.timezone,
+            locale: detailsRow.locale,
+            userId: detailsRow.userId,
+            serviceProviderBusinessName:
+              detailsRow.businessName ?? joinIgnoreEmpty(detailsRow.trainerFirstName, detailsRow.trainerLastName),
+            serviceProviderContactEmail: detailsRow.onlineBookingsContactEmail ?? detailsRow.trainerEmail,
+            serviceProviderContactNumber: detailsRow.onlineBookingsShowContactNumber
+              ? (detailsRow.onlineBookingsContactNumber ?? detailsRow.trainerPhoneNumber)
+              : null,
+            bookingName: detailsRow.bookingName,
+            serviceDescription: detailsRow.serviceDescription,
+            bookingPrice: detailsRow.bookingPrice !== null ? String(detailsRow.bookingPrice) : null,
+            serviceDuration: detailsRow.serviceDuration,
+            bookingStartsAt: detailsRow.bookingStartsAt,
+            bookingEndsAt: detailsRow.bookingEndsAt,
+            bookingLocation: detailsRow.bookingLocation,
+            bookingAddress: detailsRow.bookingAddress,
+            bookingGooglePlaceId: detailsRow.bookingGooglePlaceId,
+            bookingGeo: detailsRow.serviceGeo ? { lat: detailsRow.serviceGeo.x, lng: detailsRow.serviceGeo.y } : null,
+            bookingPaymentType: detailsRow.bookingPaymentType,
+            bookingRequestClientAddressOnline: detailsRow.bookingRequestClientAddressOnline,
+            bookingQuestion: detailsRow.bookingQuestion,
+            bookingQuestionState: detailsRow.bookingQuestionState,
+            bufferMinutesBefore: detailsRow.bufferMinutesBefore,
+            bufferMinutesAfter: detailsRow.bufferMinutesAfter,
+            currency: detailsRow.currency,
+          }
+        : null
       if (!details) {
         return {
           ok: false,
@@ -513,9 +628,33 @@ const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) 
         throw new Error('Failed to create client session for booking')
       }
 
+      const bookingEndsAt = new Date(details.bookingEndsAt)
+      const locale = details.locale ?? 'en-US'
+      const paymentAmount = data.payment?.amount ? Number.parseFloat(data.payment.amount) : undefined
+
+      const notificationPayload = buildBookingNotificationPayload({
+        userId: details.userId,
+        clientId: clientRecord.id,
+        clientFirstName: clientRecord.firstName,
+        clientLastName: clientRecord.lastName,
+        bookingName: details.bookingName,
+        bookingStartsAt,
+        bookingEndsAt,
+        locale,
+        timezone: details.timezone,
+        paymentAmount: Number.isFinite(paymentAmount ?? NaN) ? paymentAmount : undefined,
+        currency: details.currency ?? data.payment?.currency ?? null,
+      })
+
+      const bookingId = clientSession.booking_id ?? clientSession.id
+
+      await enqueueWorkflowTask(trx, 'user.notify', notificationPayload, {
+        dedupeKey: `user.notify:onlineBooking:${bookingId}`,
+      })
+
       return {
         ok: true,
-        bookingId: clientSession.booking_id ?? clientSession.id,
+        bookingId,
       } as const
     })
 
@@ -533,54 +672,98 @@ const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) 
 const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) => {
   try {
     const result = await db.transaction().execute(async (trx) => {
-      const detailsResult = await sql<SessionBookingDetails>`
-        SELECT
-          session.id AS "sessionId",
-          session.trainer_id AS "trainerId",
-          session.bookable_online AS "bookableOnline",
-          trainer.online_bookings_enabled AS "onlineBookingsEnabled",
-          session.start AS "bookingStartsAt",
-          session.start + session.duration AS "bookingEndsAt",
-          session.duration AS "serviceDuration",
-          session.booking_payment_type AS "bookingPaymentType",
-          session.request_client_address_online AS "bookingRequestClientAddressOnline",
-          session.booking_question AS "bookingQuestion",
-          session.booking_question_state AS "bookingQuestionState",
-          session.location AS "bookingLocation",
-          session.address AS "bookingAddress",
-          session.google_place_id AS "bookingGooglePlaceId",
-          CASE
-            WHEN session.geo IS NOT NULL THEN json_build_object('lat', session.geo[0], 'lng', session.geo[1])
-            ELSE NULL
-          END AS "bookingGeo",
-          session.buffer_minutes_before AS "bufferMinutesBefore",
-          session.buffer_minutes_after AS "bufferMinutesAfter",
-          session_series.name AS "bookingName",
-          session_series.description AS "serviceDescription",
-          session_series.timezone AS "timezone",
-          session.maximum_attendance AS "maximumAttendance",
-          COALESCE(
-            session.maximum_attendance - (
-              SELECT count(*)
-              FROM client_session
-              WHERE client_session.session_id = session.id
-              AND client_session.state IN ('accepted','confirmed')
-            ),
-            1
-          )::int AS "availableSpots",
-          (session.start >= NOW() + trainer.online_bookings_duration_until_booking_window_opens) AS "afterWindowOpens",
-          (session.start < NOW() + trainer.online_bookings_duration_until_booking_window_closes) AS "beforeWindowCloses",
-          session_series.price::text AS "bookingPrice",
-          currency.alpha_code AS "currency"
-        FROM session
-        JOIN session_series ON session_series.id = session.session_series_id
-        JOIN trainer ON trainer.id = session.trainer_id
-        JOIN supported_country_currency ON supported_country_currency.country_id = trainer.country_id
-        JOIN currency ON currency.id = supported_country_currency.currency_id
-        WHERE session.id = ${data.sessionId}
-      `.execute(trx)
+      const detailsRow = await trx
+        .selectFrom('session')
+        .innerJoin('session_series', 'session_series.id', 'session.session_series_id')
+        .innerJoin('trainer', 'trainer.id', 'session.trainer_id')
+        .innerJoin('supported_country_currency', 'supported_country_currency.country_id', 'trainer.country_id')
+        .innerJoin('currency', 'currency.id', 'supported_country_currency.currency_id')
+        .select((eb) => [
+          eb.ref('session.id').as('sessionId'),
+          eb.ref('session.trainer_id').as('trainerId'),
+          eb.ref('session.bookable_online').as('bookableOnline'),
+          eb.ref('trainer.online_bookings_enabled').as('onlineBookingsEnabled'),
+          eb.ref('trainer.user_id').as('userId'),
+          eb.ref('trainer.locale').as('locale'),
+          eb.ref('session.start').as('bookingStartsAt'),
+          eb(eb.ref('session.start'), '+', eb.ref('session.duration')).as('bookingEndsAt'),
+          eb.ref('session.duration').as('serviceDuration'),
+          eb.ref('session.booking_payment_type').as('bookingPaymentType'),
+          eb.ref('session.request_client_address_online').as('bookingRequestClientAddressOnline'),
+          eb.ref('session.booking_question').as('bookingQuestion'),
+          eb.ref('session.booking_question_state').as('bookingQuestionState'),
+          eb.ref('session.location').as('bookingLocation'),
+          eb.ref('session.address').as('bookingAddress'),
+          eb.ref('session.google_place_id').as('bookingGooglePlaceId'),
+          eb.ref('session.geo').as('bookingGeo'),
+          eb.ref('session.buffer_minutes_before').as('bufferMinutesBefore'),
+          eb.ref('session.buffer_minutes_after').as('bufferMinutesAfter'),
+          eb.ref('session_series.name').as('bookingName'),
+          eb.ref('session_series.description').as('serviceDescription'),
+          eb.ref('session_series.timezone').as('timezone'),
+          eb.ref('session.maximum_attendance').as('maximumAttendance'),
+          eb.fn
+            .coalesce(
+              eb(
+                eb.ref('session.maximum_attendance'),
+                '-',
+                eb
+                  .selectFrom('client_session')
+                  .select((sub) => sub.fn.count<number>('client_session.id').as('count'))
+                  .whereRef('client_session.session_id', '=', 'session.id')
+                  .where('client_session.state', 'in', ['accepted', 'confirmed'])
+              ),
+              1
+            )
+            .as('availableSpots'),
+          eb(
+            eb.ref('session.start'),
+            '>=',
+            eb(eb.fn('now'), '+', eb.ref('trainer.online_bookings_duration_until_booking_window_opens'))
+          ).as('afterWindowOpens'),
+          eb(
+            eb.ref('session.start'),
+            '<',
+            eb(eb.fn('now'), '+', eb.ref('trainer.online_bookings_duration_until_booking_window_closes'))
+          ).as('beforeWindowCloses'),
+          eb.ref('session_series.price').as('bookingPrice'),
+          eb.ref('currency.alpha_code').as('currency'),
+        ])
+        .where('session.id', '=', data.sessionId)
+        .executeTakeFirst()
 
-      const details = detailsResult.rows[0]
+      const details = detailsRow
+        ? {
+            sessionId: detailsRow.sessionId,
+            trainerId: detailsRow.trainerId,
+            userId: detailsRow.userId,
+            locale: detailsRow.locale,
+            bookableOnline: detailsRow.bookableOnline,
+            onlineBookingsEnabled: detailsRow.onlineBookingsEnabled,
+            bookingStartsAt: detailsRow.bookingStartsAt,
+            bookingEndsAt: detailsRow.bookingEndsAt,
+            serviceDuration: detailsRow.serviceDuration,
+            bookingPaymentType: detailsRow.bookingPaymentType,
+            bookingRequestClientAddressOnline: detailsRow.bookingRequestClientAddressOnline,
+            bookingQuestion: detailsRow.bookingQuestion,
+            bookingQuestionState: detailsRow.bookingQuestionState,
+            bookingLocation: detailsRow.bookingLocation,
+            bookingAddress: detailsRow.bookingAddress,
+            bookingGooglePlaceId: detailsRow.bookingGooglePlaceId,
+            bookingGeo: detailsRow.bookingGeo ? { lat: detailsRow.bookingGeo.x, lng: detailsRow.bookingGeo.y } : null,
+            bufferMinutesBefore: detailsRow.bufferMinutesBefore,
+            bufferMinutesAfter: detailsRow.bufferMinutesAfter,
+            bookingName: detailsRow.bookingName,
+            serviceDescription: detailsRow.serviceDescription,
+            timezone: detailsRow.timezone,
+            maximumAttendance: detailsRow.maximumAttendance,
+            availableSpots: Number(detailsRow.availableSpots),
+            afterWindowOpens: detailsRow.afterWindowOpens,
+            beforeWindowCloses: detailsRow.beforeWindowCloses,
+            bookingPrice: detailsRow.bookingPrice !== null ? String(detailsRow.bookingPrice) : null,
+            currency: detailsRow.currency,
+          }
+        : null
       if (!details) {
         return {
           ok: false,
@@ -696,10 +879,10 @@ const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) 
 
       const clientAlreadyBooked = await trx
         .selectFrom('client_session')
-        .select(sql`TRUE`.as('exists'))
+        .select('client_session.id')
         .innerJoin('client', 'client.id', 'client_session.client_id')
         .where('client_session.session_id', '=', details.sessionId)
-        .where(sql<boolean>`LOWER(client.email) = LOWER(${data.email})`)
+        .where((eb) => eb(eb.fn('lower', [eb.ref('client.email')]), '=', data.email.toLowerCase()))
         .executeTakeFirst()
 
       if (clientAlreadyBooked) {
@@ -727,9 +910,33 @@ const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) 
         throw new Error('Failed to create client session booking')
       }
 
+      const bookingEndsAt = new Date(details.bookingEndsAt)
+      const locale = details.locale ?? 'en-US'
+      const paymentAmount = data.payment?.amount ? Number.parseFloat(data.payment.amount) : undefined
+
+      const notificationPayload = buildBookingNotificationPayload({
+        userId: details.userId,
+        clientId: clientRecord.id,
+        clientFirstName: clientRecord.firstName,
+        clientLastName: clientRecord.lastName,
+        bookingName: details.bookingName,
+        bookingStartsAt,
+        bookingEndsAt,
+        locale,
+        timezone: details.timezone,
+        paymentAmount: Number.isFinite(paymentAmount ?? NaN) ? paymentAmount : undefined,
+        currency: details.currency ?? data.payment?.currency ?? null,
+      })
+
+      const bookingId = clientSession.booking_id ?? clientSession.id
+
+      await enqueueWorkflowTask(trx, 'user.notify', notificationPayload, {
+        dedupeKey: `user.notify:onlineBooking:${bookingId}`,
+      })
+
       return {
         ok: true,
-        bookingId: clientSession.booking_id ?? clientSession.id,
+        bookingId,
       } as const
     })
 

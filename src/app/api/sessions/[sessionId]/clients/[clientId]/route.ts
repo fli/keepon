@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 
 const paramsSchema = z.object({
@@ -114,49 +114,54 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
 
   try {
     const transactionResult = await db.transaction().execute(async (trx) => {
-      const sessionSeriesResult = await sql<SessionSeriesRow>`
-        SELECT
-          session_series.id AS session_series_id,
-          session.start AS session_start
-        FROM session_series
-        JOIN session ON session.session_series_id = session_series.id
-        JOIN client_session ON client_session.session_id = session.id
-       WHERE session_series.trainer_id = ${authorization.trainerId}
-         AND client_session.client_id = ${clientId}
-         AND client_session.session_id = ${sessionId}
-       LIMIT 1
-      `.execute(trx)
-
-      const sessionSeriesRow = sessionSeriesResult.rows[0]
+      const sessionSeriesRow = await trx
+        .selectFrom('session_series')
+        .innerJoin('session', 'session.session_series_id', 'session_series.id')
+        .innerJoin('client_session', 'client_session.session_id', 'session.id')
+        .select((eb) => [
+          eb.ref('session_series.id').as('session_series_id'),
+          eb.ref('session.start').as('session_start'),
+        ])
+        .where('session_series.trainer_id', '=', authorization.trainerId)
+        .where('client_session.client_id', '=', clientId)
+        .where('client_session.session_id', '=', sessionId)
+        .executeTakeFirst()
 
       if (!sessionSeriesRow) {
         throw new ClientSessionNotFoundError()
       }
 
-      const futureCondition = future ? sql`` : sql`AND session.id = ${sessionId}`
+      const deletablePayments = trx
+        .selectFrom('payment')
+        .select('sale_id')
+        .where((eb) => eb.or([eb('payment.is_credit_pack', '=', true), eb('payment.is_subscription', '=', true)]))
+        .as('deletable_payments')
 
-      const detailsResult = await sql<RawDetailRow>`
-        SELECT
-          client_session.id AS client_session_id,
-          COALESCE(sale_payment_status.payment_status = 'paid', FALSE) AS paid_for,
-          deletable_payments.sale_id AS deletable_sale_id
-        FROM client_session
-        JOIN session ON client_session.session_id = session.id
-        LEFT JOIN sale_payment_status
-          ON sale_payment_status.sale_id = client_session.sale_id
-        LEFT JOIN (
-          SELECT sale_id
-            FROM payment
-           WHERE payment.is_credit_pack OR payment.is_subscription
-        ) AS deletable_payments
-          ON deletable_payments.sale_id = client_session.sale_id
-       WHERE session.session_series_id = ${sessionSeriesRow.session_series_id}
-         AND session.start >= ${sessionSeriesRow.session_start}
-         AND client_session.client_id = ${clientId}
-         ${futureCondition}
-      `.execute(trx)
+      let detailsQuery = trx
+        .selectFrom('client_session')
+        .innerJoin('session', 'client_session.session_id', 'session.id')
+        .leftJoin('sale_payment_status', 'sale_payment_status.sale_id', 'client_session.sale_id')
+        .leftJoin(deletablePayments, 'deletable_payments.sale_id', 'client_session.sale_id')
+        .select((eb) => [
+          eb.ref('client_session.id').as('client_session_id'),
+          eb.ref('sale_payment_status.payment_status').as('payment_status'),
+          eb.ref('deletable_payments.sale_id').as('deletable_sale_id'),
+        ])
+        .where('session.session_series_id', '=', sessionSeriesRow.session_series_id)
+        .where('session.start', '>=', sessionSeriesRow.session_start)
+        .where('client_session.client_id', '=', clientId)
 
-      const details = detailsResult.rows
+      if (!future) {
+        detailsQuery = detailsQuery.where('session.id', '=', sessionId)
+      }
+
+      const detailRows = await detailsQuery.execute()
+
+      const details: RawDetailRow[] = detailRows.map((row) => ({
+        client_session_id: row.client_session_id,
+        paid_for: row.payment_status === 'paid',
+        deletable_sale_id: row.deletable_sale_id ?? null,
+      }))
 
       if (details.length === 0) {
         throw new ClientSessionNotFoundError()

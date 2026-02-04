@@ -8,9 +8,10 @@ import {
   clientAppointmentReminderTypes,
   serviceProviderAppointmentReminderTypes,
 } from '@/config/referenceData'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { isIsoDuration } from '@/lib/reminders'
 import { getTrainerProfile } from '@/server/trainerProfile'
+import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { getStripeClient, STRIPE_API_VERSION } from '../../_lib/stripeClient'
@@ -212,6 +213,9 @@ const bankAccountCurrencyNotSupportedResponse = (currency: string) =>
     { status: 409 }
   )
 
+const DEFAULT_SERVICE_PROVIDER_REMINDER_TYPE = 'emailAndNotification'
+const DEFAULT_CLIENT_REMINDER_TYPE = 'email'
+
 let clientReminderTypeCache: string[] | null = null
 
 const loadClientReminderTypes = async () => {
@@ -226,7 +230,7 @@ const loadClientReminderTypes = async () => {
 
 const mapClientReminderTypeToDb = async (type: string | null | undefined) => {
   if (!type) {
-    return sql`DEFAULT`
+    return DEFAULT_CLIENT_REMINDER_TYPE
   }
   if (type !== 'emailAndSms') {
     return type
@@ -300,7 +304,7 @@ const ensureStripeBankAccount = async (
     .insertInto('stripe.bank_account')
     .values({
       id: bankAccount.id,
-      api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+      api_version: stripeApiVersionDate,
       object: JSON.stringify(bankAccount),
     })
     .onConflict((oc) =>
@@ -469,6 +473,9 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     .leftJoin('vw_legacy_trainer as v', 'v.id', 'trainer.id')
     .select((eb) => [
       eb.ref('trainer.id').as('id'),
+      eb.ref('trainer.first_name').as('firstName'),
+      eb.ref('trainer.last_name').as('lastName'),
+      eb.ref('trainer.email').as('email'),
       eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
       eb.ref('trainer.cover_image_url').as('coverImageUrl'),
       eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
@@ -485,6 +492,9 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const parsedTrainerRow = z
     .object({
       id: z.string(),
+      firstName: z.string(),
+      lastName: z.string().nullable(),
+      email: z.string(),
       businessLogoUrl: z.string().nullable(),
       coverImageUrl: z.string().nullable(),
       stripeAccountId: z.string().nullable(),
@@ -508,6 +518,10 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   }
 
   const currentTrainer = parsedTrainerRow.data
+  const mailchimpNeedsRefresh =
+    (body.firstName !== undefined && body.firstName !== currentTrainer.firstName) ||
+    (body.lastName !== undefined && (body.lastName ?? null) !== currentTrainer.lastName) ||
+    (body.email !== undefined && body.email.trim().toLowerCase() !== currentTrainer.email.toLowerCase())
 
   if (body.businessLogoUrl !== undefined && body.businessLogoUrl !== currentTrainer.businessLogoUrl) {
     return mustUploadImageResponse()
@@ -521,7 +535,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     const duplicate = await db
       .selectFrom('trainer')
       .select('id')
-      .where(sql<boolean>`LOWER(email) = LOWER(${body.email})`)
+      .where((eb) => eb(eb.fn('lower', [eb.ref('email')]), '=', body.email.trim().toLowerCase()))
       .where('id', '!=', auth.trainerId)
       .executeTakeFirst()
 
@@ -641,14 +655,14 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     updates.default_service_provider_appointment_reminder_1 =
       body.defaultServiceProviderAppointmentReminder1?.timeBeforeStart ?? null
     updates.default_service_provider_appointment_reminder_1_type =
-      body.defaultServiceProviderAppointmentReminder1?.type ?? sql`DEFAULT`
+      body.defaultServiceProviderAppointmentReminder1?.type ?? DEFAULT_SERVICE_PROVIDER_REMINDER_TYPE
   }
 
   if (body.defaultServiceProviderAppointmentReminder2 !== undefined) {
     updates.default_service_provider_appointment_reminder_2 =
       body.defaultServiceProviderAppointmentReminder2?.timeBeforeStart ?? null
     updates.default_service_provider_appointment_reminder_2_type =
-      body.defaultServiceProviderAppointmentReminder2?.type ?? sql`DEFAULT`
+      body.defaultServiceProviderAppointmentReminder2?.type ?? DEFAULT_SERVICE_PROVIDER_REMINDER_TYPE
   }
 
   if (body.defaultClientAppointmentReminder1 !== undefined) {
@@ -667,17 +681,32 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
   if (Object.keys(updates).length > 0) {
     try {
-      const updated = await db
-        .updateTable('trainer')
-        .set(updates)
-        .where('id', '=', auth.trainerId)
-        .returning('id')
-        .executeTakeFirst()
+      await db.transaction().execute(async (trx) => {
+        const updated = await trx
+          .updateTable('trainer')
+          .set(updates)
+          .where('id', '=', auth.trainerId)
+          .returning('id')
+          .executeTakeFirst()
 
-      if (!updated) {
+        if (!updated) {
+          throw new Error('trainerNotFound')
+        }
+
+        if (mailchimpNeedsRefresh) {
+          await enqueueWorkflowTask(
+            trx,
+            'mailchimp.refresh_user_properties',
+            { trainerId: auth.trainerId, email: currentTrainer.email },
+            { dedupeKey: `mailchimp.refresh_user_properties:${auth.trainerId}:${currentTrainer.email.toLowerCase()}` }
+          )
+        }
+      })
+    } catch (error) {
+      if (error instanceof Error && error.message === 'trainerNotFound') {
         return trainerNotFoundResponse()
       }
-    } catch (error) {
+
       console.error('Failed to update trainer profile', { trainerId: auth.trainerId, updates, error })
       return NextResponse.json(
         buildErrorResponse({

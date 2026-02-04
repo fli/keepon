@@ -1,5 +1,6 @@
+import { addDays } from 'date-fns'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { AppleSignInError, verifyAppleIdentityToken } from '../app/api/_lib/appleSignIn'
 
 const passwordLoginSchema = z.object({
@@ -20,22 +21,21 @@ const APPLE_AUDIENCE = process.env.APPLE_CLIENT_ID ?? process.env.IOS_BUNDLE_ID 
 
 async function loginWithPassword(body: z.infer<typeof passwordLoginSchema>): Promise<LoginResult> {
   const result = await db.transaction().execute(async (trx) => {
-    const detailsResult = await sql<{
-      trainerId: string
-      userId: string
-      userType: string
-      passwordMatch: boolean
-    }>`
-          SELECT
-            trainer.id AS "trainerId",
-            trainer.user_id AS "userId",
-            trainer.user_type AS "userType",
-            trainer.password_hash = crypt(${body.password}, trainer.password_hash) AS "passwordMatch"
-          FROM trainer
-          WHERE trainer.email = ${body.email}
-        `.execute(trx)
+    const details = await trx
+      .selectFrom('trainer')
+      .select((eb) => [
+        eb.ref('trainer.id').as('trainerId'),
+        eb.ref('trainer.user_id').as('userId'),
+        eb.ref('trainer.user_type').as('userType'),
+        eb(
+          eb.ref('trainer.password_hash'),
+          '=',
+          eb.fn('crypt', [eb.val(body.password), eb.ref('trainer.password_hash')])
+        ).as('passwordMatch'),
+      ])
+      .where('trainer.email', '=', body.email)
+      .executeTakeFirst()
 
-    const details = detailsResult.rows[0]
     if (!details) {
       throw new Error('noAccount')
     }
@@ -44,24 +44,23 @@ async function loginWithPassword(body: z.infer<typeof passwordLoginSchema>): Pro
       throw new Error('incorrectPassword')
     }
 
-    const tokenResult = await sql<{ accessToken: string }>`
-          INSERT INTO access_token (user_id, user_type, expires_at, type)
-          VALUES (
-            ${details.userId},
-            ${details.userType},
-            NOW() + INTERVAL '14 days',
-            'api'
-          )
-          RETURNING id AS "accessToken"
-        `.execute(trx)
+    const tokenRow = await trx
+      .insertInto('access_token')
+      .values({
+        user_id: details.userId,
+        user_type: details.userType,
+        expires_at: addDays(new Date(), 14),
+        type: 'api',
+      })
+      .returning('id')
+      .executeTakeFirst()
 
-    const tokenRow = tokenResult.rows[0]
     if (!tokenRow) {
       throw new Error('tokenCreationFailed')
     }
 
     return {
-      id: tokenRow.accessToken,
+      id: tokenRow.id,
       userId: details.userId,
       trainerId: details.trainerId,
     }
@@ -89,80 +88,72 @@ async function loginWithApple(body: z.infer<typeof appleLoginSchema>): Promise<L
   }
 
   const result = await db.transaction().execute(async (trx) => {
-    const existingToken = await sql<{
-      accessToken: string
-      userId: string
-      trainerId: string
-    }>`
-          WITH inserted AS (
-            INSERT INTO access_token (user_id, user_type, expires_at, type)
-              SELECT
-                trainer.user_id,
-                trainer.user_type,
-                NOW() + INTERVAL '14 days',
-                'api'
-              FROM trainer
-              WHERE trainer.sign_in_with_apple_user_id = ${identity.userId}
-            RETURNING id, user_id
-          )
-          SELECT
-            inserted.id AS "accessToken",
-            inserted.user_id AS "userId",
-            trainer.id AS "trainerId"
-          FROM inserted
-          JOIN trainer ON trainer.user_id = inserted.user_id
-        `.execute(trx)
+    const existingTrainer = await trx
+      .selectFrom('trainer')
+      .select((eb) => [
+        eb.ref('trainer.id').as('trainerId'),
+        eb.ref('trainer.user_id').as('userId'),
+        eb.ref('trainer.user_type').as('userType'),
+      ])
+      .where('trainer.sign_in_with_apple_user_id', '=', identity.userId)
+      .executeTakeFirst()
 
-    const existing = existingToken.rows[0]
-    if (existing) {
+    if (existingTrainer) {
+      const tokenRow = await trx
+        .insertInto('access_token')
+        .values({
+          user_id: existingTrainer.userId,
+          user_type: existingTrainer.userType,
+          expires_at: addDays(new Date(), 14),
+          type: 'api',
+        })
+        .returning('id')
+        .executeTakeFirst()
+
+      if (!tokenRow) {
+        throw new Error('tokenCreationFailed')
+      }
+
       return {
-        id: existing.accessToken,
-        userId: existing.userId,
-        trainerId: existing.trainerId,
+        id: tokenRow.id,
+        userId: existingTrainer.userId,
+        trainerId: existingTrainer.trainerId,
       }
     }
 
-    const linkResult = await sql<{ trainerId: string }>`
-          UPDATE trainer
-             SET sign_in_with_apple_user_id = ${identity.userId}
-           WHERE email = ${identity.email}
-          RETURNING trainer.id AS "trainerId"
-        `.execute(trx)
+    const linkedTrainer = await trx
+      .updateTable('trainer')
+      .set({ sign_in_with_apple_user_id: identity.userId })
+      .where('email', '=', identity.email)
+      .returning((eb) => [
+        eb.ref('trainer.id').as('trainerId'),
+        eb.ref('trainer.user_id').as('userId'),
+        eb.ref('trainer.user_type').as('userType'),
+      ])
+      .executeTakeFirst()
 
-    const linkedTrainer = linkResult.rows[0]
     if (!linkedTrainer) {
       throw new Error('appleNoAccount')
     }
 
-    const tokenResult = await sql<{
-      accessToken: string
-      userId: string
-    }>`
-          WITH inserted AS (
-            INSERT INTO access_token (user_id, user_type, expires_at, type)
-              SELECT
-                trainer.user_id,
-                trainer.user_type,
-                NOW() + INTERVAL '14 days',
-                'api'
-              FROM trainer
-              WHERE trainer.sign_in_with_apple_user_id = ${identity.userId}
-            RETURNING id, user_id
-          )
-          SELECT
-            inserted.id AS "accessToken",
-            inserted.user_id AS "userId"
-          FROM inserted
-        `.execute(trx)
+    const tokenRow = await trx
+      .insertInto('access_token')
+      .values({
+        user_id: linkedTrainer.userId,
+        user_type: linkedTrainer.userType,
+        expires_at: addDays(new Date(), 14),
+        type: 'api',
+      })
+      .returning('id')
+      .executeTakeFirst()
 
-    const tokenRow = tokenResult.rows[0]
     if (!tokenRow) {
       throw new Error('tokenCreationFailed')
     }
 
     return {
-      id: tokenRow.accessToken,
-      userId: tokenRow.userId,
+      id: tokenRow.id,
+      userId: linkedTrainer.userId,
       trainerId: linkedTrainer.trainerId,
     }
   })

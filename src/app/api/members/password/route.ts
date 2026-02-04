@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 
 const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
@@ -84,16 +84,17 @@ export async function POST(request: Request) {
   try {
     const { currentPassword, password: newPassword } = parsedBody
 
-    const result = await sql<{ id: string }>`
-      SELECT change_password AS "id"
-        FROM change_password(
-          trainer_id => ${authorization.trainerId},
-          current_password => ${currentPassword},
-          new_password => ${newPassword}
-        )
-    `.execute(db)
-
-    const row = result.rows[0]
+    const row = await db
+      .selectNoFrom((eb) =>
+        eb
+          .fn<string>('change_password', [
+            eb.val(authorization.trainerId),
+            eb.val(currentPassword),
+            eb.val(newPassword),
+          ])
+          .as('id')
+      )
+      .executeTakeFirst()
 
     if (!row?.id) {
       console.error('Change password function did not return an access token', {

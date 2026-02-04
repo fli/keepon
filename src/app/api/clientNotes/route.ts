@@ -8,7 +8,7 @@ const requestBodySchema = z.object({
   clientId: z
     .string()
     .transform((value) => value.trim())
-    .optional(),
+    .min(1, 'clientId must not be empty'),
   title: z.union([z.string(), z.null(), z.undefined()]).transform((value) => {
     if (value === null || value === undefined) {
       return null

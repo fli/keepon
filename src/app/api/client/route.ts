@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z, ZodError } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateClientRequest, buildErrorResponse } from '../_lib/accessToken'
 
 const clientRowSchema = z.object({
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
         eb.ref('c.email').as('email'),
         eb.ref('c.stripe_customer_id').as('stripeCustomerId'),
         eb.ref('t.stripe_account_id').as('stripeAccountId'),
-        sql<string | null>`${sql.ref('stripeAccount.object')}->>'type'`.as('stripeAccountType'),
+        eb.ref('stripeAccount.object').as('stripeAccountObject'),
       ])
       .where('c.id', '=', authorization.clientId)
       .where('c.trainer_id', '=', authorization.trainerId)
@@ -70,24 +70,35 @@ export async function GET(request: Request) {
       )
     }
 
-    const clientRow = clientRowSchema.parse(row)
+    const stripeAccountValue = row.stripeAccountObject
+    const stripeAccountType =
+      stripeAccountValue && typeof stripeAccountValue === 'object' && 'type' in stripeAccountValue
+        ? ((stripeAccountValue as { type?: string }).type ?? null)
+        : null
+
+    const clientRow = clientRowSchema.parse({
+      email: row.email,
+      stripeCustomerId: row.stripeCustomerId,
+      stripeAccountId: row.stripeAccountId,
+      stripeAccountType,
+    })
 
     if (!clientRow.stripeCustomerId) {
       return NextResponse.json({ email: clientRow.email })
     }
 
-    const paymentMethodResult = await sql<{
-      id: string
-      object: unknown
-    }>`
-      SELECT id, object
-        FROM stripe.payment_method
-       WHERE object->>'customer' = ${clientRow.stripeCustomerId}
-    ORDER BY (object->>'created')::bigint DESC
-       LIMIT 1
-    `.execute(db)
-
-    const paymentMethodRow = paymentMethodResult.rows[0]
+    const paymentMethodRow = await db
+      .selectFrom('stripe.payment_method')
+      .select(['id', 'object'])
+      .where((eb) =>
+        eb(eb.fn('json_extract_path_text', [eb.ref('object'), 'customer']), '=', clientRow.stripeCustomerId)
+      )
+      .orderBy(
+        (eb) => eb.cast<number>(eb.fn('json_extract_path_text', [eb.ref('object'), 'created']), 'bigint'),
+        'desc'
+      )
+      .limit(1)
+      .executeTakeFirst()
     if (!paymentMethodRow) {
       return NextResponse.json({ email: clientRow.email })
     }

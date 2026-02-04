@@ -17,6 +17,9 @@
     "plugins": [
       {
         "name": "next"
+      },
+      {
+        "name": "workflow"
       }
     ],
     "paths": {
@@ -35,6 +38,7 @@
     "scripts/**/*.ts",
     "kysely-codegen.config.ts",
     "next.config.ts",
+    "instrumentation.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],

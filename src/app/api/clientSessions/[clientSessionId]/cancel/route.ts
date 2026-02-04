@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z, ZodError } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import type { RawClientSessionRow } from '../../../_lib/clientSessionsSchema'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { adaptClientSessionRow } from '../../../_lib/clientSessionsSchema'
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         .updateTable('client_session')
         .set({
           state: 'cancelled',
-          cancel_time: sql<Date>`NOW()`,
+          cancel_time: new Date(),
           cancel_reason: parsedBody.cancelReason === undefined ? null : parsedBody.cancelReason,
         })
         .where('id', '=', clientSessionId)

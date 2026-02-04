@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 import { buildErrorResponse } from '../../../../_lib/accessToken'
 import { APP_EMAIL, APP_NAME, NO_REPLY_EMAIL } from '../../../../_lib/constants'
 
@@ -251,60 +252,85 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
   try {
     await db.transaction().execute(async (trx) => {
-      const detailsResult = await sql`
-        SELECT
-          client.email AS "clientEmail",
-          COALESCE(
-            trainer.online_bookings_business_name,
-            trainer.business_name,
-            trainer.first_name || COALESCE(' ' || trainer.last_name, '')
-          ) AS "serviceProviderName",
-          trainer.email AS "serviceProviderEmail",
-          client.id AS "clientId",
-          trainer.id AS "trainerId",
-          trainer.user_id AS "trainerUserId",
-          client.first_name AS "clientFirstName",
-          client.last_name AS "clientLastName",
-          session_series.name AS "appointmentName",
-          session_series.event_type AS "eventType",
-          trainer.brand_color AS "brandColor",
-          trainer.business_logo_url AS "businessLogoUrl",
-          COALESCE(trainer.online_bookings_contact_email, trainer.email) AS "serviceProviderContactEmail",
-          CASE
-            WHEN trainer.online_bookings_show_contact_number
-              THEN COALESCE(trainer.online_bookings_contact_number, trainer.phone_number)
-            ELSE NULL
-          END AS "serviceProviderContactNumber",
-          session.timezone AS timezone,
-          trainer.locale AS locale,
-          session.start AS "startsAt",
-          session.can_clients_cancel
-            AND session.start - session.cancellation_advance_notice_duration > NOW()
-            AND client_session.state IN ('accepted', 'confirmed', 'maybe') AS "canCancel"
-        FROM client_session
-        JOIN session ON session.id = client_session.session_id
-        JOIN session_series ON session_series.id = session.session_series_id
-        JOIN client ON client.id = client_session.client_id
-        JOIN trainer ON trainer.id = client_session.trainer_id
-        WHERE client_session.booking_id = ${bookingId}
-      `.execute(trx)
-
-      const detailsRow = detailsResult.rows[0]
+      const detailsRow = await trx
+        .selectFrom('client_session')
+        .innerJoin('session', 'session.id', 'client_session.session_id')
+        .innerJoin('session_series', 'session_series.id', 'session.session_series_id')
+        .innerJoin('client', 'client.id', 'client_session.client_id')
+        .innerJoin('trainer', 'trainer.id', 'client_session.trainer_id')
+        .select((eb) => [
+          eb.ref('client.email').as('clientEmail'),
+          eb.ref('trainer.online_bookings_business_name').as('onlineBookingsBusinessName'),
+          eb.ref('trainer.business_name').as('businessName'),
+          eb.ref('trainer.first_name').as('serviceProviderFirstName'),
+          eb.ref('trainer.last_name').as('serviceProviderLastName'),
+          eb.ref('trainer.email').as('serviceProviderEmail'),
+          eb.ref('client.id').as('clientId'),
+          eb.ref('trainer.id').as('trainerId'),
+          eb.ref('trainer.user_id').as('trainerUserId'),
+          eb.ref('client.first_name').as('clientFirstName'),
+          eb.ref('client.last_name').as('clientLastName'),
+          eb.ref('session_series.name').as('appointmentName'),
+          eb.ref('session_series.event_type').as('eventType'),
+          eb.ref('trainer.brand_color').as('brandColor'),
+          eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
+          eb.ref('trainer.online_bookings_contact_email').as('onlineBookingsContactEmail'),
+          eb.ref('trainer.online_bookings_show_contact_number').as('onlineBookingsShowContactNumber'),
+          eb.ref('trainer.online_bookings_contact_number').as('onlineBookingsContactNumber'),
+          eb.ref('trainer.phone_number').as('serviceProviderPhoneNumber'),
+          eb.ref('session.timezone').as('timezone'),
+          eb.ref('trainer.locale').as('locale'),
+          eb.ref('session.start').as('startsAt'),
+          eb
+            .and([
+              eb('session.can_clients_cancel', '=', true),
+              eb(eb('session.start', '-', eb.ref('session.cancellation_advance_notice_duration')), '>', eb.fn('now')),
+              eb('client_session.state', 'in', ['accepted', 'confirmed', 'maybe']),
+            ])
+            .as('canCancel'),
+        ])
+        .where('client_session.booking_id', '=', bookingId)
+        .executeTakeFirst()
       if (!detailsRow) {
         throw new BookingNotFoundError()
       }
 
-      const details = detailsSchema.parse(detailsRow)
+      const serviceProviderName =
+        detailsRow.onlineBookingsBusinessName ??
+        detailsRow.businessName ??
+        joinNames(detailsRow.serviceProviderFirstName, detailsRow.serviceProviderLastName)
+
+      const serviceProviderContactEmail = detailsRow.onlineBookingsContactEmail ?? detailsRow.serviceProviderEmail
+      const serviceProviderContactNumber = detailsRow.onlineBookingsShowContactNumber
+        ? (detailsRow.onlineBookingsContactNumber ?? detailsRow.serviceProviderPhoneNumber)
+        : null
+
+      const details = detailsSchema.parse({
+        clientEmail: detailsRow.clientEmail,
+        serviceProviderName: serviceProviderName || '',
+        serviceProviderEmail: detailsRow.serviceProviderEmail,
+        clientId: detailsRow.clientId,
+        trainerId: detailsRow.trainerId,
+        trainerUserId: detailsRow.trainerUserId,
+        clientFirstName: detailsRow.clientFirstName,
+        clientLastName: detailsRow.clientLastName,
+        appointmentName: detailsRow.appointmentName,
+        eventType: detailsRow.eventType,
+        brandColor: detailsRow.brandColor,
+        businessLogoUrl: detailsRow.businessLogoUrl,
+        serviceProviderContactEmail,
+        serviceProviderContactNumber,
+        startsAt: detailsRow.startsAt,
+        timezone: detailsRow.timezone,
+        locale: detailsRow.locale,
+        canCancel: Boolean(detailsRow.canCancel),
+      })
 
       if (!details.canCancel) {
         throw new CannotCancelBookingError()
       }
 
-      await sql`
-        UPDATE client_session
-           SET state = 'cancelled'
-         WHERE booking_id = ${bookingId}
-      `.execute(trx)
+      await trx.updateTable('client_session').set({ state: 'cancelled' }).where('booking_id', '=', bookingId).execute()
 
       const formatter = new Intl.DateTimeFormat(details.locale, {
         weekday: 'short',
@@ -359,30 +385,20 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         })
 
         tasks.push(
-          sql`
-            INSERT INTO mail (
-              trainer_id,
-              client_id,
-              from_email,
-              from_name,
-              to_email,
-              to_name,
-              subject,
-              html,
-              reply_to
-            )
-            VALUES (
-              ${details.trainerId},
-              ${details.clientId},
-              ${NO_REPLY_EMAIL},
-              ${`${details.serviceProviderName} via ${APP_NAME}`},
-              ${details.clientEmail},
-              ${details.clientFirstName ?? null},
-              ${clientSubject},
-              ${clientHtml},
-              ${unreplyable ? null : details.serviceProviderEmail}
-            )
-          `.execute(trx)
+          trx
+            .insertInto('mail')
+            .values({
+              trainer_id: details.trainerId,
+              client_id: details.clientId,
+              from_email: NO_REPLY_EMAIL,
+              from_name: `${details.serviceProviderName} via ${APP_NAME}`,
+              to_email: details.clientEmail,
+              to_name: details.clientFirstName ?? null,
+              subject: clientSubject,
+              html: clientHtml,
+              reply_to: unreplyable ? null : details.serviceProviderEmail,
+            })
+            .execute()
         )
       }
 
@@ -396,37 +412,27 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       })
 
       tasks.push(
-        sql`
-          INSERT INTO mail (
-            trainer_id,
-            client_id,
-            from_email,
-            from_name,
-            to_email,
-            to_name,
-            subject,
-            html,
-            reply_to
-          )
-          VALUES (
-            ${details.trainerId},
-            ${details.clientId},
-            ${APP_EMAIL},
-            ${`${APP_NAME} Team`},
-            ${details.serviceProviderEmail},
-            NULL,
-            ${trainerSubject},
-            ${trainerHtml},
-            NULL
-          )
-        `.execute(trx)
+        trx
+          .insertInto('mail')
+          .values({
+            trainer_id: details.trainerId,
+            client_id: details.clientId,
+            from_email: APP_EMAIL,
+            from_name: `${APP_NAME} Team`,
+            to_email: details.serviceProviderEmail,
+            to_name: null,
+            subject: trainerSubject,
+            html: trainerHtml,
+            reply_to: null,
+          })
+          .execute()
       )
 
       const notificationPayload = {
         clientId: details.clientId,
         userId: details.trainerUserId,
-        messageType: 'default',
-        notificationType: 'general',
+        messageType: 'default' as const,
+        notificationType: 'general' as const,
         title: 'Booking cancelled',
         body: `${clientName || 'A client'} has cancelled their booking${
           details.appointmentName ? ` for ${details.appointmentName}` : ''
@@ -434,10 +440,9 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       }
 
       tasks.push(
-        sql`
-          INSERT INTO task_queue (task_type, data)
-          VALUES ('user.notify', ${JSON.stringify(notificationPayload)}::jsonb)
-        `.execute(trx)
+        enqueueWorkflowTask(trx, 'user.notify', notificationPayload, {
+          dedupeKey: `user.notify:onlineBookingCancel:${bookingId}`,
+        })
       )
 
       await Promise.all(tasks)

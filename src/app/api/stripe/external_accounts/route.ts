@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { getStripeClient, STRIPE_API_VERSION } from '../../_lib/stripeClient'
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
         .insertInto('stripe.bank_account')
         .values({
           id: parsedAccount.data.id,
-          api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+          api_version: stripeApiVersionDate,
           object: JSON.stringify(parsedAccount.data),
         })
         .onConflict((oc) =>
@@ -386,22 +386,22 @@ export async function GET(request: Request) {
       )
     }
 
-    const storedBankAccountsResult = await sql<{
-      id: string | null
-      apiVersion: Date | string | number | null
-      object: unknown
-    }>`
-      SELECT bank_account.id,
-             bank_account.api_version AS "apiVersion",
-             bank_account.object
-        FROM stripe.bank_account AS bank_account
-       WHERE bank_account.object ->> 'account' = ${stripeAccountId}
-    `.execute(db)
+    const storedBankAccounts = await db
+      .selectFrom('stripe.bank_account as bankAccount')
+      .select((eb) => [
+        eb.ref('bankAccount.id').as('id'),
+        eb.ref('bankAccount.api_version').as('apiVersion'),
+        eb.ref('bankAccount.object').as('object'),
+      ])
+      .where((eb) =>
+        eb(eb.fn('json_extract_path_text', [eb.ref('bankAccount.object'), 'account']), '=', stripeAccountId)
+      )
+      .execute()
 
-    const storedBankAccounts = storedBankAccountsResult.rows
-      .filter((row) => row.id !== null)
+    const storedBankAccountsParsed = storedBankAccounts
+      .filter((row): row is { id: string; apiVersion: string | null; object: unknown } => row.id !== null)
       .map((row) => ({
-        id: row.id!,
+        id: row.id,
         apiVersion: row.apiVersion ?? '',
         object: row.object,
       }))
@@ -412,9 +412,9 @@ export async function GET(request: Request) {
       id: string
     }[] = []
 
-    let requiresRefresh = storedBankAccounts.length === 0
+    let requiresRefresh = storedBankAccountsParsed.length === 0
 
-    for (const row of storedBankAccounts) {
+    for (const row of storedBankAccountsParsed) {
       try {
         const parsedRow = storedBankAccountRowSchema.parse(row)
         const apiVersion = normalizeApiVersion(parsedRow.apiVersion)
@@ -449,7 +449,7 @@ export async function GET(request: Request) {
     const freshAccounts = await fetchAllBankAccounts(stripeClient, stripeAccountId)
 
     const freshIds = new Set(freshAccounts.map((account) => account.id))
-    const storedIds = new Set(storedBankAccounts.map((row) => row.id))
+    const storedIds = new Set(storedBankAccountsParsed.map((row) => row.id))
     const idsToDelete = Array.from(storedIds).filter((id) => !freshIds.has(id))
 
     if (idsToDelete.length > 0 || freshAccounts.length > 0) {
@@ -464,7 +464,7 @@ export async function GET(request: Request) {
             .values(
               freshAccounts.map((account) => ({
                 id: account.id,
-                api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+                api_version: stripeApiVersionDate,
                 object: JSON.stringify(account),
               }))
             )

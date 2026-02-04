@@ -1,7 +1,9 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { isoLocalDateTimeToUtc } from '@/lib/dates/timezone'
+import { db } from '@/lib/db'
+import { intervalFromMinutes, toPoint } from '@/lib/db/values'
 import type { RawSessionRow } from '../shared'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
@@ -274,12 +276,12 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         const updateData: Record<string, unknown> = {}
 
         if (parsedBody.date !== undefined) {
-          updateData.start = sql`timezone(${timezone}, ${parsedBody.date}::timestamp)`
+          updateData.start = isoLocalDateTimeToUtc(parsedBody.date, timezone)
         }
 
         if (parsedBody.length !== undefined) {
           const durationMinutes = Math.round(parsedBody.length * 60)
-          updateData.duration = sql`make_interval(mins := ${durationMinutes})`
+          updateData.duration = intervalFromMinutes(durationMinutes)
         }
 
         if (parsedBody.maximumAttendance !== undefined) {
@@ -295,7 +297,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         }
 
         if (parsedBody.geo !== undefined) {
-          updateData.geo = parsedBody.geo === null ? null : sql`point(${parsedBody.geo.lat}, ${parsedBody.geo.lng})`
+          updateData.geo = parsedBody.geo === null ? null : toPoint(parsedBody.geo.lat, parsedBody.geo.lng)
         }
 
         if (parsedBody.googlePlaceId !== undefined) {
@@ -359,7 +361,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         }
 
         if (parsedBody.cancellationAdvanceNoticeDuration !== undefined) {
-          updateData.cancellation_advance_notice_duration = sql`${parsedBody.cancellationAdvanceNoticeDuration}::interval`
+          updateData.cancellation_advance_notice_duration = parsedBody.cancellationAdvanceNoticeDuration ?? null
         }
 
         if (parsedBody.requestClientAddressOnline !== undefined && parsedBody.requestClientAddressOnline !== null) {
@@ -474,26 +476,30 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
 
   try {
     const transactionResult = await db.transaction().execute(async (trx) => {
-      const detailsResult = await sql<RawDeleteDetailRow>`
-        SELECT
-          COALESCE(sale_payment_status.payment_status = 'paid', FALSE) AS paid_for,
-          deletable_payments.sale_id AS deletable_sale_id
-        FROM session
-        JOIN session_series ON session_series.id = session.session_series_id
-        LEFT JOIN client_session ON client_session.session_id = session.id
-        LEFT JOIN sale_payment_status
-          ON sale_payment_status.sale_id = client_session.sale_id
-        LEFT JOIN (
-          SELECT sale_id
-            FROM payment
-           WHERE payment.is_credit_pack OR payment.is_subscription
-        ) AS deletable_payments
-          ON deletable_payments.sale_id = client_session.sale_id
-       WHERE session_series.trainer_id = ${authorization.trainerId}
-         AND session.id = ${sessionId}
-      `.execute(trx)
+      const deletablePayments = trx
+        .selectFrom('payment')
+        .select('sale_id')
+        .where((eb) => eb.or([eb('payment.is_credit_pack', '=', true), eb('payment.is_subscription', '=', true)]))
+        .as('deletable_payments')
 
-      const details = detailsResult.rows
+      const detailRows = await trx
+        .selectFrom('session')
+        .innerJoin('session_series', 'session_series.id', 'session.session_series_id')
+        .leftJoin('client_session', 'client_session.session_id', 'session.id')
+        .leftJoin('sale_payment_status', 'sale_payment_status.sale_id', 'client_session.sale_id')
+        .leftJoin(deletablePayments, 'deletable_payments.sale_id', 'client_session.sale_id')
+        .select((eb) => [
+          eb.ref('sale_payment_status.payment_status').as('paymentStatus'),
+          eb.ref('deletable_payments.sale_id').as('deletableSaleId'),
+        ])
+        .where('session_series.trainer_id', '=', authorization.trainerId)
+        .where('session.id', '=', sessionId)
+        .execute()
+
+      const details: RawDeleteDetailRow[] = detailRows.map((row) => ({
+        paid_for: row.paymentStatus === 'paid',
+        deletable_sale_id: row.deletableSaleId ?? null,
+      }))
 
       if (details.length === 0) {
         throw new SessionNotFoundError()

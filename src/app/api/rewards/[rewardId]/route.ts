@@ -1,7 +1,9 @@
 import type { NextRequest } from 'next/server'
+import { addDays } from 'date-fns'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { intervalFromDays } from '@/lib/db/values'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { adaptRewardRow, rewardRowSchema, rewardSchema, rewardTypeSchema } from '../shared'
@@ -81,28 +83,32 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
 
   try {
     const rewardRow = await db.transaction().execute(async (trx) => {
-      const rewardStatusResult = await sql<{
-        type: string
-        claimed: boolean
-        subscriptionStatus: string | null
-      }>`
-        SELECT
-          reward.type,
-          reward.claimed_at IS NOT NULL AS "claimed",
-          vw_legacy_trainer.subscription->>'status' AS "subscriptionStatus"
-        FROM reward
-        JOIN vw_legacy_trainer ON vw_legacy_trainer.id = reward.trainer_id
-        WHERE reward.id = ${rewardId}
-          AND reward.trainer_id = ${authorization.trainerId}
-      `.execute(trx)
-
-      const statusRow = rewardStatusResult.rows[0] ?? null
+      const statusRow = await trx
+        .selectFrom('reward')
+        .innerJoin('vw_legacy_trainer', 'vw_legacy_trainer.id', 'reward.trainer_id')
+        .select(['reward.type', 'reward.claimed_at', 'vw_legacy_trainer.subscription'])
+        .where('reward.id', '=', rewardId)
+        .where('reward.trainer_id', '=', authorization.trainerId)
+        .executeTakeFirst()
 
       if (!statusRow) {
         return null
       }
 
-      const parsedStatus = rewardStatusSchema.safeParse(statusRow)
+      const subscriptionValue = statusRow.subscription
+      const subscriptionStatusValue =
+        subscriptionValue && typeof subscriptionValue === 'object' && 'status' in subscriptionValue
+          ? typeof (subscriptionValue as { status?: unknown }).status === 'string'
+            ? (subscriptionValue as { status?: unknown }).status
+            : null
+          : null
+
+      const parsedStatus = rewardStatusSchema.safeParse({
+        type: statusRow.type,
+        claimed: statusRow.claimed_at !== null,
+        subscriptionStatus:
+          subscriptionStatusValue && subscriptionStatusValue.length > 0 ? subscriptionStatusValue : null,
+      })
 
       if (!parsedStatus.success) {
         throw new Error(INVALID_REWARD_STATE)
@@ -127,78 +133,82 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
           }
 
           if (effectiveType !== currentType) {
-            await sql`
-              UPDATE reward
-                 SET type = ${effectiveType}
-               WHERE id = ${rewardId}
-                 AND trainer_id = ${authorization.trainerId}
-            `.execute(trx)
+            await trx
+              .updateTable('reward')
+              .set({ type: effectiveType })
+              .where('id', '=', rewardId)
+              .where('trainer_id', '=', authorization.trainerId)
+              .execute()
           }
         }
 
         if (effectiveType === '1DayTrial' || effectiveType === '2DayTrial') {
-          const activeTrial = await sql<{ id: string }>`
-            SELECT id
-              FROM trial
-             WHERE end_time > NOW()
-               AND trainer_id = ${authorization.trainerId}
-             ORDER BY end_time DESC
-             LIMIT 1
-          `.execute(trx)
-
-          const trialRow = activeTrial.rows[0] ?? null
+          const now = new Date()
+          const trialRow = await trx
+            .selectFrom('trial')
+            .select(['id'])
+            .where('end_time', '>', now)
+            .where('trainer_id', '=', authorization.trainerId)
+            .orderBy('end_time', 'desc')
+            .executeTakeFirst()
 
           if (trialRow) {
-            await sql`
-              UPDATE trial
-                 SET end_time = end_time + ${effectiveType === '1DayTrial' ? 1 : 2} * '1 day'::interval
-               WHERE trial.id = ${trialRow.id}
-            `.execute(trx)
+            await trx
+              .updateTable('trial')
+              .set((eb) => ({
+                end_time: eb('end_time', '+', intervalFromDays(effectiveType === '1DayTrial' ? 1 : 2)),
+              }))
+              .where('trial.id', '=', trialRow.id)
+              .execute()
           } else {
-            await sql`
-              INSERT INTO trial (trainer_id, start_time, end_time)
-              VALUES (
-                ${authorization.trainerId},
-                NOW(),
-                NOW() + ${effectiveType === '1DayTrial' ? 1 : 2} * '1 day'::interval
-              )
-            `.execute(trx)
+            const startTime = now
+            const endTime = addDays(now, effectiveType === '1DayTrial' ? 1 : 2)
+
+            await trx
+              .insertInto('trial')
+              .values({
+                trainer_id: authorization.trainerId,
+                start_time: startTime,
+                end_time: endTime,
+              })
+              .execute()
           }
         } else if (effectiveType === '2TextCredits' || effectiveType === '3TextCredits') {
-          await sql`
-            INSERT INTO sms_credit (trainer_id, amount, source)
-            VALUES (
-              ${authorization.trainerId},
-              ${effectiveType === '2TextCredits' ? 2 : 3},
-              'reward'
-            )
-          `.execute(trx)
+          await trx
+            .insertInto('sms_credit')
+            .values({
+              trainer_id: authorization.trainerId,
+              amount: effectiveType === '2TextCredits' ? 2 : 3,
+              source: 'reward',
+            })
+            .execute()
         } else {
           throw new Error(UNSUPPORTED_REWARD_TYPE)
         }
 
-        await sql`
-          UPDATE reward
-             SET claimed_at = NOW()
-           WHERE id = ${rewardId}
-             AND trainer_id = ${authorization.trainerId}
-        `.execute(trx)
+        await trx
+          .updateTable('reward')
+          .set({ claimed_at: new Date() })
+          .where('id', '=', rewardId)
+          .where('trainer_id', '=', authorization.trainerId)
+          .execute()
       }
 
-      const rewardResult = await sql`
-        SELECT
-          reward.id,
-          reward.type,
-          reward_type.title,
-          reward_type.description,
-          reward.claimed_at AS "claimedAt"
-        FROM reward
-        JOIN reward_type ON reward.type = reward_type.type
-        WHERE reward.id = ${rewardId}
-          AND reward.trainer_id = ${authorization.trainerId}
-      `.execute(trx)
+      const rewardResult = await trx
+        .selectFrom('reward')
+        .innerJoin('reward_type', 'reward.type', 'reward_type.type')
+        .select((eb) => [
+          eb.ref('reward.id').as('id'),
+          eb.ref('reward.type').as('type'),
+          eb.ref('reward_type.title').as('title'),
+          eb.ref('reward_type.description').as('description'),
+          eb.ref('reward.claimed_at').as('claimedAt'),
+        ])
+        .where('reward.id', '=', rewardId)
+        .where('reward.trainer_id', '=', authorization.trainerId)
+        .executeTakeFirst()
 
-      return rewardResult.rows[0] ?? null
+      return rewardResult ?? null
     })
 
     if (!rewardRow) {

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { Buffer } from 'node:buffer'
 import crypto from 'node:crypto'
 
-import { db, sql, type Json } from '@/lib/db'
+import { db, type Json } from '@/lib/db'
 
 import { buildErrorResponse } from '../_lib/accessToken'
 
@@ -194,11 +194,11 @@ export async function POST(request: Request) {
     const message = await fetchTwilioMessage(accountSid, authToken, messageSid)
     const sanitizedMessage = sanitizeMessage(message)
 
-    await sql`
-      INSERT INTO twilio.message (sid, object)
-      VALUES (${messageSid}, ${sanitizedMessage})
-      ON CONFLICT (sid) DO UPDATE SET object = EXCLUDED.object
-    `.execute(db)
+    await db
+      .insertInto('twilio.message')
+      .values({ sid: messageSid, object: sanitizedMessage })
+      .onConflict((oc) => oc.column('sid').doUpdateSet({ object: sanitizedMessage }))
+      .execute()
   } catch (error) {
     console.error('Failed to record Twilio message status', { messageSid, error })
     return createInternalErrorResponse()

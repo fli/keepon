@@ -1,9 +1,12 @@
 import type { Transaction } from 'kysely'
+import { addDays } from 'date-fns'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import type { DB } from '@/lib/db'
 import { brandColors } from '@/config/referenceData'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { intervalFromMinutes, toPoint } from '@/lib/db/values'
+import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 import { AppleSignInError, verifyAppleIdentityToken } from '../app/api/_lib/appleSignIn'
 
 type BrandColorName = (typeof brandColors)[number]
@@ -185,11 +188,11 @@ const seedTrainerDefaults = async ({ trx, trainerId, email, timezone, currencyId
       .values({
         id: serviceId,
         trainer_id: trainerId,
-        duration: sql`make_interval(mins := ${service.durationMinutes})`,
+        duration: intervalFromMinutes(service.durationMinutes),
         location: service.location,
         address: service.address,
         google_place_id: service.googlePlaceId,
-        geo: sql`point(${service.geo.lat}, ${service.geo.lng})`,
+        geo: toPoint(service.geo.lat, service.geo.lng),
         bookable_online: true,
         booking_payment_type: 'noPrepayment',
         is_service: true,
@@ -276,7 +279,7 @@ const seedTrainerDefaults = async ({ trx, trainerId, email, timezone, currencyId
         id: series.id,
         trainer_id: trainerId,
         event_type: series.eventType,
-        duration: sql`make_interval(mins := ${30})`,
+        duration: intervalFromMinutes(30),
         start: series.start,
         end_: null,
         daily_recurrence_interval: null,
@@ -296,11 +299,11 @@ const seedTrainerDefaults = async ({ trx, trainerId, email, timezone, currencyId
         session_series_id: series.id,
         trainer_id: trainerId,
         start: series.start,
-        duration: sql`make_interval(mins := ${30})`,
+        duration: intervalFromMinutes(30),
         timezone,
         location: 'Area 51',
         address: 'Nevada, USA',
-        geo: sql`point(${37.2514874}, ${-115.8043178})`,
+        geo: toPoint(37.2514874, -115.8043178),
         google_place_id: 'ChIJgYw-uqobuIARrjdijuMnBJc',
       })
       .returning('id')
@@ -406,77 +409,86 @@ export async function createTrainerAccount(input: TrainerSignupInput) {
     const userId = userRow.id
     const passwordToHash = 'password' in parsed ? parsed.password : randomUUID()
 
-    const trainerInsert = await sql<{
-      id: string
-      onlineBookingsPageUrlSlug: string
-    }>`
-        INSERT INTO trainer (
-          user_id,
-          user_type,
-          country_id,
-          email,
-          password_hash,
-          first_name,
-          last_name,
-          phone_number,
-          timezone,
-          locale,
-          eligible_for_grandfather,
-          terms_accepted,
-          sign_in_with_apple_user_id,
-          business_name,
-          industry,
-          brand_color,
-          partner,
-          first_user_agent
-        ) VALUES (
-          ${userId},
-          'trainer',
-          ${countryRow.id},
-          ${email},
-          crypt(${passwordToHash}, gen_salt('bf', 10)),
-          ${parsed.firstName},
-          ${parsed.lastName ?? null},
-          ${parsed.phone ?? null},
-          ${parsed.timezone},
-          ${parsed.locale},
-          false,
-          true,
-          ${appleUserId},
-          ${parsed.businessName ?? null},
-          ${parsed.industry ?? null},
-          ${brandColor},
-          ${parsed.partner ?? null},
-          null
-        )
-        RETURNING id, online_bookings_page_url_slug
-      `.execute(trx)
+    const passwordHashRow = await trx
+      .selectNoFrom((eb) =>
+        eb.fn<string>('crypt', [eb.val(passwordToHash), eb.fn('gen_salt', [eb.val('bf'), eb.val(10)])]).as('hash')
+      )
+      .executeTakeFirst()
 
-    const trainer = trainerInsert.rows[0]
+    if (!passwordHashRow?.hash) {
+      throw new Error('passwordHashFailed')
+    }
+
+    const trainer = await trx
+      .insertInto('trainer')
+      .values({
+        user_id: userId,
+        user_type: 'trainer',
+        country_id: countryRow.id,
+        email,
+        password_hash: passwordHashRow.hash,
+        first_name: parsed.firstName,
+        last_name: parsed.lastName ?? null,
+        phone_number: parsed.phone ?? null,
+        timezone: parsed.timezone,
+        locale: parsed.locale,
+        eligible_for_grandfather: false,
+        terms_accepted: true,
+        sign_in_with_apple_user_id: appleUserId,
+        business_name: parsed.businessName ?? null,
+        industry: parsed.industry ?? null,
+        brand_color: brandColor,
+        partner: parsed.partner ?? null,
+        first_user_agent: null,
+      })
+      .returning((eb) => [
+        eb.ref('trainer.id').as('id'),
+        eb.ref('trainer.online_bookings_page_url_slug').as('onlineBookingsPageUrlSlug'),
+      ])
+      .executeTakeFirst()
+
     if (!trainer) {
       throw new Error('trainerCreateFailed')
     }
 
+    await Promise.all([
+      enqueueWorkflowTask(
+        trx,
+        'createStripeAccount',
+        { trainerId: trainer.id },
+        { dedupeKey: `createStripeAccount:${trainer.id}` }
+      ),
+      enqueueWorkflowTask(
+        trx,
+        'mailchimp.subscribe',
+        { trainerId: trainer.id },
+        { dedupeKey: `mailchimp.subscribe:${trainer.id}` }
+      ),
+    ])
+
     // Insert trial
     const defaultTrialDuration = defaultTrialDurationMs
     const now = new Date()
-    await sql`
-        INSERT INTO trial (trainer_id, start_time, end_time)
-        VALUES (${trainer.id}, ${now}, ${new Date(now.getTime() + defaultTrialDuration)})
-      `.execute(trx)
+    await trx
+      .insertInto('trial')
+      .values({
+        trainer_id: trainer.id,
+        start_time: now,
+        end_time: new Date(now.getTime() + defaultTrialDuration),
+      })
+      .execute()
 
-    const tokenResult = await sql<{ accessToken: string }>`
-        INSERT INTO access_token (user_id, user_type, expires_at, type)
-        VALUES (
-          ${userId},
-          'trainer',
-          NOW() + INTERVAL '14 days',
-          'api'
-        )
-        RETURNING id AS "accessToken"
-      `.execute(trx)
+    const tokenRow = await trx
+      .insertInto('access_token')
+      .values({
+        user_id: userId,
+        user_type: 'trainer',
+        expires_at: addDays(now, 14),
+        type: 'api',
+      })
+      .returning('id')
+      .executeTakeFirst()
 
-    const tokenRow = tokenResult.rows[0]
     if (!tokenRow) {
       throw new Error('tokenCreateFailed')
     }
@@ -490,7 +502,7 @@ export async function createTrainerAccount(input: TrainerSignupInput) {
     })
 
     return {
-      id: tokenRow.accessToken,
+      id: tokenRow.id,
       userId,
       trainerId: trainer.id,
       onlineBookingsPageUrlSlug: trainer.onlineBookingsPageUrlSlug,

@@ -2,7 +2,7 @@ import BigNumber from 'bignumber.js'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { buildErrorResponse } from '../_lib/accessToken'
 import { getSmsCreditPricingForCountry } from '../_lib/smsCreditPricing'
 import { parseStrictJsonBody } from '../_lib/strictJson'
@@ -212,12 +212,12 @@ export async function POST(request: Request) {
           .insertInto('stripe.customer')
           .values({
             id: customer.id,
-            api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+            api_version: stripeApiVersionDate,
             object: JSON.stringify(customer),
           })
           .onConflict((oc) =>
             oc.column('id').doUpdateSet({
-              api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+              api_version: stripeApiVersionDate,
               object: JSON.stringify(customer),
             })
           )
@@ -275,12 +275,12 @@ export async function POST(request: Request) {
         .insertInto('stripe.checkout_session')
         .values({
           id: session.id,
-          api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+          api_version: stripeApiVersionDate,
           object: JSON.stringify(session),
         })
         .onConflict((oc) =>
           oc.column('id').doUpdateSet({
-            api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+            api_version: stripeApiVersionDate,
             object: JSON.stringify(session),
           })
         )

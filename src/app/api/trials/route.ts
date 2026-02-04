@@ -1,6 +1,8 @@
+import { add } from 'date-fns'
 import { NextResponse } from 'next/server'
+import parseInterval from 'postgres-interval'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 
 const FALLBACK_TRIAL_DURATION = '14 days'
@@ -81,62 +83,49 @@ export async function POST(request: Request) {
 
   try {
     const trialRow = await db.transaction().execute(async (trx) => {
-      const insertedTrial = await sql<TrialRow>`
-        INSERT INTO trial (trainer_id, start_time, end_time)
-        SELECT
-          ${authorization.trainerId},
-          NOW(),
-          NOW() + ${defaultTrialDuration}::interval
-        FROM unnest(
-          CASE WHEN (
-            SELECT
-              TRUE
-            FROM trial
-            WHERE trainer_id = ${authorization.trainerId}
-            LIMIT 1
-          ) THEN
-            NULL
-          ELSE
-            '{true}'::boolean[]
-          END
-        ) AS t(value)
-        RETURNING
-          id,
-          trainer_id AS "trainerId",
-          to_char(
-            timezone('UTC', start_time),
-            'YYYY-MM-DD"T"HH24:MI:SS"Z"'
-          ) AS "startTime",
-          to_char(
-            timezone('UTC', end_time),
-            'YYYY-MM-DD"T"HH24:MI:SS"Z"'
-          ) AS "endTime"
-      `.execute(trx)
+      const existingTrial = await trx
+        .selectFrom('trial')
+        .select(['id', 'trainer_id', 'start_time', 'end_time'])
+        .where('trainer_id', '=', authorization.trainerId)
+        .orderBy('end_time', 'desc')
+        .executeTakeFirst()
 
-      const createdTrial = insertedTrial.rows[0]
-      if (createdTrial) {
-        return createdTrial
+      if (existingTrial) {
+        return {
+          id: existingTrial.id,
+          trainerId: existingTrial.trainer_id,
+          startTime: new Date(existingTrial.start_time).toISOString(),
+          endTime: new Date(existingTrial.end_time).toISOString(),
+        }
       }
 
-      const existingTrial = await sql<TrialRow>`
-        SELECT
-          id,
-          trainer_id AS "trainerId",
-          to_char(
-            timezone('UTC', start_time),
-            'YYYY-MM-DD"T"HH24:MI:SS"Z"'
-          ) AS "startTime",
-          to_char(
-            timezone('UTC', end_time),
-            'YYYY-MM-DD"T"HH24:MI:SS"Z"'
-          ) AS "endTime"
-        FROM trial
-        WHERE trainer_id = ${authorization.trainerId}
-        ORDER BY end_time DESC
-        LIMIT 1
-      `.execute(trx)
+      const interval = parseInterval(defaultTrialDuration)
+      const now = new Date()
+      const endTime = add(now, {
+        years: interval.years,
+        months: interval.months,
+        days: interval.days,
+        hours: interval.hours,
+        minutes: interval.minutes,
+        seconds: interval.seconds,
+        milliseconds: interval.milliseconds,
+      })
 
-      const trial = existingTrial.rows[0]
+      const insertedTrial = await trx
+        .insertInto('trial')
+        .values({ trainer_id: authorization.trainerId, start_time: now, end_time: endTime })
+        .returning(['id', 'trainer_id', 'start_time', 'end_time'])
+        .executeTakeFirst()
+
+      const trial = insertedTrial
+        ? {
+            id: insertedTrial.id,
+            trainerId: insertedTrial.trainer_id,
+            startTime: new Date(insertedTrial.start_time).toISOString(),
+            endTime: new Date(insertedTrial.end_time).toISOString(),
+          }
+        : null
+
       if (!trial) {
         throw new Error(TRIAL_NOT_FOUND_ERROR)
       }

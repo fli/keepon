@@ -1,10 +1,12 @@
+import type { ExpressionBuilder } from 'kysely'
 import BigNumber from 'bignumber.js'
 import { isValid, parseISO } from 'date-fns'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db, type Database } from '@/lib/db'
 import { uuidOrNil } from '@/lib/uuid'
+import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 import { authenticateTrainerOrClientRequest, buildErrorResponse } from '../_lib/accessToken'
 import { APP_NAME } from '../_lib/constants'
 import { adaptSalePaymentRow, salePaymentSchema, type SalePaymentRow } from '../_lib/salePayments'
@@ -27,6 +29,16 @@ const createLegacyInvalidParametersResponse = (detail: string) =>
     }),
     { status: 400 }
   )
+
+const joinIgnoreEmpty = (...parts: Array<string | null | undefined>) =>
+  parts
+    .map((part) => (typeof part === 'string' ? part.trim() : ''))
+    .filter((part) => part.length > 0)
+    .join(' ')
+
+const formatCurrency = (amount: BigNumber, locale: string, currency: string) => {
+  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount.toNumber())
+}
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -85,15 +97,14 @@ export async function GET(request: Request) {
   }
 
   try {
-    const combinedUpdatedAt = sql<Date>`
-      GREATEST(
-        ${sql.ref('payment.updated_at')},
-        COALESCE(${sql.ref('paymentCreditPack.updated_at')}, ${sql.ref('payment.updated_at')}),
-        COALESCE(${sql.ref('paymentManual.updated_at')}, ${sql.ref('payment.updated_at')}),
-        COALESCE(${sql.ref('paymentStripe.updated_at')}, ${sql.ref('payment.updated_at')}),
-        COALESCE(${sql.ref('paymentSubscription.updated_at')}, ${sql.ref('payment.updated_at')})
-      )
-    `
+    const combinedUpdatedAt = (eb: ExpressionBuilder<Database, any>) =>
+      eb.fn('greatest', [
+        eb.ref('payment.updated_at'),
+        eb.fn.coalesce(eb.ref('paymentCreditPack.updated_at'), eb.ref('payment.updated_at')),
+        eb.fn.coalesce(eb.ref('paymentManual.updated_at'), eb.ref('payment.updated_at')),
+        eb.fn.coalesce(eb.ref('paymentStripe.updated_at'), eb.ref('payment.updated_at')),
+        eb.fn.coalesce(eb.ref('paymentSubscription.updated_at'), eb.ref('payment.updated_at')),
+      ])
 
     let query = db
       .selectFrom('payment as payment')
@@ -158,7 +169,7 @@ export async function GET(request: Request) {
     }
 
     if (filters.updatedAfter) {
-      query = query.where(combinedUpdatedAt, '>', filters.updatedAfter)
+      query = query.where(({ eb }) => eb(combinedUpdatedAt(eb), '>', filters.updatedAfter))
     }
 
     const rows = (await query.orderBy('payment.created_at', 'desc').execute()) as SalePaymentRow[]
@@ -240,6 +251,13 @@ class StripePaymentsDisabledError extends Error {
   constructor() {
     super('Stripe payments not enabled')
     this.name = 'StripePaymentsDisabledError'
+  }
+}
+
+class ServiceProviderCantTakePaymentsError extends Error {
+  constructor() {
+    super('Service provider cannot take payments')
+    this.name = 'ServiceProviderCantTakePaymentsError'
   }
 }
 
@@ -507,7 +525,7 @@ export async function POST(request: Request) {
           eb.ref('country.alpha_2_code').as('country'),
           eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
           eb.ref('trainer.stripe_payments_blocked').as('stripePaymentsBlocked'),
-          sql<string | null>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('stripeAccountType'),
+          eb.ref('stripeAccount.object').as('stripeAccountObject'),
           eb.ref('client.email').as('clientEmail'),
           eb.ref('client.first_name').as('clientFirstName'),
           eb.ref('client.last_name').as('clientLastName'),
@@ -529,7 +547,16 @@ export async function POST(request: Request) {
         throw new SaleNotFoundError()
       }
 
-      const saleDetails = saleDetailsSchema.parse(saleDetailsRow)
+      const stripeAccountValue = saleDetailsRow.stripeAccountObject
+      const stripeAccountTypeValue =
+        stripeAccountValue && typeof stripeAccountValue === 'object' && 'type' in stripeAccountValue
+          ? ((stripeAccountValue as { type?: string }).type ?? null)
+          : null
+
+      const saleDetails = saleDetailsSchema.parse({
+        ...saleDetailsRow,
+        stripeAccountType: stripeAccountTypeValue,
+      })
 
       if (
         saleDetails.paymentStatus &&
@@ -691,12 +718,12 @@ export async function POST(request: Request) {
           .insertInto('stripe.customer')
           .values({
             id: customer.id,
-            api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+            api_version: stripeApiVersionDate,
             object: JSON.stringify(customer),
           })
           .onConflict((oc) =>
             oc.column('id').doUpdateSet({
-              api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+              api_version: stripeApiVersionDate,
               object: JSON.stringify(customer),
             })
           )
@@ -790,51 +817,96 @@ export async function POST(request: Request) {
         .integerValue(BigNumber.ROUND_HALF_UP)
         .toNumber()
 
+      if (authorization.actor === 'client') {
+        const formattedAmount = formatCurrency(chargeAmount, saleDetails.locale, currency)
+        const notificationPayload = {
+          title: joinIgnoreEmpty(saleDetails.clientFirstName, saleDetails.clientLastName),
+          userId: saleDetails.trainerUserId,
+          messageType: 'success' as const,
+          notificationType: 'transaction' as const,
+          body: `Payment Processed!\nPayment of ${formattedAmount} has gone through for ${saleDetails.productName}`,
+        }
+
+        await enqueueWorkflowTask(trx, 'user.notify', notificationPayload, {
+          dedupeKey: `user.notify:salePayment:${paymentId}`,
+        })
+      }
+
       let paymentIntent: Stripe.Response<Stripe.PaymentIntent>
 
-      if (payload.stripePaymentIntentId) {
-        const existingIntent = await stripeClient.paymentIntents.retrieve(
-          payload.stripePaymentIntentId,
-          { expand: ['payment_method'] },
-          stripeRequestOptions
-        )
+      try {
+        if (payload.stripePaymentIntentId) {
+          const existingIntent = await stripeClient.paymentIntents.retrieve(
+            payload.stripePaymentIntentId,
+            { expand: ['payment_method'] },
+            stripeRequestOptions
+          )
 
-        if (existingIntent.amount !== chargeAmountInSmallestUnit) {
-          throw new StripePaymentIntentMismatchError('Payment intent amount does not match sale total')
-        }
+          if (existingIntent.amount !== chargeAmountInSmallestUnit) {
+            throw new StripePaymentIntentMismatchError('Payment intent amount does not match sale total')
+          }
 
-        if (existingIntent.application_fee_amount !== applicationFeeAmount) {
-          throw new StripePaymentIntentMismatchError('Payment intent application fee does not match expected fee')
-        }
+          if (existingIntent.application_fee_amount !== applicationFeeAmount) {
+            throw new StripePaymentIntentMismatchError('Payment intent application fee does not match expected fee')
+          }
 
-        paymentIntent = await stripeClient.paymentIntents.confirm(existingIntent.id, undefined, stripeRequestOptions)
-      } else {
-        paymentIntent = await stripeClient.paymentIntents.create(
-          {
-            amount: chargeAmountInSmallestUnit,
-            currency: currency.toLowerCase(),
-            payment_method_types: ['card'],
-            customer: customerId,
-            description: `Payment for ${saleDetails.productName}`,
-            receipt_email: saleDetails.clientEmail ?? undefined,
-            statement_descriptor_suffix: `VIA ${APP_NAME}`,
-            payment_method: paymentMethod.id,
-            application_fee_amount: applicationFeeAmount,
-            on_behalf_of: stripeAccountType === 'standard' ? undefined : stripeAccountId,
-            transfer_data: stripeAccountType === 'standard' ? undefined : { destination: stripeAccountId },
-            confirmation_method: 'manual',
-            confirm: true,
-            setup_future_usage:
-              authorization.actor === 'client' && payload.setupFutureUsage ? 'off_session' : undefined,
-            use_stripe_sdk: true,
-            payment_method_options: {
-              card: {
-                request_three_d_secure: stripeAccountType === 'standard' ? 'automatic' : 'any',
+          paymentIntent = await stripeClient.paymentIntents.confirm(existingIntent.id, undefined, stripeRequestOptions)
+        } else {
+          paymentIntent = await stripeClient.paymentIntents.create(
+            {
+              amount: chargeAmountInSmallestUnit,
+              currency: currency.toLowerCase(),
+              payment_method_types: ['card'],
+              customer: customerId,
+              description: `Payment for ${saleDetails.productName}`,
+              receipt_email: saleDetails.clientEmail ?? undefined,
+              statement_descriptor_suffix: `VIA ${APP_NAME}`,
+              payment_method: paymentMethod.id,
+              application_fee_amount: applicationFeeAmount,
+              on_behalf_of: stripeAccountType === 'standard' ? undefined : stripeAccountId,
+              transfer_data: stripeAccountType === 'standard' ? undefined : { destination: stripeAccountId },
+              confirmation_method: 'manual',
+              confirm: true,
+              setup_future_usage:
+                authorization.actor === 'client' && payload.setupFutureUsage ? 'off_session' : undefined,
+              use_stripe_sdk: true,
+              payment_method_options: {
+                card: {
+                  request_three_d_secure: stripeAccountType === 'standard' ? 'automatic' : 'any',
+                },
               },
             },
-          },
-          stripeRequestOptions
-        )
+            stripeRequestOptions
+          )
+        }
+      } catch (error) {
+        if (
+          error instanceof Stripe.errors.StripeInvalidRequestError &&
+          error.message.startsWith(
+            'Your destination account needs to have at least one of the following capabilities enabled'
+          ) &&
+          error.message.includes('transfers')
+        ) {
+          const formattedAmount = formatCurrency(chargeAmount, saleDetails.locale, currency)
+          const failurePayload = {
+            title: 'Attempted payment failed!',
+            userId: saleDetails.trainerUserId,
+            messageType: 'failure' as const,
+            notificationType: 'transaction' as const,
+            body: `${joinIgnoreEmpty(
+              saleDetails.clientFirstName,
+              saleDetails.clientLastName
+            )} attempted to pay ${formattedAmount} for ${saleDetails.productName} but it failed as you aren't verified.`,
+          }
+
+          await enqueueWorkflowTask(db, 'user.notify', failurePayload, {
+            dedupeKey: `user.notify:salePaymentFailed:${paymentId}`,
+          })
+
+          throw new ServiceProviderCantTakePaymentsError()
+        }
+
+        throw error
       }
 
       if (paymentIntent.status === 'requires_action') {
@@ -852,12 +924,12 @@ export async function POST(request: Request) {
         .insertInto('stripe_payment_intent')
         .values({
           id: paymentIntent.id,
-          api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+          api_version: stripeApiVersionDate,
           object: paymentIntent ? JSON.stringify(paymentIntent) : null,
         })
         .onConflict((oc) =>
           oc.column('id').doUpdateSet({
-            api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+            api_version: stripeApiVersionDate,
             object: paymentIntent ? JSON.stringify(paymentIntent) : null,
           })
         )
@@ -980,6 +1052,17 @@ export async function POST(request: Request) {
           title: 'Stripe payments not enabled',
           detail: 'Stripe payments are not enabled for this trainer.',
           type: '/stripe-payments-disabled',
+        }),
+        { status: 409 }
+      )
+    }
+
+    if (error instanceof ServiceProviderCantTakePaymentsError) {
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 409,
+          title: 'Your service provider does not have payments enabled. We’ve notified them.',
+          type: '/service-provider-cant-take-payments',
         }),
         { status: 409 }
       )

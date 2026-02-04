@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../../_lib/accessToken'
 import { normalizePlanRow, type RawPlanRow } from '../../../../../plans/shared'
 
@@ -97,11 +97,11 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       await trx
         .updateTable('payment_plan_pause')
         .set({
-          end_: sql<Date>`NOW()`,
+          end_: new Date(),
         })
         .where('payment_plan_id', '=', planId)
         .where('trainer_id', '=', authorization.trainerId)
-        .where('end_', '=', sql<Date>`'infinity'::timestamp with time zone`)
+        .where('end_', '=', db.fn<Date>('infinity_timestamptz'))
         .execute()
 
       const updatedPlan = await trx

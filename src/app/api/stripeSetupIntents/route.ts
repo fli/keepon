@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateClientRequest, buildErrorResponse } from '../_lib/accessToken'
 import { getStripeClient, STRIPE_API_VERSION } from '../_lib/stripeClient'
 
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
         eb.ref('client.email').as('clientEmail'),
         eb.ref('trainer.email').as('serviceProviderEmail'),
         eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
-        sql<string | null>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('stripeAccountType'),
+        eb.ref('stripeAccount.object').as('stripeAccountObject'),
       ])
       .where('client.id', '=', authorization.clientId)
       .where('trainer.id', '=', authorization.trainerId)
@@ -136,7 +136,16 @@ export async function POST(request: Request) {
       return createClientNotFoundResponse()
     }
 
-    const parsedRow = clientStripeRowSchema.safeParse(row)
+    const stripeAccountValue = row.stripeAccountObject
+    const stripeAccountType =
+      stripeAccountValue && typeof stripeAccountValue === 'object' && 'type' in stripeAccountValue
+        ? ((stripeAccountValue as { type?: string }).type ?? null)
+        : null
+
+    const parsedRow = clientStripeRowSchema.safeParse({
+      ...row,
+      stripeAccountType,
+    })
 
     if (!parsedRow.success) {
       const detail = parsedRow.error.issues.map((issue) => issue.message).join('; ')
@@ -191,12 +200,12 @@ export async function POST(request: Request) {
           .insertInto('stripe.customer')
           .values({
             id: customer.id,
-            api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+            api_version: stripeApiVersionDate,
             object: JSON.stringify(customer),
           })
           .onConflict((oc) =>
             oc.column('id').doUpdateSet({
-              api_version: sql<Date>`cast(${stripeApiVersionDate} as date)`,
+              api_version: stripeApiVersionDate,
               object: JSON.stringify(customer),
             })
           )

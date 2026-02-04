@@ -3,7 +3,7 @@ import BigNumber from 'bignumber.js'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { z, ZodError } from 'zod'
-import { db, sql, type Selectable, type VwLegacyPlanPayment } from '@/lib/db'
+import { db, type Selectable, type VwLegacyPlanPayment } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { getStripeClient, STRIPE_API_VERSION } from '../../../_lib/stripeClient'
 import { planPaymentSchema, planPaymentStatusSchema } from '../../../plans/shared'
@@ -245,13 +245,26 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           eb.ref('paymentPlanCharge.stripe_payment_intent_id').as('stripePaymentIntentId'),
           eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
           eb.ref('trainer.minimum_balance').as('minimumBalance'),
-          sql<string | null>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('stripeAccountType'),
+          eb.ref('stripeAccount.object').as('stripeAccountObject'),
         ])
         .where('paymentPlanPayment.id', '=', paymentPlanPaymentId)
         .where('paymentPlanPayment.trainer_id', '=', authorization.trainerId)
         .executeTakeFirst()
 
-      const detailsResult = stripeDetailsSchema.safeParse(rawDetails)
+      const stripeAccountValue = rawDetails?.stripeAccountObject
+      const stripeAccountType =
+        stripeAccountValue && typeof stripeAccountValue === 'object' && 'type' in stripeAccountValue
+          ? ((stripeAccountValue as { type?: string }).type ?? null)
+          : null
+
+      const detailsResult = stripeDetailsSchema.safeParse(
+        rawDetails
+          ? {
+              ...rawDetails,
+              stripeAccountType,
+            }
+          : rawDetails
+      )
       if (!detailsResult.success) {
         throw new PlanPaymentNotFoundError()
       }
@@ -330,7 +343,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
             .insertInto('stripe_resource')
             .values({
               id: refund.id,
-              api_version: sql<Date>`cast(${STRIPE_API_VERSION} as date)`,
+              api_version: STRIPE_API_VERSION,
               object: JSON.stringify(refund),
             })
             .execute()

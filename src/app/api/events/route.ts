@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { buildErrorResponse } from '../_lib/accessToken'
 import { parseAmount } from '../paymentPlans/shared'
 
@@ -285,19 +285,17 @@ export async function GET(request: Request) {
         eb.ref('s.id').as('id'),
         eb.ref('series.name').as('name'),
         eb.ref('s.start').as('startsAt'),
-        sql<number>`
-          (EXTRACT(EPOCH FROM ${sql.ref('s.duration')}) / 60)::int
-        `.as('durationMinutes'),
+        eb
+          .cast<number>(eb(eb.fn('date_part', [eb.val('epoch'), eb.ref('s.duration')]), '/', 60), 'int4')
+          .as('durationMinutes'),
         eb.ref('s.timezone').as('timezone'),
         eb.ref('currency.alpha_code').as('currency'),
-        sql<number>`
-          (
-            SELECT COUNT(*)
-            FROM client_session
-            WHERE client_session.session_id = ${sql.ref('s.id')}
-              AND client_session.state IN ('confirmed', 'accepted')
-          )::int
-        `.as('currentAttendance'),
+        eb
+          .selectFrom('client_session')
+          .select((sub) => sub.cast<number>(sub.fn.countAll(), 'int4').as('count'))
+          .whereRef('client_session.session_id', '=', 's.id')
+          .where('client_session.state', 'in', ['confirmed', 'accepted'])
+          .as('currentAttendance'),
         eb.ref('s.booking_payment_type').as('bookingPaymentType'),
         eb.ref('s.request_client_address_online').as('requestClientAddressOnline'),
         eb.ref('s.booking_question').as('bookingQuestion'),
@@ -316,14 +314,14 @@ export async function GET(request: Request) {
         eb(
           's.start',
           '<',
-          sql<Date>`NOW() + ${sql.ref('trainer.online_bookings_duration_until_booking_window_closes')}`
+          eb(eb.fn('now'), '+', eb.ref('trainer.online_bookings_duration_until_booking_window_closes'))
         )
       )
       .where(({ eb }) =>
         eb(
           's.start',
           '>=',
-          sql<Date>`NOW() + ${sql.ref('trainer.online_bookings_duration_until_booking_window_opens')}`
+          eb(eb.fn('now'), '+', eb.ref('trainer.online_bookings_duration_until_booking_window_opens'))
         )
       )
       .orderBy('s.start', 'asc')

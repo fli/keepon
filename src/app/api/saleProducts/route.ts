@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { intervalFromMinutes, toPoint } from '@/lib/db/values'
 import { uuidOrNil } from '@/lib/uuid'
 import { authenticateTrainerOrClientRequest, authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import {
@@ -455,11 +456,11 @@ export async function POST(request: Request) {
             .values({
               id: inserted.id,
               trainer_id: auth.trainerId,
-              duration: sql`make_interval(mins := ${data.durationMinutes})`,
+              duration: intervalFromMinutes(data.durationMinutes),
               location: toNullableTrimmedString(data.location),
               address: toNullableTrimmedString(data.address),
               google_place_id: toNullableTrimmedString(data.googlePlaceId),
-              geo: data.geo ? sql`point(${data.geo.lat}, ${data.geo.lng})` : null,
+              geo: data.geo ? toPoint(data.geo.lat, data.geo.lng) : null,
               is_service: true,
             })
             .execute()

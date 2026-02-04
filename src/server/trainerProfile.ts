@@ -2,12 +2,13 @@ import type Stripe from 'stripe'
 import BigNumber from 'bignumber.js'
 import { z } from 'zod'
 
+import { jsonArrayFrom } from 'kysely/helpers/postgres'
 import {
   normalizeSessionSeriesRow,
   sessionSeriesSchema,
   type RawSessionSeriesRow,
 } from '@/app/api/sessionSeries/shared'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 
 const toIsoString = (value: unknown): string | null => {
   if (value === null || value === undefined) {
@@ -283,70 +284,96 @@ export const getTrainerProfile = async (
   const calendarBaseUrl = `${new URL('cal', baseUrl).toString().replace(/\/$/, '')}/`
 
   const sessionSeriesSelection = includeSessionSeries
-    ? sql`, (SELECT COALESCE(json_agg(vw_legacy_session_series_2), '[]')
-          FROM vw_legacy_session_series_2
-         WHERE vw_legacy_session_series_2."trainerId" = vw_legacy_trainer.id) AS "sessionSeries"`
-    : sql``
+    ? jsonArrayFrom(
+        db
+          .selectFrom('vw_legacy_session_series_2')
+          .selectAll()
+          .where('vw_legacy_session_series_2.trainerId', '=', trainerId)
+      ).as('sessionSeries')
+    : null
 
-  const rowResult = await sql<TrainerQueryRow>`
-    SELECT
-      to_char(timezone('UTC', vw_legacy_trainer.created_at), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt",
-      vw_legacy_trainer.id,
-      vw_legacy_trainer.email,
-      vw_legacy_trainer.first_name AS "firstName",
-      vw_legacy_trainer.last_name AS "lastName",
-      vw_legacy_trainer.phone,
-      vw_legacy_trainer.device_id AS "deviceId",
-      vw_legacy_trainer.stripe_account_status AS "stripeAccountStatus",
-      vw_legacy_trainer.member_id AS "memberId",
-      to_char(timezone('UTC', vw_legacy_trainer.first_card_payment_processed), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "firstCardPaymentProcessed",
-      vw_legacy_trainer.timezone,
-      vw_legacy_trainer.locale,
-      vw_legacy_trainer.country,
-      vw_legacy_trainer.default_currency AS "defaultCurrency",
-      vw_legacy_trainer.subscription,
-      vw_legacy_trainer.terms_accepted AS "termsAccepted",
-      vw_legacy_trainer.business_name AS "businessName",
-      trainer.brand_color AS "brandColor",
-      trainer.business_logo_url AS "businessLogoUrl",
-      trainer.cover_image_url AS "coverImageUrl",
-      trainer.industry,
-      vw_legacy_trainer.default_service_provider_appointment_reminder_1 AS "defaultServiceProviderAppointmentReminder1",
-      vw_legacy_trainer.default_service_provider_appointment_reminder_2 AS "defaultServiceProviderAppointmentReminder2",
-      vw_legacy_trainer.default_client_appointment_reminder_1 AS "defaultClientAppointmentReminder1",
-      vw_legacy_trainer.default_client_appointment_reminder_2 AS "defaultClientAppointmentReminder2",
-      vw_legacy_trainer.sms_credit_balance AS "smsCreditBalance",
-      vw_legacy_trainer.sms_credit_top_up_at AS "smsCreditTopUpAt",
-      vw_legacy_trainer.sms_credit_top_up_count AS "smsCreditTopUpCount",
-      ${calendarBaseUrl} || trainer.icalendar_url_slug AS "calendarUrl",
-      trainer.default_can_clients_cancel_appointment AS "defaultCanClientsCancelAppointment",
-      trainer.sms_credit_checkout_id AS "smsCreditCheckoutId",
-      trainer.default_cancellation_advance_notice_duration::text AS "defaultCancellationAdvanceNoticeDuration",
-      stripe.account.object AS "stripeAccount",
-      (
-        SELECT object
-          FROM stripe.bank_account
-         WHERE object->>'account' = trainer.stripe_account_id
-           AND object->>'default_for_currency' = 'true'
-         LIMIT 1
-      ) AS "stripeBankAccount",
-      stripe_balance.object AS "stripeBalance",
-      trainer.stripe_account_id AS "stripeAccountId"
-      ${sessionSeriesSelection}
-    FROM vw_legacy_trainer
-    JOIN trainer ON trainer.id = vw_legacy_trainer.id
-    LEFT JOIN stripe.account ON trainer.stripe_account_id = stripe.account.id
-    LEFT JOIN stripe_balance ON stripe_balance.account_id = trainer.stripe_account_id
-    WHERE trainer.id = ${trainerId}
-    LIMIT 1
-  `.execute(db)
+  const selection = [
+    'vw_legacy_trainer.id as id',
+    'vw_legacy_trainer.email as email',
+    'vw_legacy_trainer.first_name as firstName',
+    'vw_legacy_trainer.last_name as lastName',
+    'vw_legacy_trainer.phone as phone',
+    'vw_legacy_trainer.device_id as deviceId',
+    'vw_legacy_trainer.stripe_account_status as stripeAccountStatus',
+    'vw_legacy_trainer.member_id as memberId',
+    'vw_legacy_trainer.timezone as timezone',
+    'vw_legacy_trainer.locale as locale',
+    'vw_legacy_trainer.country as country',
+    'vw_legacy_trainer.default_currency as defaultCurrency',
+    'vw_legacy_trainer.subscription as subscription',
+    'vw_legacy_trainer.terms_accepted as termsAccepted',
+    'vw_legacy_trainer.business_name as businessName',
+    'vw_legacy_trainer.default_service_provider_appointment_reminder_1 as defaultServiceProviderAppointmentReminder1',
+    'vw_legacy_trainer.default_service_provider_appointment_reminder_2 as defaultServiceProviderAppointmentReminder2',
+    'vw_legacy_trainer.default_client_appointment_reminder_1 as defaultClientAppointmentReminder1',
+    'vw_legacy_trainer.default_client_appointment_reminder_2 as defaultClientAppointmentReminder2',
+    'vw_legacy_trainer.sms_credit_balance as smsCreditBalance',
+    'vw_legacy_trainer.sms_credit_top_up_at as smsCreditTopUpAt',
+    'vw_legacy_trainer.sms_credit_top_up_count as smsCreditTopUpCount',
+  ] as const
 
-  const row = rowResult.rows[0]
+  const row = await db
+    .selectFrom('vw_legacy_trainer')
+    .innerJoin('trainer', 'trainer.id', 'vw_legacy_trainer.id')
+    .leftJoin('stripe.account', 'trainer.stripe_account_id', 'stripe.account.id')
+    .leftJoin('stripe_balance', 'stripe_balance.account_id', 'trainer.stripe_account_id')
+    .select(selection)
+    .select((eb) => [
+      eb.ref('vw_legacy_trainer.created_at').as('createdAt'),
+      eb.ref('vw_legacy_trainer.first_card_payment_processed').as('firstCardPaymentProcessed'),
+      eb.ref('trainer.brand_color').as('brandColor'),
+      eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
+      eb.ref('trainer.cover_image_url').as('coverImageUrl'),
+      eb.ref('trainer.industry').as('industry'),
+      eb.fn('concat', [eb.val(calendarBaseUrl), eb.ref('trainer.icalendar_url_slug')]).as('calendarUrl'),
+      eb.ref('trainer.default_can_clients_cancel_appointment').as('defaultCanClientsCancelAppointment'),
+      eb.ref('trainer.sms_credit_checkout_id').as('smsCreditCheckoutId'),
+      eb
+        .cast<string>(eb.ref('trainer.default_cancellation_advance_notice_duration'), 'text')
+        .as('defaultCancellationAdvanceNoticeDuration'),
+      eb.ref('stripe.account.object').as('stripeAccount'),
+      eb
+        .selectFrom('stripe.bank_account as bankAccount')
+        .select('bankAccount.object')
+        .where((sub) =>
+          sub.and([
+            sub(
+              sub.fn('json_extract_path_text', [sub.ref('bankAccount.object'), sub.val('account')]),
+              '=',
+              sub.ref('trainer.stripe_account_id')
+            ),
+            sub(
+              sub.fn('json_extract_path_text', [sub.ref('bankAccount.object'), sub.val('default_for_currency')]),
+              '=',
+              sub.val('true')
+            ),
+          ])
+        )
+        .limit(1)
+        .as('stripeBankAccount'),
+      eb.ref('stripe_balance.object').as('stripeBalance'),
+      eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
+      ...(sessionSeriesSelection ? [sessionSeriesSelection] : []),
+    ])
+    .where('trainer.id', '=', trainerId)
+    .executeTakeFirst()
   if (!row) {
     return null
   }
 
-  const parsedRow = trainerRowSchema.parse(row)
+  const normalizedRow = {
+    ...row,
+    createdAt: toIsoString(row.createdAt) ?? row.createdAt,
+    firstCardPaymentProcessed: toIsoString(row.firstCardPaymentProcessed),
+    smsCreditTopUpAt: toIsoString(row.smsCreditTopUpAt),
+  }
+
+  const parsedRow = trainerRowSchema.parse(normalizedRow)
 
   const stripeAccount = (parsedRow.stripeAccount ?? null) as Stripe.Account | null
   const stripeBalance = (parsedRow.stripeBalance ?? null) as Stripe.Balance | null

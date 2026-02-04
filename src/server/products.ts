@@ -1,6 +1,8 @@
+import type { ExpressionBuilder } from 'kysely'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql, type Point } from '@/lib/db'
+import type { Database, Point } from '@/lib/db'
+import { db } from '@/lib/db'
 import { uuidOrNil } from '@/lib/uuid'
 import { buildErrorResponse } from '../app/api/_lib/accessToken'
 
@@ -66,6 +68,13 @@ export const productSchema = z.union([creditPackProductSchema, itemProductSchema
 export const productListSchema = z.array(productSchema)
 export type ProductList = z.infer<typeof productListSchema>
 export type Product = z.infer<typeof productSchema>
+
+const combinedUpdatedAt = (eb: ExpressionBuilder<Database, 'product' | 'credit_pack' | 'service'>) =>
+  eb.fn('greatest', [
+    eb.ref('product.updated_at'),
+    eb.fn('coalesce', [eb.ref('service.updated_at'), eb.ref('product.updated_at')]),
+    eb.fn('coalesce', [eb.ref('creditPack.updated_at'), eb.ref('product.updated_at')]),
+  ])
 
 const productTypeSchema = z.enum(['creditPack', 'service', 'item'])
 
@@ -285,14 +294,6 @@ const mapRowToProduct = (row: RawProductRow) => {
 }
 
 export const fetchProductsForTrainer = async (trainerId: string, filters: ProductFilters): Promise<RawProductRow[]> => {
-  const greatestUpdatedAt = sql<Date>`
-    GREATEST(
-      ${sql.ref('product.updated_at')},
-      COALESCE(${sql.ref('service.updated_at')}, ${sql.ref('product.updated_at')}),
-      COALESCE(${sql.ref('creditPack.updated_at')}, ${sql.ref('product.updated_at')})
-    )
-  `
-
   let query = db
     .selectFrom('product as product')
     .innerJoin('currency as currency', 'currency.id', 'product.currency_id')
@@ -305,19 +306,20 @@ export const fetchProductsForTrainer = async (trainerId: string, filters: Produc
       eb.ref('product.price').as('price'),
       eb.ref('currency.alpha_code').as('currency'),
       eb.ref('product.created_at').as('createdAt'),
-      greatestUpdatedAt.as('combinedUpdatedAt'),
+      combinedUpdatedAt(eb).as('combinedUpdatedAt'),
       eb.ref('product.display_order').as('displayOrder'),
       eb.ref('product.is_credit_pack').as('isCreditPack'),
       eb.ref('product.is_item').as('isItem'),
       eb.ref('product.is_service').as('isService'),
       eb.ref('product.is_membership').as('isMembership'),
       eb.ref('creditPack.total_credits').as('totalCredits'),
-      sql<number | null>`
-        CASE
-          WHEN service.duration IS NULL THEN NULL
-          ELSE EXTRACT(EPOCH FROM service.duration) / 60
-        END
-      `.as('durationMinutes'),
+      eb
+        .case()
+        .when('service.duration', 'is', null)
+        .then(null)
+        .else(eb(eb.fn('date_part', [eb.val('epoch'), eb.ref('service.duration')]), '/', 60))
+        .end()
+        .as('durationMinutes'),
       eb.ref('service.location').as('location'),
       eb.ref('service.address').as('address'),
       eb.ref('service.google_place_id').as('googlePlaceId'),
@@ -357,19 +359,7 @@ export const fetchProductsForTrainer = async (trainerId: string, filters: Produc
 
   if (filters.updatedAfter) {
     const updatedAfterDate = filters.updatedAfter
-    query = query.where(({ eb }) =>
-      eb(
-        sql<Date>`
-          GREATEST(
-            ${sql.ref('product.updated_at')},
-            COALESCE(${sql.ref('service.updated_at')}, ${sql.ref('product.updated_at')}),
-            COALESCE(${sql.ref('creditPack.updated_at')}, ${sql.ref('product.updated_at')})
-          )
-        `,
-        '>',
-        updatedAfterDate
-      )
-    )
+    query = query.where(({ eb }) => eb(combinedUpdatedAt(eb), '>', updatedAfterDate))
   }
 
   return query.orderBy('product.created_at', 'desc').execute() as Promise<RawProductRow[]>

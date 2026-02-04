@@ -1,8 +1,9 @@
 import type { NextRequest } from 'next/server'
 import BigNumber from 'bignumber.js'
+import { addDays } from 'date-fns'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../../_lib/constants'
 import { parseStrictJsonBody } from '../../../../_lib/strictJson'
@@ -314,13 +315,10 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           eb.ref('plan.end_').as('end'),
           eb.ref('plan.amount').as('amount'),
           eb.ref('trainer.locale').as('locale'),
-          sql<string>`
-            COALESCE(
-              trainer.online_bookings_business_name,
-              trainer.business_name,
-              trainer.first_name || COALESCE(' ' || trainer.last_name, '')
-            )
-          `.as('serviceProviderName'),
+          eb.ref('trainer.online_bookings_business_name').as('onlineBookingsBusinessName'),
+          eb.ref('trainer.business_name').as('businessName'),
+          eb.ref('trainer.first_name').as('firstName'),
+          eb.ref('trainer.last_name').as('lastName'),
           eb.ref('trainer.brand_color').as('brandColor'),
           eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
           eb.ref('client.email').as('clientEmail'),
@@ -336,7 +334,27 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         throw new SubscriptionNotFoundError()
       }
 
-      const detailsResult = planDetailsSchema.safeParse(planRow)
+      const serviceProviderName =
+        planRow.onlineBookingsBusinessName ??
+        planRow.businessName ??
+        `${planRow.firstName}${planRow.lastName ? ` ${planRow.lastName}` : ''}`
+
+      const detailsResult = planDetailsSchema.safeParse({
+        name: planRow.name,
+        status: planRow.status,
+        frequencyWeeklyInterval: planRow.frequencyWeeklyInterval,
+        locale: planRow.locale,
+        start: planRow.start,
+        end: planRow.end,
+        amount: planRow.amount,
+        serviceProviderName,
+        brandColor: planRow.brandColor,
+        businessLogoUrl: planRow.businessLogoUrl,
+        clientEmail: planRow.clientEmail,
+        clientUserId: planRow.clientUserId,
+        clientId: planRow.clientId,
+        currency: planRow.currency,
+      })
 
       if (!detailsResult.success) {
         throw new InvalidEndDateError('Subscription data is invalid')
@@ -394,21 +412,19 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           updatedEndDate.getTime() + details.frequencyWeeklyInterval * 7 * 24 * 60 * 60 * 1000
         )
 
-        const paidSessionsAfterEndDate = await sql<{
-          exists: boolean
-        }>`
-          SELECT TRUE as exists
-            FROM client_session
-            JOIN session ON session.id = client_session.session_id
-            JOIN sale ON sale.id = client_session.sale_id
-            JOIN payment ON payment.sale_id = sale.id
-            JOIN payment_subscription ON payment_subscription.id = payment.id
-           WHERE payment_subscription.subscription_id = ${planId}
-             AND client_session.client_id = ${details.clientId}
-             AND session.start > ${finalPaymentDate.toISOString()}
-        `.execute(trx)
+        const paidSessionsAfterEndDate = await trx
+          .selectFrom('client_session')
+          .innerJoin('session', 'session.id', 'client_session.session_id')
+          .innerJoin('sale', 'sale.id', 'client_session.sale_id')
+          .innerJoin('payment', 'payment.sale_id', 'sale.id')
+          .innerJoin('payment_subscription', 'payment_subscription.id', 'payment.id')
+          .select('client_session.id')
+          .where('payment_subscription.subscription_id', '=', planId)
+          .where('client_session.client_id', '=', details.clientId)
+          .where('session.start', '>', finalPaymentDate)
+          .executeTakeFirst()
 
-        if (paidSessionsAfterEndDate.rows.length > 0) {
+        if (paidSessionsAfterEndDate) {
           throw new PaidAppointmentsAfterSubscriptionEndDateError()
         }
       }
@@ -450,8 +466,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
       if (shouldUpdatePlan) {
         const planUpdate: Record<string, unknown> = {
-          end_:
-            newEndDate.getTime() === MAX_TIME.getTime() ? sql<Date>`'infinity'::timestamp with time zone` : newEndDate,
+          end_: newEndDate.getTime() === MAX_TIME.getTime() ? db.fn<Date>('infinity_timestamptz') : newEndDate,
           amount: updatedAmount.toString(),
         }
 
@@ -459,10 +474,10 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           planUpdate.status = 'pending'
           planUpdate.accepted_end = null
           planUpdate.accepted_amount = null
-          planUpdate.acceptance_request_time = sql<Date>`NOW()`
+          planUpdate.acceptance_request_time = new Date()
         } else {
           planUpdate.accepted_end =
-            newEndDate.getTime() === MAX_TIME.getTime() ? sql<Date>`'infinity'::timestamp with time zone` : newEndDate
+            newEndDate.getTime() === MAX_TIME.getTime() ? db.fn<Date>('infinity_timestamptz') : newEndDate
           planUpdate.accepted_amount = updatedAmount.toString()
         }
 
@@ -485,13 +500,14 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       }
 
       if (messages.length > 0 || requiresClientAcceptance) {
+        const now = new Date()
         const tokenRow = await trx
           .insertInto('access_token')
           .values({
             user_id: details.clientUserId,
             user_type: 'client',
             type: 'client_dashboard',
-            expires_at: sql<Date>`NOW() + INTERVAL '7 days'`,
+            expires_at: addDays(now, 7),
           })
           .returning('id')
           .executeTakeFirst()

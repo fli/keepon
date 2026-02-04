@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { intervalFromMinutes } from '@/lib/db/values'
 import { adaptSaleProductRow, fetchSaleProducts, saleProductSchema } from '../app/api/saleProducts/shared'
 
 const createSaleProductSchema = z.object({
@@ -88,7 +89,7 @@ export async function createSaleProductForTrainer(
           .values({
             id: inserted.id,
             trainer_id: trainerId,
-            duration: sql`make_interval(mins := ${minutes})`,
+            duration: intervalFromMinutes(minutes),
             location: parsed.location ?? null,
             address: parsed.address ?? null,
             google_place_id: parsed.googlePlaceId ?? null,

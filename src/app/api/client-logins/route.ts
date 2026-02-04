@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { Buffer } from 'node:buffer'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { buildErrorResponse } from '../_lib/accessToken'
 
 const clientSchema = z.object({
@@ -69,52 +69,50 @@ export async function GET(_request: Request) {
 
   try {
     const result = await db.transaction().execute(async (trx) => {
-      const loginRequest = await sql<{ exists: true }>`
-          SELECT TRUE AS exists
-            FROM client_login_request
-           WHERE email = ${email}
-             AND code = ${code}
-             AND expires_at > NOW()
-             AND NOT authenticated
-             AND failed_authentication_count < 3
-           FOR UPDATE
-        `.execute(trx)
+      const now = new Date()
+      const loginRequest = await trx
+        .selectFrom('client_login_request')
+        .select('id')
+        .where('email', '=', email)
+        .where('code', '=', code)
+        .where('expires_at', '>', now)
+        .where('authenticated', '=', false)
+        .where('failed_authentication_count', '<', 3)
+        .forUpdate()
+        .executeTakeFirst()
 
-      if (loginRequest.rows.length === 0) {
-        await sql`
-            UPDATE client_login_request
-               SET failed_authentication_count = failed_authentication_count + 1
-             WHERE email = ${email}
-               AND expires_at > NOW()
-               AND NOT authenticated
-          `.execute(trx)
+      if (!loginRequest) {
+        await trx
+          .updateTable('client_login_request')
+          .set((eb) => ({
+            failed_authentication_count: eb('failed_authentication_count', '+', 1),
+          }))
+          .where('email', '=', email)
+          .where('expires_at', '>', now)
+          .where('authenticated', '=', false)
+          .execute()
 
         return { ok: false as const }
       }
 
-      const clientsResult = await sql<{
-        id: string
-        first_name: string
-        last_name: string | null
-        service_provider_first_name: string
-        service_provider_last_name: string | null
-      }>`
-          SELECT
-            client.id,
-            client.first_name,
-            client.last_name,
-            trainer.first_name AS service_provider_first_name,
-            trainer.last_name AS service_provider_last_name
-          FROM client
-          JOIN trainer ON trainer.id = client.trainer_id
-         WHERE client.email = ${email}
-        `.execute(trx)
+      const clients = await trx
+        .selectFrom('client')
+        .innerJoin('trainer', 'trainer.id', 'client.trainer_id')
+        .select([
+          'client.id as id',
+          'client.first_name as first_name',
+          'client.last_name as last_name',
+          'trainer.first_name as service_provider_first_name',
+          'trainer.last_name as service_provider_last_name',
+        ])
+        .where('client.email', '=', email)
+        .execute()
 
-      if (clientsResult.rows.length === 0) {
+      if (clients.length === 0) {
         return { ok: false as const }
       }
 
-      const clients = clientsResult.rows.map((row) => ({
+      const mappedClients = clients.map((row) => ({
         id: row.id,
         firstName: row.first_name,
         lastName: row.last_name,
@@ -122,7 +120,7 @@ export async function GET(_request: Request) {
         serviceProviderLastName: row.service_provider_last_name,
       }))
 
-      return { ok: true as const, clients }
+      return { ok: true as const, clients: mappedClients }
     })
 
     if (!result.ok) {

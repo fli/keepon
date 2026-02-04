@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../_lib/constants'
 
@@ -284,11 +284,13 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         .leftJoin('sms_balance', 'sms_balance.trainer_id', 'trainer.id')
         .select((eb) => [
           eb.ref('cs.booking_id').as('bookingId'),
-          sql<string>`COALESCE(sms_balance.credit_balance, '0')`.as('smsCreditBalance'),
-          sql<string>`COALESCE(trainer.online_bookings_business_name, trainer.business_name, trainer.first_name || COALESCE(' ' || trainer.last_name, ''))`.as(
-            'serviceProviderName'
-          ),
-          sql<string>`COALESCE(trainer.online_bookings_contact_email, trainer.email)`.as('serviceProviderEmail'),
+          eb.ref('sms_balance.credit_balance').as('smsCreditBalance'),
+          eb.ref('trainer.online_bookings_business_name').as('onlineBookingsBusinessName'),
+          eb.ref('trainer.business_name').as('businessName'),
+          eb.ref('trainer.first_name').as('trainerFirstName'),
+          eb.ref('trainer.last_name').as('trainerLastName'),
+          eb.ref('trainer.online_bookings_contact_email').as('onlineBookingsContactEmail'),
+          eb.ref('trainer.email').as('trainerEmail'),
           eb.ref('trainer.brand_color').as('brandColor'),
           eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
           eb.ref('client.email').as('clientEmail'),
@@ -296,7 +298,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
           eb.ref('country.alpha_2_code').as('country'),
           eb.ref('trainer.id').as('trainerId'),
           eb.ref('client.id').as('clientId'),
-          sql<string>`COALESCE(ss.name, 'Appointment')`.as('appointmentName'),
+          eb.ref('ss.name').as('appointmentName'),
           eb.ref('s.start').as('startsAt'),
           eb.ref('trainer.locale').as('locale'),
           eb.ref('s.timezone').as('timezone'),
@@ -309,7 +311,33 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         throw new ClientSessionNotFoundError()
       }
 
-      const details = detailsSchema.parse(detailsRow)
+      const serviceProviderName =
+        detailsRow.onlineBookingsBusinessName ??
+        detailsRow.businessName ??
+        [detailsRow.trainerFirstName, detailsRow.trainerLastName]
+          .map((part) => part?.trim())
+          .filter(Boolean)
+          .join(' ')
+
+      const serviceProviderEmail = detailsRow.onlineBookingsContactEmail ?? detailsRow.trainerEmail
+
+      const details = detailsSchema.parse({
+        bookingId: detailsRow.bookingId,
+        smsCreditBalance: detailsRow.smsCreditBalance ?? '0',
+        serviceProviderName: serviceProviderName || 'Appointment',
+        serviceProviderEmail: serviceProviderEmail || '',
+        brandColor: detailsRow.brandColor,
+        businessLogoUrl: detailsRow.businessLogoUrl,
+        clientEmail: detailsRow.clientEmail,
+        clientMobileNumber: detailsRow.clientMobileNumber,
+        country: detailsRow.country,
+        trainerId: detailsRow.trainerId,
+        clientId: detailsRow.clientId,
+        appointmentName: detailsRow.appointmentName ?? 'Appointment',
+        startsAt: detailsRow.startsAt,
+        locale: detailsRow.locale,
+        timezone: detailsRow.timezone,
+      })
 
       const wantsEmail = method === 'email' || method === 'emailAndSms'
       const wantsSms = method === 'sms' || method === 'emailAndSms'

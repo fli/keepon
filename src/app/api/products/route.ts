@@ -2,7 +2,8 @@ import type { Insertable } from 'kysely'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import type { Service } from '@/lib/db/generated'
-import { db, sql } from '@/lib/db'
+import { db } from '@/lib/db'
+import { intervalFromMinutes, toPoint } from '@/lib/db/values'
 import { sanitizeProductQuery, listProducts } from '@/server/products'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 
@@ -31,6 +32,11 @@ const geoSchema = z
   })
   .nullable()
   .optional()
+
+const serviceProductSchema = z.object({
+  bookingPaymentType: z.enum(['hidePrice', 'noPrepayment', 'fullPrepayment']).nullable().optional(),
+  showPriceOnline: z.boolean().nullable().optional(),
+})
 
 const invalidJsonResponse = () =>
   NextResponse.json(
@@ -187,20 +193,37 @@ export async function POST(request: Request) {
     }
   }
 
-  if (Object.hasOwn(body, 'bookableOnline') && typeof body.bookableOnline !== 'boolean') {
-    return invalidParametersResponse('bookableOnline  should be boolean')
+  let bookableOnline: boolean | undefined = undefined
+  if (Object.hasOwn(body, 'bookableOnline')) {
+    if (typeof body.bookableOnline !== 'boolean') {
+      return invalidParametersResponse('bookableOnline  should be boolean')
+    }
+    bookableOnline = body.bookableOnline
   }
 
-  if (Object.hasOwn(body, 'showPriceOnline') && typeof body.showPriceOnline !== 'boolean') {
-    return invalidParametersResponse('showPriceOnline  should be boolean')
+  let showPriceOnline: boolean | undefined = undefined
+  if (Object.hasOwn(body, 'showPriceOnline')) {
+    if (typeof body.showPriceOnline !== 'boolean') {
+      return invalidParametersResponse('showPriceOnline  should be boolean')
+    }
+    showPriceOnline = body.showPriceOnline
   }
 
-  if (
-    Object.hasOwn(body, 'bookingPaymentType') &&
-    body.bookingPaymentType !== null &&
-    typeof body.bookingPaymentType !== 'string'
-  ) {
-    return invalidParametersResponse('bookingPaymentType  should be string or  should be null')
+  let bookingPaymentType: 'hidePrice' | 'noPrepayment' | 'fullPrepayment' | null | undefined = undefined
+  if (Object.hasOwn(body, 'bookingPaymentType')) {
+    const value = body.bookingPaymentType
+    if (value === null) {
+      bookingPaymentType = null
+    } else if (typeof value === 'string') {
+      if (!['hidePrice', 'noPrepayment', 'fullPrepayment'].includes(value)) {
+        return invalidParametersResponse(
+          'bookingPaymentType  should be "hidePrice" or  should be "noPrepayment" or  should be "fullPrepayment" or  should be null'
+        )
+      }
+      bookingPaymentType = value
+    } else {
+      return invalidParametersResponse('bookingPaymentType  should be string or  should be null')
+    }
   }
 
   if (Object.hasOwn(body, 'location') && body.location !== null && typeof body.location !== 'string') {
@@ -215,42 +238,54 @@ export async function POST(request: Request) {
     return invalidParametersResponse('googlePlaceId  should be string or  should be null')
   }
 
-  if (
-    Object.hasOwn(body, 'bufferMinutesBefore') &&
-    (typeof body.bufferMinutesBefore !== 'number' ||
+  let bufferMinutesBefore: number | undefined = undefined
+  if (Object.hasOwn(body, 'bufferMinutesBefore')) {
+    if (
+      typeof body.bufferMinutesBefore !== 'number' ||
       !Number.isInteger(body.bufferMinutesBefore) ||
-      body.bufferMinutesBefore < 0)
-  ) {
-    return invalidParametersResponse('bufferMinutesBefore  should be integer')
+      body.bufferMinutesBefore < 0
+    ) {
+      return invalidParametersResponse('bufferMinutesBefore  should be integer')
+    }
+    bufferMinutesBefore = body.bufferMinutesBefore
   }
 
-  if (
-    Object.hasOwn(body, 'bufferMinutesAfter') &&
-    (typeof body.bufferMinutesAfter !== 'number' ||
+  let bufferMinutesAfter: number | undefined = undefined
+  if (Object.hasOwn(body, 'bufferMinutesAfter')) {
+    if (
+      typeof body.bufferMinutesAfter !== 'number' ||
       !Number.isInteger(body.bufferMinutesAfter) ||
-      body.bufferMinutesAfter < 0)
-  ) {
-    return invalidParametersResponse('bufferMinutesAfter  should be integer')
+      body.bufferMinutesAfter < 0
+    ) {
+      return invalidParametersResponse('bufferMinutesAfter  should be integer')
+    }
+    bufferMinutesAfter = body.bufferMinutesAfter
   }
 
-  if (
-    Object.hasOwn(body, 'timeSlotFrequencyMinutes') &&
-    (typeof body.timeSlotFrequencyMinutes !== 'number' ||
+  let timeSlotFrequencyMinutes: number | undefined = undefined
+  if (Object.hasOwn(body, 'timeSlotFrequencyMinutes')) {
+    if (
+      typeof body.timeSlotFrequencyMinutes !== 'number' ||
       !Number.isInteger(body.timeSlotFrequencyMinutes) ||
-      body.timeSlotFrequencyMinutes < 1)
-  ) {
-    return invalidParametersResponse('timeSlotFrequencyMinutes  should be integer')
+      body.timeSlotFrequencyMinutes < 1
+    ) {
+      return invalidParametersResponse('timeSlotFrequencyMinutes  should be integer')
+    }
+    timeSlotFrequencyMinutes = body.timeSlotFrequencyMinutes
   }
 
-  if (
-    Object.hasOwn(body, 'requestClientAddressOnline') &&
-    body.requestClientAddressOnline !== null &&
-    body.requestClientAddressOnline !== 'optional' &&
-    body.requestClientAddressOnline !== 'required'
-  ) {
-    return invalidParametersResponse(
-      'requestClientAddressOnline  should be "optional" or  should be "required" or  should be null'
-    )
+  let requestClientAddressOnline: 'optional' | 'required' | null | undefined = undefined
+  if (Object.hasOwn(body, 'requestClientAddressOnline')) {
+    if (
+      body.requestClientAddressOnline !== null &&
+      body.requestClientAddressOnline !== 'optional' &&
+      body.requestClientAddressOnline !== 'required'
+    ) {
+      return invalidParametersResponse(
+        'requestClientAddressOnline  should be "optional" or  should be "required" or  should be null'
+      )
+    }
+    requestClientAddressOnline = body.requestClientAddressOnline
   }
 
   if (
@@ -261,15 +296,18 @@ export async function POST(request: Request) {
     return invalidParametersResponse('bookingQuestion  should be string or  should be null')
   }
 
-  if (
-    Object.hasOwn(body, 'bookingQuestionState') &&
-    body.bookingQuestionState !== null &&
-    body.bookingQuestionState !== 'optional' &&
-    body.bookingQuestionState !== 'required'
-  ) {
-    return invalidParametersResponse(
-      'bookingQuestionState  should be "optional" or  should be "required" or  should be null'
-    )
+  let bookingQuestionState: 'optional' | 'required' | null | undefined = undefined
+  if (Object.hasOwn(body, 'bookingQuestionState')) {
+    if (
+      body.bookingQuestionState !== null &&
+      body.bookingQuestionState !== 'optional' &&
+      body.bookingQuestionState !== 'required'
+    ) {
+      return invalidParametersResponse(
+        'bookingQuestionState  should be "optional" or  should be "required" or  should be null'
+      )
+    }
+    bookingQuestionState = body.bookingQuestionState
   }
 
   let totalCredits: number | null = null
@@ -326,19 +364,19 @@ export async function POST(request: Request) {
       displayOrder,
       totalCredits,
       durationMinutes,
-      bookableOnline: body.bookableOnline,
-      showPriceOnline: body.showPriceOnline,
-      bookingPaymentType: body.bookingPaymentType,
+      bookableOnline,
+      showPriceOnline,
+      bookingPaymentType,
       location: locationParse.success ? locationParse.data : undefined,
       address: addressParse.success ? addressParse.data : undefined,
-      geo: geoParse.success ? (body.geo as any) : undefined,
+      geo: geoParse.success ? geoParse.data : undefined,
       googlePlaceId: googlePlaceParse.success ? googlePlaceParse.data : undefined,
-      bufferMinutesBefore: body.bufferMinutesBefore,
-      bufferMinutesAfter: body.bufferMinutesAfter,
-      timeSlotFrequencyMinutes: body.timeSlotFrequencyMinutes,
-      requestClientAddressOnline: body.requestClientAddressOnline,
+      bufferMinutesBefore,
+      bufferMinutesAfter,
+      timeSlotFrequencyMinutes,
+      requestClientAddressOnline,
       bookingQuestion: bookingQuestionParse.success ? bookingQuestionParse.data : undefined,
-      bookingQuestionState: body.bookingQuestionState,
+      bookingQuestionState,
     }
 
     const currencyRow = await db
@@ -412,11 +450,11 @@ export async function POST(request: Request) {
         const serviceValues: Record<string, unknown> = {
           id: productRow.id,
           trainer_id: authorization.trainerId,
-          duration: sql`make_interval(mins := ${data.durationMinutes ?? 0})`,
+          duration: intervalFromMinutes(data.durationMinutes ?? 0),
           location: data.location ?? null,
           address: data.address ?? null,
           google_place_id: data.googlePlaceId ?? null,
-          geo: data.geo ? sql`point(${data.geo.lat}, ${data.geo.lng})` : null,
+          geo: data.geo ? toPoint(data.geo.lat, data.geo.lng) : null,
           bookable_online: data.bookableOnline ?? false,
           booking_payment_type: bookingPaymentType,
           is_service: true,
