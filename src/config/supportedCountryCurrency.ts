@@ -4,7 +4,7 @@ export type SupportedCountryCurrency = Readonly<{
 }>
 
 // Stripe Connect supported country -> currency mappings provided by user.
-export const supportedCountryCurrency: ReadonlyArray<SupportedCountryCurrency> = [
+export const supportedCountryCurrency: readonly SupportedCountryCurrency[] = [
   { countryId: 36, currencyId: 36 }, // Australia -> AUD
   { countryId: 124, currencyId: 124 }, // Canada -> CAD
   { countryId: 208, currencyId: 208 }, // Denmark -> DKK

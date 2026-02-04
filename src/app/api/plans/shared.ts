@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { type Selectable, type VwLegacyPlan } from '@/lib/db'
+import type { Selectable, VwLegacyPlan } from '@/lib/db'
 
 export const isoDateTimeString = z.string().datetime({ offset: true })
 
@@ -57,7 +57,7 @@ export type RawPlanRow = Selectable<VwLegacyPlan>
 const ensureIsoDateTimeString = (value: unknown, label: string): string => {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
-      throw new Error(`Invalid ${label}`)
+      throw new TypeError(`Invalid ${label}`)
     }
     return value.toISOString()
   }
@@ -70,7 +70,7 @@ const ensureIsoDateTimeString = (value: unknown, label: string): string => {
 
     const parsed = new Date(trimmed)
     if (Number.isNaN(parsed.getTime())) {
-      throw new Error(`Invalid ${label}`)
+      throw new TypeError(`Invalid ${label}`)
     }
 
     return parsed.toISOString()
@@ -105,7 +105,7 @@ const toNullableIsoDateTimeString = (
 const ensureNumber = (value: unknown, label: string): number => {
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(`Invalid ${label}`)
+      throw new TypeError(`Invalid ${label}`)
     }
     return value
   }
@@ -118,7 +118,7 @@ const ensureNumber = (value: unknown, label: string): number => {
 
     const parsed = Number(trimmed)
     if (!Number.isFinite(parsed)) {
-      throw new Error(`Invalid ${label}`)
+      throw new TypeError(`Invalid ${label}`)
     }
 
     return parsed
@@ -137,7 +137,7 @@ const ensureString = (value: unknown, label: string): string => {
 
 const ensurePlanPaymentStatus = (value: unknown, label: string): PlanPaymentStatus => {
   if (typeof value !== 'string') {
-    throw new Error(`Invalid ${label}`)
+    throw new TypeError(`Invalid ${label}`)
   }
 
   if (!planPaymentStatusSchema.options.includes(value as PlanPaymentStatus)) {
@@ -153,7 +153,7 @@ const parsePlanPayments = (value: unknown): PlanPayment[] => {
   }
 
   if (!Array.isArray(value)) {
-    throw new Error('Invalid plan payments payload')
+    throw new TypeError('Invalid plan payments payload')
   }
 
   return value.map((entry, index) => {
@@ -181,7 +181,7 @@ const parsePlanPauses = (value: unknown): PlanPause[] => {
   }
 
   if (!Array.isArray(value)) {
-    throw new Error('Invalid plan pauses payload')
+    throw new TypeError('Invalid plan pauses payload')
   }
 
   return value.map((entry, index) => {
@@ -227,7 +227,7 @@ const parseSessionSeriesIds = (value: unknown): string[] => {
   }
 
   if (!Array.isArray(value)) {
-    throw new Error('Invalid session series ids payload')
+    throw new TypeError('Invalid session series ids payload')
   }
 
   const normalized = value.map((entry, index) => {

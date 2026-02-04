@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db } from '@/lib/db'
 import { uuidOrNil } from '@/lib/uuid'
 import { authenticateTrainerOrClientRequest, authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { parseStrictJsonBody } from '../_lib/strictJson'
 import { adaptSaleRow, fetchSales, saleListSchema, saleSchema, salesQuerySchema } from './shared'
-import { db } from '@/lib/db'
 
 const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
 
@@ -115,15 +115,21 @@ const createSaleSchema = z.object({
 })
 
 const parseDueAfter = (value: string | null | undefined) => {
-  if (!value) return new Date()
+  if (!value) {
+    return new Date()
+  }
 
   const match = /^P(?:(\d+)W)?(?:(\d+)D)?$/i.exec(value.trim())
-  if (!match) return new Date()
+  if (!match) {
+    return new Date()
+  }
 
   const weeks = match[1] ? Number.parseInt(match[1], 10) : 0
   const days = match[2] ? Number.parseInt(match[2], 10) : 0
   const totalDays = weeks * 7 + days
-  if (!Number.isFinite(totalDays) || totalDays <= 0) return new Date()
+  if (!Number.isFinite(totalDays) || totalDays <= 0) {
+    return new Date()
+  }
 
   return new Date(Date.now() + totalDays * 24 * 60 * 60 * 1000)
 }

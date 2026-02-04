@@ -1,9 +1,9 @@
-import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
+import { PageContainer } from '@/components/page-container'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { PageContainer } from '@/components/page-container'
 
 import { statusColors, normalizeStatus, optionalValue } from '@/lib/app/features/clients/shared'
 import { loadClientsServer, readSessionFromCookies } from '../actions'
@@ -49,7 +49,7 @@ async function ClientDetailContent({ params }: { params: Promise<{ clientId: str
         <h1 className="text-3xl leading-tight font-semibold">
           {client.firstName} {client.lastName}
         </h1>
-        <p className="text-sm text-muted-foreground">{client.company || 'Independent client'}</p>
+        <p className="text-sm text-muted-foreground">{client.company ?? 'Independent client'}</p>
       </div>
 
       <Card className="max-w-3xl">

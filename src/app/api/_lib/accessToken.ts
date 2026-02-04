@@ -1,8 +1,8 @@
-import { Buffer } from 'node:buffer'
-import { NextResponse, connection } from 'next/server'
 import { headers } from 'next/headers'
-import { db } from '@/lib/db'
+import { NextResponse, connection } from 'next/server'
+import { Buffer } from 'node:buffer'
 import { z } from 'zod'
+import { db } from '@/lib/db'
 
 const TRAINER_ACCESS_TOKEN_EXTENSION_MS = 28 * 24 * 60 * 60 * 1000
 const CLIENT_ACCESS_TOKEN_EXTENSION_MS = 7 * 24 * 60 * 60 * 1000

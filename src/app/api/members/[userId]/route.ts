@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db } from '@/lib/db'
 import { buildErrorResponse, extractAccessToken } from '../../_lib/accessToken'
 
 const FIFTEEN_MINUTES_IN_MS = 15 * 60 * 1000

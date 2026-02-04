@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import type { Trainer } from '@/lib/db'
-import { z } from 'zod'
-import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
 import type { CountryCode } from 'libphonenumber-js'
+import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+import type { Trainer } from '@/lib/db'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
 
@@ -160,17 +160,14 @@ type RawTrainerSettingsRow = {
   cancellationPolicy: string | null
   durationUntilBookingWindowOpens: unknown
   durationUntilBookingWindowCloses: unknown
-} & {
-  [K in AcceptingKey]: boolean | null
-} & {
-  [K in IntervalsKey]: string[] | null
-}
+} & Record<AcceptingKey, boolean | null> &
+  Record<IntervalsKey, string[] | null>
 
-const dayFieldMap: Array<{
+const dayFieldMap: {
   day: Weekday
   acceptingKey: AcceptingKey
   intervalsKey: IntervalsKey
-}> = weekdays.map((day) => ({
+}[] = weekdays.map((day) => ({
   day,
   acceptingKey: `${day}AcceptingBookings`,
   intervalsKey: `${day}AvailableIntervals`,
@@ -246,7 +243,7 @@ const parseTimerange = (value: string): [string, string] | null => {
     return null
   }
 
-  const compact = trimmed.replace(/\s+/g, '')
+  const compact = trimmed.replaceAll(/\s+/g, '')
   if (compact === SENTINEL_RANGE) {
     return null
   }
@@ -255,7 +252,7 @@ const parseTimerange = (value: string): [string, string] | null => {
     return null
   }
 
-  const content = trimmed.slice(1, trimmed.length - 1)
+  const content = trimmed.slice(1, -1)
   const [startRaw, endRaw] = content.split(',')
   if (!startRaw || !endRaw) {
     return null
@@ -284,8 +281,8 @@ const parsePgArray = (value: string): string[] => {
   if (!trimmed || trimmed === '{}') {
     return []
   }
-  const matches = Array.from(trimmed.matchAll(/\"((?:\\\\.|[^\"\\\\])*)\"/g)).map((match) =>
-    match[1].replace(/\\\\\"/g, '"').replace(/\\\\\\\\/g, '\\')
+  const matches = Array.from(trimmed.matchAll(/"((?:\\\\.|[^"\\\\])*)"/g)).map((match) =>
+    match[1].replaceAll(/\\\\"/g, '"').replaceAll(/\\\\\\\\/g, '\\')
   )
   if (matches.length > 0) {
     return matches
@@ -298,7 +295,9 @@ const parsePgArray = (value: string): string[] => {
 }
 
 const normalizeTimerangeInput = (values: unknown): string[] => {
-  if (!values) return []
+  if (!values) {
+    return []
+  }
   if (Array.isArray(values)) {
     return values.map((entry) => String(entry))
   }
@@ -308,7 +307,7 @@ const normalizeTimerangeInput = (values: unknown): string[] => {
   return []
 }
 
-const parseTimerangeList = (values: unknown): Array<[string, string]> => {
+const parseTimerangeList = (values: unknown): [string, string][] => {
   const list = normalizeTimerangeInput(values)
   if (!list || list.length === 0) {
     return []
@@ -318,10 +317,10 @@ const parseTimerangeList = (values: unknown): Array<[string, string]> => {
 
   return intervals
     .slice()
-    .sort((a, b) => timeToMinutes(a[0]) - timeToMinutes(b[0]) || timeToMinutes(a[1]) - timeToMinutes(b[1]))
+    .toSorted((a, b) => timeToMinutes(a[0]) - timeToMinutes(b[0]) || timeToMinutes(a[1]) - timeToMinutes(b[1]))
 }
 
-const toTimerangeArray = (intervals: Array<[string, string]>) =>
+const toTimerangeArray = (intervals: [string, string][]) =>
   intervals
     .filter(([start, end]) => start !== end && timeToMinutes(start) < timeToMinutes(end))
     .map(([start, end]) => `[${start},${end})`)
@@ -470,15 +469,15 @@ export async function GET(request: Request) {
     }
 
     if (typeof trainerRow.enabled !== 'boolean') {
-      throw new Error('Online bookings enabled flag is missing or invalid')
+      throw new TypeError('Online bookings enabled flag is missing or invalid')
     }
 
     if (typeof trainerRow.showContactNumber !== 'boolean') {
-      throw new Error('Online bookings show contact number flag is invalid')
+      throw new TypeError('Online bookings show contact number flag is invalid')
     }
 
     if (typeof trainerRow.pageUrlSlug !== 'string') {
-      throw new Error('Online bookings page URL slug is missing')
+      throw new TypeError('Online bookings page URL slug is missing')
     }
 
     const pageUrl = buildBookingsPageUrl(trainerRow.pageUrlSlug)
@@ -492,10 +491,10 @@ export async function GET(request: Request) {
       'durationUntilBookingWindowCloses'
     )
 
-    const defaultsEntries: Array<[Weekday, Availability]> = dayFieldMap.map(({ day, acceptingKey, intervalsKey }) => {
+    const defaultsEntries: [Weekday, Availability][] = dayFieldMap.map(({ day, acceptingKey, intervalsKey }) => {
       const acceptingValue = trainerRow[acceptingKey]
       if (typeof acceptingValue !== 'boolean') {
-        throw new Error(`Online bookings ${day} accepting flag is invalid`)
+        throw new TypeError(`Online bookings ${day} accepting flag is invalid`)
       }
       const intervals = parseTimerangeList(trainerRow[intervalsKey])
       return [
@@ -533,7 +532,7 @@ export async function GET(request: Request) {
         return accumulator
       }
 
-      const accepting = row.acceptingBookings === null ? null : row.acceptingBookings === true
+      const accepting = row.acceptingBookings === null ? null : row.acceptingBookings
 
       const availableIntervals = row.availableIntervals === null ? null : parseTimerangeList(row.availableIntervals)
 

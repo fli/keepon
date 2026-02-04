@@ -11,7 +11,7 @@ const querySchema = z.object({
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const queryParams = {
-    clientId: url.searchParams.get('clientId')?.trim() || undefined,
+    clientId: url.searchParams.get('clientId')?.trim() ?? undefined,
   }
 
   const parsedQuery = querySchema.safeParse(queryParams)

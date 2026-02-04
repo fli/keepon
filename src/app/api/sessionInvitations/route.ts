@@ -1,33 +1,36 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z, ZodError } from 'zod'
+import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../_lib/constants'
 import { parseStrictJsonBody } from '../_lib/strictJson'
 
 const requestSchema = z.object({
-  clientId: z
-    .string({ message: 'clientId is required' })
-    .trim()
-    .min(1, 'clientId must not be empty'),
-  sessionId: z
-    .string({ message: 'sessionId is required' })
-    .trim()
-    .min(1, 'sessionId must not be empty'),
+  clientId: z.string({ message: 'clientId is required' }).trim().min(1, 'clientId must not be empty'),
+  sessionId: z.string({ message: 'sessionId is required' }).trim().min(1, 'sessionId must not be empty'),
 })
 
 const nullableCount = z.union([z.number(), z.string(), z.null()]).transform((value) => {
-  if (value === null || value === undefined) return null
+  if (value === null || value === undefined) {
+    return null
+  }
   if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new Error('Invalid numeric value')
+    if (!Number.isFinite(value)) {
+      throw new Error('Invalid numeric value')
+    }
     return value
   }
 
   const trimmed = value.trim()
-  if (trimmed.length === 0) return null
+  if (trimmed.length === 0) {
+    return null
+  }
 
   const parsed = Number(trimmed)
-  if (!Number.isFinite(parsed)) throw new Error('Invalid numeric value')
+  if (!Number.isFinite(parsed)) {
+    throw new Error('Invalid numeric value')
+  }
 
   return parsed
 })
@@ -39,15 +42,23 @@ const detailsSchema = z.object({
   isPastAppointment: z.boolean(),
   location: z.string().nullable(),
   price: z.union([z.number(), z.string(), z.null()]).transform((value) => {
-    if (value === null || value === undefined) return null
+    if (value === null || value === undefined) {
+      return null
+    }
     if (typeof value === 'number') {
-      if (!Number.isFinite(value)) throw new Error('Invalid numeric value')
+      if (!Number.isFinite(value)) {
+        throw new Error('Invalid numeric value')
+      }
       return value
     }
     const trimmed = value.trim()
-    if (trimmed.length === 0) return null
+    if (trimmed.length === 0) {
+      return null
+    }
     const parsed = Number(trimmed)
-    if (!Number.isFinite(parsed)) throw new Error('Invalid numeric value')
+    if (!Number.isFinite(parsed)) {
+      throw new Error('Invalid numeric value')
+    }
     return parsed
   }),
   maximumAttendance: nullableCount,
@@ -87,11 +98,11 @@ class AppointmentHasAlreadyStartedError extends Error {
 
 const escapeHtml = (value: string) =>
   value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+    .replaceAll(/&/g, '&amp;')
+    .replaceAll(/</g, '&lt;')
+    .replaceAll(/>/g, '&gt;')
+    .replaceAll(/"/g, '&quot;')
+    .replaceAll(/'/g, '&#39;')
 
 const buildInvitationEmail = (options: {
   businessName: string
@@ -179,8 +190,12 @@ const buildInvitationEmail = (options: {
 }
 
 const formatEventPrice = (price: number | null, locale: string, currency?: string | null) => {
-  if (price === null) return null
-  if (price === 0) return 'Free'
+  if (price === null) {
+    return null
+  }
+  if (price === 0) {
+    return 'Free'
+  }
 
   if (currency) {
     try {

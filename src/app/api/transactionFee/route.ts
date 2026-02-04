@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server'
 import BigNumber from 'bignumber.js'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
@@ -25,7 +25,9 @@ const invalidParametersResponse = (detail: string) =>
   )
 
 const parseLegacyQueryValue = (value: string | null) => {
-  if (value === null) return undefined
+  if (value === null) {
+    return undefined
+  }
   try {
     return JSON.parse(value)
   } catch {

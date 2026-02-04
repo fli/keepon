@@ -1,14 +1,14 @@
-import Link from 'next/link'
 import type { Route } from 'next'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 
 import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { CreditPackSelector } from '../credit-pack-selector'
-import { loadClients, loadCreditPacks } from '../actions'
 import { readSessionFromCookies } from '../../../../../session.server'
+import { loadClients, loadCreditPacks } from '../actions'
+import { CreditPackSelector } from '../credit-pack-selector'
 
 export default async function SelectCreditPackPage({
   params,
@@ -21,7 +21,9 @@ export default async function SelectCreditPackPage({
   const qs = (await searchParams) ?? {}
 
   const session = await readSessionFromCookies()
-  if (!session) redirect('/auth')
+  if (!session) {
+    redirect('/auth')
+  }
 
   // Single fetch fan-out reused in nested Suspense boundaries.
   const clientsPromise = loadClients()
@@ -29,7 +31,9 @@ export default async function SelectCreditPackPage({
 
   const queryString = new URLSearchParams(
     Object.entries(qs).reduce<Record<string, string>>((acc, [key, value]) => {
-      if (typeof value === 'string') acc[key] = value
+      if (typeof value === 'string') {
+        acc[key] = value
+      }
       return acc
     }, {})
   ).toString()

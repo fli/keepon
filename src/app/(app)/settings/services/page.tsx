@@ -5,10 +5,10 @@ import Link from 'next/link'
 import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
 
+import { z } from 'zod'
+import { listProducts } from '@/server/products'
 import { readSessionFromCookies } from '../../../session.server'
 import { ServicesTable } from './services-table'
-import { listProducts } from '@/server/products'
-import { z } from 'zod'
 
 const serviceProductSchema = z.object({
   id: z.string(),

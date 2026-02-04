@@ -1,9 +1,9 @@
-import Link from 'next/link'
 import type { Route } from 'next'
+import Link from 'next/link'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CreditPack } from './actions'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import type { CreditPack } from './actions'
 
 type Props = {
   clientId: string
@@ -13,7 +13,9 @@ type Props = {
 
 const formatPrice = (amount: string, currency: string) => {
   const parsed = Number.parseFloat(amount)
-  if (!Number.isFinite(parsed)) return `${amount} ${currency}`
+  if (!Number.isFinite(parsed)) {
+    return `${amount} ${currency}`
+  }
 
   try {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(parsed)

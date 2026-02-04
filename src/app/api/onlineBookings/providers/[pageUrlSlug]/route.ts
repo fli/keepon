@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { buildErrorResponse } from '../../../_lib/accessToken'
 
 const ISO_DURATION_PATTERN = /^-?P/
@@ -97,7 +97,7 @@ const providerSchema = z.object({
 type Provider = z.infer<typeof providerSchema>
 
 type ProviderRow = Omit<Provider, 'pageUrl' | 'unavailability'> & {
-  unavailability: Array<[string | Date, string | Date]>
+  unavailability: [string | Date, string | Date][]
 }
 
 type HandlerContext = { params: Promise<Record<string, string>> }
@@ -507,7 +507,9 @@ export async function GET(_request: Request, context: HandlerContext) {
     const normalizedUnavailability = Array.isArray(row.unavailability)
       ? row.unavailability
           .map((interval) => {
-            if (!Array.isArray(interval) || interval.length < 2) return null
+            if (!Array.isArray(interval) || interval.length < 2) {
+              return null
+            }
             const [start, end] = interval
 
             const normalizedStart = normalizeDateValue(start)

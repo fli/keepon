@@ -1,27 +1,36 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
-import { z } from 'zod'
-import { APP_EMAIL, APP_NAME, NO_REPLY_EMAIL } from '../../_lib/constants'
-import { nullableNumber } from '../../_lib/clientSessionsSchema'
-import { buildErrorResponse } from '../../_lib/accessToken'
 import type { Transaction } from 'kysely'
-import type { Database } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { validate as validateUuid } from 'uuid'
+import { z } from 'zod'
+import type { Database } from '@/lib/db'
+import { db, sql } from '@/lib/db'
+import { buildErrorResponse } from '../../_lib/accessToken'
+import { nullableNumber } from '../../_lib/clientSessionsSchema'
+import { APP_EMAIL, APP_NAME, NO_REPLY_EMAIL } from '../../_lib/constants'
 
 const querySchema = z.object({
   action: z.enum(['accept', 'decline'] as const),
 })
 
 const nullableCount = z.union([z.number(), z.string(), z.null()]).transform((value) => {
-  if (value === null || value === undefined) return null
+  if (value === null || value === undefined) {
+    return null
+  }
   if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new Error('Invalid numeric value')
+    if (!Number.isFinite(value)) {
+      throw new Error('Invalid numeric value')
+    }
     return value
   }
   const trimmed = value.trim()
-  if (trimmed.length === 0) return null
+  if (trimmed.length === 0) {
+    return null
+  }
   const parsed = Number(trimmed)
-  if (!Number.isFinite(parsed)) throw new Error('Invalid numeric value')
+  if (!Number.isFinite(parsed)) {
+    throw new Error('Invalid numeric value')
+  }
   return parsed
 })
 
@@ -64,8 +73,12 @@ type InvitationDetails = InvitationRow & {
 }
 
 const normalizeUpdatedCount = (value: unknown) => {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
-  if (typeof value === 'bigint') return Number(value)
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0
+  }
+  if (typeof value === 'bigint') {
+    return Number(value)
+  }
   if (typeof value === 'string') {
     const parsed = Number(value)
     return Number.isFinite(parsed) ? parsed : 0
@@ -75,21 +88,25 @@ const normalizeUpdatedCount = (value: unknown) => {
 
 const escapeHtml = (value: string) =>
   value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+    .replaceAll(/&/g, '&amp;')
+    .replaceAll(/</g, '&lt;')
+    .replaceAll(/>/g, '&gt;')
+    .replaceAll(/"/g, '&quot;')
+    .replaceAll(/'/g, '&#39;')
 
-const joinNames = (...parts: Array<string | null | undefined>) =>
+const joinNames = (...parts: (string | null | undefined)[]) =>
   parts
     .map((part) => part?.trim())
     .filter(Boolean)
     .join(' ')
 
 const formatEventPrice = (price: number | null, locale: string, currency?: string | null) => {
-  if (price === null) return null
-  if (price === 0) return 'Free'
+  if (price === null) {
+    return null
+  }
+  if (price === 0) {
+    return 'Free'
+  }
 
   if (currency) {
     try {
@@ -148,11 +165,7 @@ const successHtml = ({
           <p
             className="mt-4 max-w-2xl text-xl leading-8 text-gray-600 lg:mx-auto"
           >
-           ${
-             eventName
-               ? `<span className="text-gray-900 text-2xl font-bold">${eventName}</span>`
-               : ''
-           }
+           ${eventName ? `<span className="text-gray-900 text-2xl font-bold">${eventName}</span>` : ''}
             <br />
             ${escapeHtml(dateRangeString)}${price === null ? '' : `, ${escapeHtml(price)}`}<br />
             ${location ? `at : <span>${escapeHtml(location)}</span> <br />` : ''} With :
@@ -273,11 +286,7 @@ const eventNotFoundHtml = `
 </div>
 `
 
-const invitationExpiredHtml = ({
-  serviceProviderEmail,
-}: {
-  serviceProviderEmail: string
-}) => `
+const invitationExpiredHtml = ({ serviceProviderEmail }: { serviceProviderEmail: string }) => `
 <link href="https://unpkg.com/tailwindcss@^1.4.6/dist/tailwind.min.css" rel="stylesheet">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>This invitation has expired</title>
@@ -365,7 +374,9 @@ const sendTrainerNotification = async (
   details: InvitationDetails,
   payload: { title: string; body: string; messageType: 'success' | 'failure' | 'default' }
 ) => {
-  if (!details.trainerUserId) return
+  if (!details.trainerUserId) {
+    return
+  }
 
   const notificationPayload = {
     clientId: details.clientId,
@@ -383,7 +394,7 @@ const sendTrainerNotification = async (
 }
 
 const sendAcceptSideEffects = async (trx: DbTransaction, details: InvitationDetails) => {
-  const tasks: Array<Promise<unknown>> = []
+  const tasks: Promise<unknown>[] = []
 
   tasks.push(
     sql`
@@ -433,7 +444,7 @@ const sendAcceptSideEffects = async (trx: DbTransaction, details: InvitationDeta
 }
 
 const sendDeclineSideEffects = async (trx: DbTransaction, details: InvitationDetails) => {
-  const tasks: Array<Promise<unknown>> = []
+  const tasks: Promise<unknown>[] = []
 
   tasks.push(
     sql`

@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
-import { z } from 'zod'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { validate as validateUuid, NIL as NIL_UUID } from 'uuid'
+import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import {
   authenticateTrainerOrClientRequest,
   authenticateTrainerRequest,
@@ -237,9 +238,9 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
   const { saleId } = await context.params
   const safeSaleId = coerceUuidOrNil(saleId)
 
-  const hasDueAt = Object.prototype.hasOwnProperty.call(parsedBody, 'dueAt')
-  const hasNote = Object.prototype.hasOwnProperty.call(parsedBody, 'note')
-  const hasPassOnFee = Object.prototype.hasOwnProperty.call(parsedBody, 'paymentRequestPassOnTransactionFee')
+  const hasDueAt = Object.hasOwn(parsedBody, 'dueAt')
+  const hasNote = Object.hasOwn(parsedBody, 'note')
+  const hasPassOnFee = Object.hasOwn(parsedBody, 'paymentRequestPassOnTransactionFee')
 
   const updatePayload: Record<string, unknown> = {}
 

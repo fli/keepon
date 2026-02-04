@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 
 const isValidTimeZone = (value: string) => {
@@ -42,16 +42,16 @@ const querySchema = z
       })
     }
 
-  if (value.endTime) {
-    const end = Date.parse(value.endTime)
-    if (!Number.isFinite(end)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['endTime'],
-        message: 'endTime must be a valid ISO 8601 timestamp.',
-      })
+    if (value.endTime) {
+      const end = Date.parse(value.endTime)
+      if (!Number.isFinite(end)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['endTime'],
+          message: 'endTime must be a valid ISO 8601 timestamp.',
+        })
+      }
     }
-  }
   })
 
 const revenuePointSchema = z.object({
@@ -70,7 +70,7 @@ const revenueResponseSchema = z.object({
 const ensureIsoString = (value: unknown, label: string) => {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
-      throw new Error(`Invalid ${label} value encountered in revenue record`)
+      throw new TypeError(`Invalid ${label} value encountered in revenue record`)
     }
     return value.toISOString()
   }
@@ -89,7 +89,7 @@ const ensureIsoString = (value: unknown, label: string) => {
 const parseNumeric = (value: unknown, label: string) => {
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(`Invalid ${label} value encountered in revenue record`)
+      throw new TypeError(`Invalid ${label} value encountered in revenue record`)
     }
     return value
   }
@@ -97,7 +97,7 @@ const parseNumeric = (value: unknown, label: string) => {
   if (typeof value === 'string') {
     const parsed = Number.parseFloat(value)
     if (!Number.isFinite(parsed)) {
-      throw new Error(`Invalid ${label} value encountered in revenue record`)
+      throw new TypeError(`Invalid ${label} value encountered in revenue record`)
     }
     return parsed
   }

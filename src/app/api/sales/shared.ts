@@ -1,5 +1,5 @@
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 
 export const moneyString = z
   .string()
@@ -37,11 +37,7 @@ export const salesQuerySchema = z.object({
     )
     .transform((value) => new Date(value))
     .optional(),
-  clientId: z
-    .string()
-    .trim()
-    .min(1, 'clientId must not be empty')
-    .optional(),
+  clientId: z.string().trim().min(1, 'clientId must not be empty').optional(),
 })
 
 export type SalesQuery = z.infer<typeof salesQuerySchema>
@@ -65,7 +61,7 @@ export type RawSaleRow = {
 const ensureDate = (value: Date | string | null | undefined, label: string): Date => {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
-      throw new Error(`Invalid ${label} value encountered in sale record`)
+      throw new TypeError(`Invalid ${label} value encountered in sale record`)
     }
     return value
   }
@@ -73,7 +69,7 @@ const ensureDate = (value: Date | string | null | undefined, label: string): Dat
   if (typeof value === 'string') {
     const parsed = new Date(value)
     if (Number.isNaN(parsed.getTime())) {
-      throw new Error(`Invalid ${label} value encountered in sale record`)
+      throw new TypeError(`Invalid ${label} value encountered in sale record`)
     }
     return parsed
   }
@@ -94,7 +90,7 @@ const formatMoney = (value: string | number | null | undefined, label: string): 
 
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(`Invalid ${label} value encountered in sale record`)
+      throw new TypeError(`Invalid ${label} value encountered in sale record`)
     }
     return value.toFixed(2)
   }
@@ -106,7 +102,7 @@ const formatMoney = (value: string | number | null | undefined, label: string): 
 
   const numeric = Number.parseFloat(trimmed)
   if (!Number.isFinite(numeric)) {
-    throw new Error(`Invalid ${label} value encountered in sale record`)
+    throw new TypeError(`Invalid ${label} value encountered in sale record`)
   }
 
   return numeric.toFixed(2)

@@ -1,6 +1,6 @@
+import { NextResponse } from 'next/server'
 import crypto from 'node:crypto'
 import path from 'node:path'
-import { NextResponse } from 'next/server'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { PublicBucketNotConfiguredError, uploadToPublicBucket } from '../../../_lib/storage'
 
@@ -48,7 +48,7 @@ const createMissingBucketResponse = () =>
 
 const makeRandomB64urlToken = async () => {
   const bytes = crypto.randomBytes(18)
-  return bytes.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+  return bytes.toString('base64').replaceAll(/\+/g, '-').replaceAll(/\//g, '_').replaceAll(/[=]/g, '')
 }
 
 const sanitizeBaseName = (filename: string) => {

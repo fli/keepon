@@ -1,10 +1,10 @@
-import crypto from 'node:crypto'
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import crypto from 'node:crypto'
 import { z } from 'zod'
+import { db } from '@/lib/db'
 import { buildErrorResponse } from '../_lib/accessToken'
-import { parseStrictJsonBody } from '../_lib/strictJson'
 import { APP_EMAIL, APP_NAME, KEEPON_LOGO_COLOR_URL } from '../_lib/constants'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 
 const requestSchema = z.object({
   email: z.string().min(1, 'Email is required').email('Email must be a valid email address.'),
@@ -55,7 +55,7 @@ const createInvalidBodyResponse = (detail: string | undefined) =>
     buildErrorResponse({
       status: 400,
       title: 'Your parameters were invalid.',
-      detail: detail || 'Request body did not match the expected schema.',
+      detail: detail ?? 'Request body did not match the expected schema.',
       type: '/invalid-parameters',
     }),
     { status: 400 }

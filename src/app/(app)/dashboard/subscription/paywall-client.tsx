@@ -1,11 +1,11 @@
 'use client'
 
 import type { ChangeEvent } from 'react'
-import { useMemo, useState, useTransition } from 'react'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { loadStripe } from '@stripe/stripe-js'
 import { AlertCircle, CheckCircle2, CreditCard, Lock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useMemo, useState, useTransition } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -65,14 +65,18 @@ export function SubscriptionPaywall({ plan, publishableKey, trainerName, trialDa
   const stripePromise = useMemo(() => (publishableKey ? loadStripe(publishableKey) : null), [publishableKey])
 
   const normalizedPlan = useMemo(() => {
-    if (!plan) return null
+    if (!plan) {
+      return null
+    }
     const monthly = Number.parseFloat(plan.monthlyPrice)
     const yearly = Number.parseFloat(plan.yearlyPrice)
     return Number.isFinite(monthly) && Number.isFinite(yearly) ? { monthly, yearly, currency: plan.currency } : null
   }, [plan])
 
   const savings = useMemo(() => {
-    if (!normalizedPlan) return null
+    if (!normalizedPlan) {
+      return null
+    }
     const yearlyAsMonthly = normalizedPlan.yearly / 12
     const diff = normalizedPlan.monthly - yearlyAsMonthly
     const pct = normalizedPlan.monthly > 0 ? Math.max(0, Math.round((diff / normalizedPlan.monthly) * 100)) : 0
@@ -80,7 +84,9 @@ export function SubscriptionPaywall({ plan, publishableKey, trainerName, trialDa
   }, [normalizedPlan])
 
   const formatCurrency = (value: number) => {
-    if (!normalizedPlan || !Number.isFinite(value)) return '—'
+    if (!normalizedPlan || !Number.isFinite(value)) {
+      return '—'
+    }
     try {
       return new Intl.NumberFormat(undefined, {
         style: 'currency',
@@ -162,8 +168,12 @@ export function SubscriptionPaywall({ plan, publishableKey, trainerName, trialDa
   }
 
   const trialCopy = (() => {
-    if (trialDaysRemaining && trialDaysRemaining > 0) return `${trialDaysRemaining} day trial remaining`
-    if (trialEndsAt) return `Trial ends ${new Date(trialEndsAt).toLocaleDateString()}`
+    if (trialDaysRemaining && trialDaysRemaining > 0) {
+      return `${trialDaysRemaining} day trial remaining`
+    }
+    if (trialEndsAt) {
+      return `Trial ends ${new Date(trialEndsAt).toLocaleDateString()}`
+    }
     return 'Trial ending soon'
   })()
 
@@ -367,7 +377,9 @@ function StripePaymentForm({
   const [error, setError] = useState<string | null>(null)
 
   const handleConfirm = async () => {
-    if (!stripe || !elements) return
+    if (!stripe || !elements) {
+      return
+    }
     setSubmitting(true)
     setError(null)
 

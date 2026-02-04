@@ -1,14 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { noteSchema } from '../../../_lib/clientSessionsSchema'
 
 const paramsSchema = z.object({
-  sessionId: z
-    .string({ message: 'Session id is required.' })
-    .trim()
-    .min(1, 'Session id must not be empty.'),
+  sessionId: z.string({ message: 'Session id is required.' }).trim().min(1, 'Session id must not be empty.'),
 })
 
 const requestBodySchema = z.object({

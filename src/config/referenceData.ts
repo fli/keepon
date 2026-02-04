@@ -43,7 +43,7 @@ export type MissionType = Readonly<{
   actionUrl: string | null
 }>
 
-export const missionTypes: ReadonlyArray<MissionType> = [
+export const missionTypes: readonly MissionType[] = [
   {
     id: 'completeStripeVerification',
     title: 'Get verified for payments',
@@ -84,7 +84,7 @@ export type RewardType = Readonly<{
   description: string
 }>
 
-export const rewardTypes: ReadonlyArray<RewardType> = [
+export const rewardTypes: readonly RewardType[] = [
   { type: '1DayTrial', title: '+1 day trial', description: '1 day has been added to your trial!' },
   {
     type: '2DayTrial',
@@ -102,7 +102,7 @@ export type SubscriptionFrequency = Readonly<{
   duration: string
 }>
 
-export const subscriptionFrequencies: ReadonlyArray<SubscriptionFrequency> = [
+export const subscriptionFrequencies: readonly SubscriptionFrequency[] = [
   { frequency: 'daily', duration: '1 day' },
   { frequency: 'monthly', duration: '1 mon' },
   { frequency: 'weekly', duration: '7 days' },

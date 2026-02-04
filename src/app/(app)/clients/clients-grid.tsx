@@ -1,9 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useMemo } from 'react'
 import type { Route } from 'next'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useMemo } from 'react'
 
+import { RefreshCw, Search } from 'lucide-react'
+import type { Client } from '@/lib/app/services/api'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
 import {
   Pagination,
   PaginationContent,
@@ -13,11 +20,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { NativeSelect } from '@/components/ui/native-select'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   isStatusFilter,
@@ -26,8 +28,6 @@ import {
   statusOptions,
   type StatusFilter,
 } from '@/lib/app/features/clients/shared'
-import type { Client } from '@/lib/app/services/api'
-import { RefreshCw, Search } from 'lucide-react'
 
 type Props = {
   clients: Client[]
@@ -56,13 +56,19 @@ export function ClientsGrid({ clients }: Props) {
       const params = new URLSearchParams(searchParams.toString())
 
       if (updates.q !== undefined) {
-        if (updates.q.trim()) params.set('q', updates.q.trim())
-        else params.delete('q')
+        if (updates.q.trim()) {
+          params.set('q', updates.q.trim())
+        } else {
+          params.delete('q')
+        }
       }
 
       if (updates.status !== undefined) {
-        if (updates.status === 'all') params.delete('status')
-        else params.set('status', updates.status)
+        if (updates.status === 'all') {
+          params.delete('status')
+        } else {
+          params.set('status', updates.status)
+        }
       }
 
       if (updates.pageSize !== undefined) {
@@ -109,9 +115,13 @@ export function ClientsGrid({ clients }: Props) {
     return clients.filter((client) => {
       const matchesStatus = statusFilter === 'all' || normalizeStatus(client.status) === statusFilter
 
-      if (!matchesStatus) return false
+      if (!matchesStatus) {
+        return false
+      }
 
-      if (!term) return true
+      if (!term) {
+        return true
+      }
 
       const haystack = [
         client.firstName,
@@ -129,7 +139,9 @@ export function ClientsGrid({ clients }: Props) {
   }, [clients, quickFilter, statusFilter])
 
   const totalPages = useMemo(() => {
-    if (filteredClients.length === 0) return 1
+    if (filteredClients.length === 0) {
+      return 1
+    }
     return Math.max(1, Math.ceil(filteredClients.length / pageSize))
   }, [filteredClients.length, pageSize])
 
@@ -148,7 +160,9 @@ export function ClientsGrid({ clients }: Props) {
 
   const handleRowClick = useCallback(
     (id?: string) => {
-      if (!id) return
+      if (!id) {
+        return
+      }
       router.push(`/clients/${id}`)
     },
     [router]
@@ -275,7 +289,7 @@ export function ClientsGrid({ clients }: Props) {
                             {`${client.firstName ?? ''} ${client.lastName ?? ''}`.trim() || 'Unnamed client'}
                           </span>
                           <span className="truncate text-xs text-muted-foreground">
-                            {client.email || client.mobileNumber || 'No contact info'}
+                            {client.email ?? client.mobileNumber ?? 'No contact info'}
                           </span>
                         </div>
                       </div>
@@ -322,7 +336,9 @@ export function ClientsGrid({ clients }: Props) {
                 href="#"
                 onClick={(event) => {
                   event.preventDefault()
-                  if (currentPage > 1) updateQuery({ page: currentPage - 1 })
+                  if (currentPage > 1) {
+                    updateQuery({ page: currentPage - 1 })
+                  }
                 }}
               />
             </PaginationItem>
@@ -368,7 +384,9 @@ export function ClientsGrid({ clients }: Props) {
                 href="#"
                 onClick={(event) => {
                   event.preventDefault()
-                  if (currentPage < totalPages) updateQuery({ page: currentPage + 1 })
+                  if (currentPage < totalPages) {
+                    updateQuery({ page: currentPage + 1 })
+                  }
                 }}
               />
             </PaginationItem>

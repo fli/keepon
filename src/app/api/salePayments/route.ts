@@ -1,12 +1,14 @@
+import BigNumber from 'bignumber.js'
+import { isValid, parseISO } from 'date-fns'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import BigNumber from 'bignumber.js'
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import { isValid, parseISO } from 'date-fns'
+import { db, sql } from '@/lib/db'
+import { uuidOrNil } from '@/lib/uuid'
 import { authenticateTrainerOrClientRequest, buildErrorResponse } from '../_lib/accessToken'
-import { parseStrictJsonBody } from '../_lib/strictJson'
+import { APP_NAME } from '../_lib/constants'
 import { adaptSalePaymentRow, salePaymentSchema, type SalePaymentRow } from '../_lib/salePayments'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 import { getStripeClient, STRIPE_API_VERSION } from '../_lib/stripeClient'
 import {
   currencyChargeLimits,
@@ -14,8 +16,6 @@ import {
   CurrencyNotSupportedError,
   CountryNotSupportedError,
 } from '../_lib/transactionFees'
-import { APP_NAME } from '../_lib/constants'
-import { uuidOrNil } from '@/lib/uuid'
 
 const createLegacyInvalidParametersResponse = (detail: string) =>
   NextResponse.json(
@@ -368,7 +368,7 @@ const parseTransactedAt = (value: string | null | undefined) => {
   }
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) {
-    throw new Error('Invalid transaction timestamp')
+    throw new TypeError('Invalid transaction timestamp')
   }
   return parsed
 }
@@ -739,7 +739,7 @@ export async function POST(request: Request) {
         throw new StripeCardRequiredError()
       }
 
-      const cardCountry = (paymentMethod.card.country || chargeCountry).toUpperCase()
+      const cardCountry = (paymentMethod.card.country ?? chargeCountry).toUpperCase()
 
       const fee = getTransactionFee({
         cardCountry,

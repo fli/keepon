@@ -13,7 +13,9 @@ export const readSessionFromCookies = cache(async (): Promise<KeeponSession | nu
   const cookieStore = await cookies()
   const cookie = cookieStore.get(SESSION_COOKIE)
   const value = typeof cookie?.value === 'string' ? cookie.value : null
-  if (!value) return null
+  if (!value) {
+    return null
+  }
 
   try {
     const decoded = decodeURIComponent(value)
@@ -36,7 +38,9 @@ export const readSessionFromCookies = cache(async (): Promise<KeeponSession | nu
 
 export async function loadClientsServer(): Promise<Client[] | undefined> {
   const session = await readSessionFromCookies()
-  if (!session) return undefined
+  if (!session) {
+    return undefined
+  }
 
   try {
     const clients = await listClientsForTrainer(session.trainerId, undefined)

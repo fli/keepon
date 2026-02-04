@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
-import { z } from 'zod'
-import Stripe from 'stripe'
 import BigNumber from 'bignumber.js'
+import { NextResponse } from 'next/server'
+import Stripe from 'stripe'
+import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { buildErrorResponse } from '../_lib/accessToken'
-import { parseStrictJsonBody } from '../_lib/strictJson'
 import { getSmsCreditPricingForCountry } from '../_lib/smsCreditPricing'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 import { getStripeClient, STRIPE_API_VERSION } from '../_lib/stripeClient'
 
 const stripeApiVersionDate = STRIPE_API_VERSION.split('.')[0]
@@ -199,7 +199,7 @@ export async function POST(request: Request) {
     if (!stripeCustomerId) {
       const customer = await stripeClient.customers.create({
         description: 'Service provider',
-        email: checkoutDetails.email || undefined,
+        email: checkoutDetails.email ?? undefined,
         metadata: {
           serviceProviderId: checkoutDetails.serviceProviderId,
         },
@@ -231,7 +231,7 @@ export async function POST(request: Request) {
       })
     } else {
       await stripeClient.customers.update(stripeCustomerId, {
-        email: checkoutDetails.email || undefined,
+        email: checkoutDetails.email ?? undefined,
       })
     }
 
@@ -247,7 +247,7 @@ export async function POST(request: Request) {
       customer: stripeCustomerId,
       client_reference_id: checkoutDetails.serviceProviderId,
       payment_intent_data: {
-        receipt_email: checkoutDetails.email || undefined,
+        receipt_email: checkoutDetails.email ?? undefined,
       },
       line_items: [
         {

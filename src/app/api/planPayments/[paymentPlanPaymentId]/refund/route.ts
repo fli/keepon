@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import BigNumber from 'bignumber.js'
+import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { z, ZodError } from 'zod'
 import { db, sql, type Selectable, type VwLegacyPlanPayment } from '@/lib/db'
@@ -8,10 +9,7 @@ import { getStripeClient, STRIPE_API_VERSION } from '../../../_lib/stripeClient'
 import { planPaymentSchema, planPaymentStatusSchema } from '../../../plans/shared'
 
 const paramsSchema = z.object({
-  paymentPlanPaymentId: z
-    .string()
-    .trim()
-    .min(1, 'Payment plan payment id is required'),
+  paymentPlanPaymentId: z.string().trim().min(1, 'Payment plan payment id is required'),
 })
 
 const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
@@ -115,7 +113,7 @@ const toBigNumberOrZero = (value: string | number | null | undefined, label: str
   return toBigNumber(value, label)
 }
 
-const sumStripeBalanceEntries = (entries: Array<{ amount: number; currency: string }>) =>
+const sumStripeBalanceEntries = (entries: { amount: number; currency: string }[]) =>
   entries.reduce((total, entry) => total.plus(new BigNumber(entry.amount).shiftedBy(-2)), new BigNumber(0))
 
 type RawPlanPayment = Selectable<VwLegacyPlanPayment>
@@ -127,7 +125,7 @@ const ensureNumber = (value: number | string | null | undefined, label: string):
 
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(`Invalid ${label}`)
+      throw new TypeError(`Invalid ${label}`)
     }
     return value
   }
@@ -139,7 +137,7 @@ const ensureNumber = (value: number | string | null | undefined, label: string):
 
   const parsed = Number.parseFloat(trimmed)
   if (!Number.isFinite(parsed)) {
-    throw new Error(`Invalid ${label}`)
+    throw new TypeError(`Invalid ${label}`)
   }
 
   return parsed
@@ -148,7 +146,7 @@ const ensureNumber = (value: number | string | null | undefined, label: string):
 const ensureDate = (value: Date | string | null | undefined, label: string): Date => {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
-      throw new Error(`Invalid ${label}`)
+      throw new TypeError(`Invalid ${label}`)
     }
     return value
   }
@@ -278,8 +276,8 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         .where('trainer_id', '=', authorization.trainerId)
         .execute()
 
-      const stripeChargeId = details.stripeChargeId === null ? undefined : details.stripeChargeId
-      const stripePaymentIntentId = details.stripePaymentIntentId === null ? undefined : details.stripePaymentIntentId
+      const stripeChargeId = details.stripeChargeId ?? undefined
+      const stripePaymentIntentId = details.stripePaymentIntentId ?? undefined
 
       const refundAmount = toBigNumber(details.amount, 'payment amount')
       const applicationFeeAmount = toBigNumberOrZero(details.applicationFeeAmount, 'application fee amount')

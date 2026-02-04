@@ -1,6 +1,6 @@
-import crypto from 'node:crypto'
-import { Buffer } from 'node:buffer'
 import { NextResponse } from 'next/server'
+import { Buffer } from 'node:buffer'
+import crypto from 'node:crypto'
 
 import { db, sql, type Json } from '@/lib/db'
 
@@ -89,7 +89,7 @@ const buildExpectedSignature = ({
 }) => {
   if (isFormUrlEncoded(contentType)) {
     const params = new URLSearchParams(rawBody)
-    const sortedEntries = [...params.entries()].sort(([a], [b]) => a.localeCompare(b))
+    const sortedEntries = [...params.entries()].toSorted(([a], [b]) => a.localeCompare(b))
     const data = url + sortedEntries.map(([key, value]) => key + value).join('')
     return crypto.createHmac('sha1', authToken).update(data).digest('base64')
   }

@@ -27,7 +27,9 @@ async function loadCreditPacks(trainerId: string): Promise<CreditPack[]> {
 
 function formatPrice(amount: string, currency: string) {
   const parsed = Number.parseFloat(amount)
-  if (!Number.isFinite(parsed)) return `${amount} ${currency}`
+  if (!Number.isFinite(parsed)) {
+    return `${amount} ${currency}`
+  }
 
   try {
     return new Intl.NumberFormat(undefined, {

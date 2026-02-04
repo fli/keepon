@@ -1,17 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql, type Selectable, type VwLegacyPayment } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z, ZodError } from 'zod'
+import { db, sql, type Selectable, type VwLegacyPayment } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../../../_lib/accessToken'
-import { normalizePlanRow, type RawPlanRow } from '../../../../../../plans/shared'
 import { paymentSchema } from '../../../../../../_lib/clientSessionsSchema'
+import { normalizePlanRow, type RawPlanRow } from '../../../../../../plans/shared'
 
 const paramsSchema = z.object({
   clientId: z.string().trim().min(1, 'Client id is required.'),
   planId: z.string().trim().min(1, 'Plan id is required.'),
-  sessionSeriesId: z
-    .string()
-    .trim()
-    .min(1, 'Session series id is required.'),
+  sessionSeriesId: z.string().trim().min(1, 'Session series id is required.'),
 })
 
 const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
@@ -137,13 +135,13 @@ const adaptPaymentRow = (row: RawPaymentRow) => {
     throw new Error('Payment row is missing updatedAt')
   }
 
-  const paidAmount = row.paidAmount === null || row.paidAmount === undefined ? 0 : row.paidAmount
+  const paidAmount = row.paidAmount ?? 0
 
   return paymentSchema.parse({
     trainerId: row.trainerId,
     id: row.id,
     paymentType: row.paymentType,
-    contributionAmount: row.contributionAmount === null ? null : row.contributionAmount,
+    contributionAmount: row.contributionAmount ?? null,
     paidAmount,
     paymentMethod: row.paymentMethod === null ? null : String(row.paymentMethod),
     paidDate: row.paidDate === null || row.paidDate === undefined ? null : (row.paidDate as Date | string),
@@ -186,7 +184,7 @@ const toDateOrThrow = (value: Date | string | number | null | undefined, label: 
 
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
-      throw new Error(`${label} is invalid`)
+      throw new TypeError(`${label} is invalid`)
     }
     return value
   }
@@ -201,14 +199,14 @@ const toDateOrThrow = (value: Date | string | number | null | undefined, label: 
     }
     const parsed = new Date(trimmed)
     if (Number.isNaN(parsed.getTime())) {
-      throw new Error(`${label} is invalid`)
+      throw new TypeError(`${label} is invalid`)
     }
     return parsed
   }
 
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(`${label} is invalid`)
+      throw new TypeError(`${label} is invalid`)
     }
     return new Date(value)
   }
@@ -223,7 +221,7 @@ const normalizeNumericString = (value: string | number | null | undefined, label
 
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(`${label} is invalid`)
+      throw new TypeError(`${label} is invalid`)
     }
     return value.toString()
   }
@@ -235,7 +233,7 @@ const normalizeNumericString = (value: string | number | null | undefined, label
     }
     const parsed = Number(trimmed)
     if (!Number.isFinite(parsed)) {
-      throw new Error(`${label} is invalid`)
+      throw new TypeError(`${label} is invalid`)
     }
     return trimmed
   }
@@ -613,7 +611,6 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 }
 
 export async function DELETE(request: NextRequest, context: HandlerContext) {
-
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while removing subscription session series',
   })

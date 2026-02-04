@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { normalizeSessionSeriesRow, type RawSessionSeriesRow } from '../shared'
 
@@ -61,8 +62,12 @@ const nullableUrl = z.preprocess(
 
 const nullableTrimmedString = z.preprocess(
   (value) => {
-    if (value === undefined) return undefined
-    if (value === null) return null
+    if (value === undefined) {
+      return undefined
+    }
+    if (value === null) {
+      return null
+    }
     if (typeof value === 'string') {
       const trimmed = value.trim()
       return trimmed.length === 0 ? null : trimmed
@@ -75,7 +80,9 @@ const nullableTrimmedString = z.preprocess(
 
 const trimmedStringToNull = z.preprocess(
   (value) => {
-    if (value === undefined) return undefined
+    if (value === undefined) {
+      return undefined
+    }
     if (typeof value === 'string') {
       const trimmed = value.trim()
       return trimmed.length === 0 ? null : trimmed
@@ -148,8 +155,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
   try {
     const rawText = await request.text()
-    const rawBody: unknown =
-      rawText.trim().length === 0 ? {} : (JSON.parse(rawText) as unknown)
+    const rawBody: unknown = rawText.trim().length === 0 ? {} : (JSON.parse(rawText) as unknown)
 
     if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
       return createLegacyInvalidJsonResponse()

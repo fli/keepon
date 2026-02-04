@@ -24,7 +24,7 @@ const createInvalidBodyResponse = (detail: string | undefined) =>
     buildErrorResponse({
       status: 400,
       title: 'Your parameters were invalid.',
-      detail: detail || 'Request body did not match the expected schema.',
+      detail: detail ?? 'Request body did not match the expected schema.',
       type: '/invalid-parameters',
     }),
     { status: 400 }

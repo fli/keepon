@@ -1,12 +1,12 @@
-import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
 import Link from 'next/link'
 
 import { PageContainer } from '@/components/page-container'
+import { Button } from '@/components/ui/button'
 import { reminderOptions } from '@/lib/reminders'
 import { getReminderSettings } from '@/server/reminders'
-import { Button } from '@/components/ui/button'
 
 import { readSessionFromCookies } from '../../../session.server'
 
@@ -79,7 +79,9 @@ type ReminderDisplay = {
 } | null
 
 const displayReminder = (reminder: { type: string; timeBeforeStart: string } | null): ReminderDisplay => {
-  if (!reminder) return null
+  if (!reminder) {
+    return null
+  }
 
   const timeLabel =
     reminderOptions.find((option) => option.value === reminder.timeBeforeStart)?.name ??
@@ -113,7 +115,7 @@ function ReminderSection({
 }: {
   title: string
   description: string
-  reminders: Array<{ type: string; timeBeforeStart: string } | null>
+  reminders: ({ type: string; timeBeforeStart: string } | null)[]
   targetSlug: 'service-provider' | 'client'
 }) {
   const items = reminders

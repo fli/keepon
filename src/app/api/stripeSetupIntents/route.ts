@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
-import { z } from 'zod'
 import Stripe from 'stripe'
+import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { authenticateClientRequest, buildErrorResponse } from '../_lib/accessToken'
 import { getStripeClient, STRIPE_API_VERSION } from '../_lib/stripeClient'
 
@@ -53,7 +53,7 @@ const createInvalidDatabaseResponse = (detail?: string) =>
     buildErrorResponse({
       status: 500,
       title: 'Failed to parse client data',
-      detail: detail || 'Client data did not match the expected schema.',
+      detail: detail ?? 'Client data did not match the expected schema.',
       type: '/invalid-database-response',
     }),
     { status: 500 }
@@ -176,7 +176,7 @@ export async function POST(request: Request) {
       const customer = await stripeClient.customers.create(
         {
           description: `Customer for ${serviceProviderEmail}`,
-          email: clientEmail || undefined,
+          email: clientEmail ?? undefined,
           metadata: {
             clientId: authorization.clientId,
           },

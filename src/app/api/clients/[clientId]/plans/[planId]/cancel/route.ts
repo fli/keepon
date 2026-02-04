@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql, type Selectable, type VwLegacyPayment } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z, ZodError } from 'zod'
+import { db, sql, type Selectable, type VwLegacyPayment } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../../_lib/accessToken'
-import { normalizePlanRow, type RawPlanRow } from '../../../../../plans/shared'
 import { paymentSchema } from '../../../../../_lib/clientSessionsSchema'
+import { normalizePlanRow, type RawPlanRow } from '../../../../../plans/shared'
 
 const paramsSchema = z.object({
   clientId: z.string().trim().min(1, 'Client id is required.'),
@@ -55,7 +56,7 @@ const toDateOrThrow = (value: unknown, label: string): Date => {
 
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
-      throw new Error(`${label} is invalid`)
+      throw new TypeError(`${label} is invalid`)
     }
     return value
   }
@@ -102,13 +103,13 @@ const adaptPaymentRow = (row: RawPaymentRow) => {
     throw new Error('Payment row is missing updatedAt')
   }
 
-  const paidAmount = row.paidAmount === null || row.paidAmount === undefined ? 0 : row.paidAmount
+  const paidAmount = row.paidAmount ?? 0
 
   return paymentSchema.parse({
     trainerId: row.trainerId,
     id: row.id,
     paymentType: row.paymentType,
-    contributionAmount: row.contributionAmount === null ? null : row.contributionAmount,
+    contributionAmount: row.contributionAmount ?? null,
     paidAmount,
     paymentMethod: row.paymentMethod === null ? null : String(row.paymentMethod),
     paidDate: row.paidDate === null || row.paidDate === undefined ? null : (row.paidDate as Date | string),

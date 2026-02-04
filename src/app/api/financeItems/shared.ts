@@ -3,7 +3,7 @@ import { z } from 'zod'
 const isoDateTimeString = z.union([z.string(), z.date()]).transform((value) => {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error('Invalid date-time value')
+    throw new TypeError('Invalid date-time value')
   }
   return date.toISOString()
 })
@@ -57,7 +57,7 @@ export type FinanceItemRow = {
 
 const ensureString = (value: unknown, label: string) => {
   if (typeof value !== 'string') {
-    throw new Error(`${label} is missing or invalid`)
+    throw new TypeError(`${label} is missing or invalid`)
   }
   const trimmed = value.trim()
   if (trimmed.length === 0) {
@@ -72,7 +72,7 @@ const parseAmount = (value: unknown, label: string) => {
   }
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(`${label} is invalid`)
+      throw new TypeError(`${label} is invalid`)
     }
     return value
   }
@@ -83,7 +83,7 @@ const parseAmount = (value: unknown, label: string) => {
     }
     const parsed = Number(trimmed)
     if (!Number.isFinite(parsed)) {
-      throw new Error(`${label} is invalid`)
+      throw new TypeError(`${label} is invalid`)
     }
     return parsed
   }
@@ -95,7 +95,7 @@ const parseNullableString = (value: unknown) => {
     return null
   }
   if (typeof value !== 'string') {
-    throw new Error('Expected value to be a string')
+    throw new TypeError('Expected value to be a string')
   }
   const trimmed = value.trim()
   return trimmed.length > 0 ? trimmed : null
@@ -113,7 +113,7 @@ const parseNotes = (value: unknown) => {
     return [] as z.infer<typeof financeItemNoteSchema>[]
   }
   if (!Array.isArray(value)) {
-    throw new Error('Finance item notes value was not an array')
+    throw new TypeError('Finance item notes value was not an array')
   }
   return value.map((note, index) => {
     const parsed = financeItemNoteSchema.safeParse(note)

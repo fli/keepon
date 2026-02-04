@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { createClientForTrainer, createClientSchema, listClientsForTrainer } from '@/server/clients'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { clientListSchema } from '../../../clients/shared'
 
 type TrainerRouteContext = RouteContext<'/api/trainers/[trainerId]/clients'>
@@ -44,8 +45,8 @@ const buildLegacyCreateClientDetail = (payload: unknown) => {
   }
 
   const body = payload as Record<string, unknown>
-  const hasFirstName = Object.prototype.hasOwnProperty.call(body, 'firstName')
-  const hasStatus = Object.prototype.hasOwnProperty.call(body, 'status')
+  const hasFirstName = Object.hasOwn(body, 'firstName')
+  const hasStatus = Object.hasOwn(body, 'status')
 
   if (!hasFirstName && !hasStatus) {
     return `firstName  not provided status  not provided${suffix}`
@@ -65,7 +66,7 @@ const buildLegacyCreateClientDetail = (payload: unknown) => {
     return ` status  should be "current" | "past" | "lead"${suffix}`
   }
 
-  if (Object.prototype.hasOwnProperty.call(body, 'birthday')) {
+  if (Object.hasOwn(body, 'birthday')) {
     const birthday = body.birthday
     if (birthday !== null) {
       if (typeof birthday !== 'string') {
@@ -78,7 +79,7 @@ const buildLegacyCreateClientDetail = (payload: unknown) => {
     }
   }
 
-  if (Object.prototype.hasOwnProperty.call(body, 'email')) {
+  if (Object.hasOwn(body, 'email')) {
     const email = body.email
     if (email !== null) {
       if (typeof email !== 'string') {
@@ -172,7 +173,7 @@ export async function POST(request: NextRequest, context: TrainerRouteContext) {
   }
 
   if (rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)) {
-    if (Object.prototype.hasOwnProperty.call(rawBody, 'birthday')) {
+    if (Object.hasOwn(rawBody, 'birthday')) {
       const birthday = (rawBody as Record<string, unknown>).birthday
       if (birthday !== null && typeof birthday !== 'string') {
         return invalidParametersResponse(buildLegacyCreateClientDetail(rawBody))

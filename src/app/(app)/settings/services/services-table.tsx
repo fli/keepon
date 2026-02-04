@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo } from 'react'
 import { CheckCircle2, CircleSlash } from 'lucide-react'
+import { useMemo } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 
@@ -20,7 +20,7 @@ type Props = {
 }
 
 export function ServicesTable({ services, error }: Props) {
-  const sorted = useMemo(() => [...services].sort((a, b) => a.name.localeCompare(b.name)), [services])
+  const sorted = useMemo(() => [...services].toSorted((a, b) => a.name.localeCompare(b.name)), [services])
 
   return (
     <div className="overflow-hidden rounded-lg border border-border shadow-sm">
@@ -68,12 +68,18 @@ export function ServicesTable({ services, error }: Props) {
 }
 
 function formatDuration(minutes?: number | null) {
-  if (!minutes || minutes <= 0) return '—'
+  if (!minutes || minutes <= 0) {
+    return '—'
+  }
   const hours = Math.floor(minutes / 60)
   const remainder = minutes % 60
   const parts: string[] = []
-  if (hours > 0) parts.push(`${hours}h`)
-  if (remainder > 0 || parts.length === 0) parts.push(`${remainder}m`)
+  if (hours > 0) {
+    parts.push(`${hours}h`)
+  }
+  if (remainder > 0 || parts.length === 0) {
+    parts.push(`${remainder}m`)
+  }
   return parts.join(' ')
 }
 

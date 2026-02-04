@@ -1,17 +1,17 @@
 'use client'
 
-import { useMemo } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useMemo } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
+import type { CalendarView } from './types'
 import { DayView } from './day-view'
 import { MonthView } from './month-view'
 import { WeekView } from './week-view'
 import { YearView } from './year-view'
-import type { CalendarView } from './types'
 
 const fallbackDate = '2022-01-22'
 
@@ -26,21 +26,27 @@ function todayIso() {
 
 function addDays(dateStr: string, delta: number) {
   const date = new Date(`${dateStr}T12:00:00`)
-  if (Number.isNaN(date.getTime())) return dateStr
+  if (Number.isNaN(date.getTime())) {
+    return dateStr
+  }
   date.setDate(date.getDate() + delta)
   return date.toISOString().slice(0, 10)
 }
 
 function addMonths(dateStr: string, delta: number) {
   const date = new Date(`${dateStr}T12:00:00`)
-  if (Number.isNaN(date.getTime())) return dateStr
+  if (Number.isNaN(date.getTime())) {
+    return dateStr
+  }
   date.setMonth(date.getMonth() + delta)
   return date.toISOString().slice(0, 10)
 }
 
 function addYears(dateStr: string, delta: number) {
   const date = new Date(`${dateStr}T12:00:00`)
-  if (Number.isNaN(date.getTime())) return dateStr
+  if (Number.isNaN(date.getTime())) {
+    return dateStr
+  }
   date.setFullYear(date.getFullYear() + delta)
   return date.toISOString().slice(0, 10)
 }
@@ -54,7 +60,9 @@ export function CalendarShell() {
 
   const selectedDateParam = searchParams.get('date')
   const date = useMemo(() => {
-    if (!selectedDateParam) return fallbackDate
+    if (!selectedDateParam) {
+      return fallbackDate
+    }
     const parsed = new Date(`${selectedDateParam}T12:00:00`)
     return Number.isNaN(parsed.getTime()) ? fallbackDate : selectedDateParam
   }, [selectedDateParam])
@@ -69,22 +77,42 @@ export function CalendarShell() {
   const setView = (nextView: CalendarView) => setParam('view', nextView)
 
   const handlePrev = () => {
-    if (view === 'day') return setDate(addDays(date, -1))
-    if (view === 'week') return setDate(addDays(date, -7))
-    if (view === 'year') return setDate(addYears(date, -1))
-    return setDate(addMonths(date, -1))
+    if (view === 'day') {
+      setDate(addDays(date, -1))
+      return
+    }
+    if (view === 'week') {
+      setDate(addDays(date, -7))
+      return
+    }
+    if (view === 'year') {
+      setDate(addYears(date, -1))
+      return
+    }
+    setDate(addMonths(date, -1))
   }
 
   const handleNext = () => {
-    if (view === 'day') return setDate(addDays(date, 1))
-    if (view === 'week') return setDate(addDays(date, 7))
-    if (view === 'year') return setDate(addYears(date, 1))
-    return setDate(addMonths(date, 1))
+    if (view === 'day') {
+      setDate(addDays(date, 1))
+      return
+    }
+    if (view === 'week') {
+      setDate(addDays(date, 7))
+      return
+    }
+    if (view === 'year') {
+      setDate(addYears(date, 1))
+      return
+    }
+    setDate(addMonths(date, 1))
   }
 
   const titleLabel = useMemo(() => {
     const d = new Date(`${date}T12:00:00`)
-    if (view === 'year') return d.getFullYear().toString()
+    if (view === 'year') {
+      return d.getFullYear().toString()
+    }
     if (view === 'day') {
       return d.toLocaleDateString(undefined, {
         weekday: 'long',

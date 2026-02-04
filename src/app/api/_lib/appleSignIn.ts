@@ -74,7 +74,7 @@ export class AppleSignInError extends Error {
 let cachedJwks: CachedJwks | null = null
 
 const base64UrlToUint8Array = (value: string): Uint8Array<ArrayBuffer> => {
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+  const normalized = value.replaceAll(/-/g, '+').replaceAll(/_/g, '/')
   const paddingNeeded = (4 - (normalized.length % 4)) % 4
   const padded = normalized + '='.repeat(paddingNeeded)
   const buffer = Buffer.from(padded, 'base64')

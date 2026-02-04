@@ -2,8 +2,8 @@
 
 import { cookies } from 'next/headers'
 
-import { readSessionFromCookies } from '../../session.server'
 import { logout } from '@/server/auth'
+import { readSessionFromCookies } from '../../session.server'
 
 const SESSION_COOKIE = 'kpSession'
 

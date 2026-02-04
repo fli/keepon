@@ -1,10 +1,10 @@
-import { Suspense } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
+import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { PageContainer } from '@/components/page-container'
 import { loadClientsServer, readSessionFromCookies } from './actions'
 import { ClientsGrid } from './clients-grid'
 import { ImportClientsButton } from './import-button'

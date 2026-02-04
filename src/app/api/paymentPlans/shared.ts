@@ -54,7 +54,7 @@ export const parseStatus = (value: string): PaymentPlanStatus => {
 export const toIsoString = (value: Date | string) => {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error('Invalid date value encountered in payment plan record')
+    throw new TypeError('Invalid date value encountered in payment plan record')
   }
   return date.toISOString()
 }
@@ -72,7 +72,7 @@ export const parseAmount = (value: string | number | null, label: string): strin
   }
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(`Invalid ${label} value encountered in payment plan record`)
+      throw new TypeError(`Invalid ${label} value encountered in payment plan record`)
     }
     return value.toFixed(2)
   }
@@ -94,7 +94,7 @@ export const parseRequiredAmount = (value: string | number, label: string): stri
 export const parseNumberValue = (value: number | string, label: string): number => {
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(`Invalid ${label} value encountered in payment plan record`)
+      throw new TypeError(`Invalid ${label} value encountered in payment plan record`)
     }
     return value
   }
@@ -104,7 +104,7 @@ export const parseNumberValue = (value: number | string, label: string): number 
   }
   const numeric = Number(trimmed)
   if (Number.isNaN(numeric)) {
-    throw new Error(`Invalid ${label} value encountered in payment plan record`)
+    throw new TypeError(`Invalid ${label} value encountered in payment plan record`)
   }
   return numeric
 }

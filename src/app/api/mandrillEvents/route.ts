@@ -1,5 +1,5 @@
-import crypto from 'node:crypto'
 import { NextResponse } from 'next/server'
+import crypto from 'node:crypto'
 import { z } from 'zod'
 import { db, type Json } from '@/lib/db'
 import { buildErrorResponse } from '../_lib/accessToken'
@@ -81,14 +81,14 @@ const fetchWebhooks = async (apiKey: string): Promise<MandrillWebhook[]> => {
 }
 
 const computeSignature = (webhook: MandrillWebhook, formEntries: [string, FormDataEntryValue][]) => {
-  const sortedEntries = [...formEntries].sort(([a], [b]) => a.localeCompare(b))
+  const sortedEntries = [...formEntries].toSorted(([a], [b]) => a.localeCompare(b))
 
   const signedData =
     webhookUrl +
     sortedEntries
       .map(([key, value]) => {
         if (typeof value !== 'string') {
-          throw new Error('Non-string form field encountered')
+          throw new TypeError('Non-string form field encountered')
         }
 
         return key + value

@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
-import type { Point } from '@/lib/db/generated'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import type { Point } from '@/lib/db/generated'
+import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { getStripeClient } from '../../_lib/stripeClient'
 import { adaptClientRow, clientSchema } from '../shared'
@@ -18,8 +19,12 @@ const nullableTrimmedString = z
   .union([z.string(), z.null()])
   .optional()
   .transform((value) => {
-    if (value === undefined) return undefined
-    if (value === null) return null
+    if (value === undefined) {
+      return undefined
+    }
+    if (value === null) {
+      return null
+    }
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
   })
@@ -28,8 +33,12 @@ const nullablePhoneString = z
   .union([z.string(), z.null()])
   .optional()
   .transform((value) => {
-    if (value === undefined) return undefined
-    if (value === null) return null
+    if (value === undefined) {
+      return undefined
+    }
+    if (value === null) {
+      return null
+    }
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
   })
@@ -38,8 +47,12 @@ const nullableEmail = z
   .union([z.string(), z.null()])
   .optional()
   .transform((value) => {
-    if (value === undefined) return undefined
-    if (value === null) return null
+    if (value === undefined) {
+      return undefined
+    }
+    if (value === null) {
+      return null
+    }
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
   })
@@ -51,8 +64,12 @@ const nullableUrl = z
   .union([z.string(), z.null()])
   .optional()
   .transform((value) => {
-    if (value === undefined) return undefined
-    if (value === null) return null
+    if (value === undefined) {
+      return undefined
+    }
+    if (value === null) {
+      return null
+    }
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
   })
@@ -61,8 +78,12 @@ const nullableUrl = z
   })
 
 const birthdaySchema = z.preprocess((value) => {
-  if (value === undefined) return undefined
-  if (value === null) return null
+  if (value === undefined) {
+    return undefined
+  }
+  if (value === null) {
+    return null
+  }
   if (typeof value === 'string') {
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
@@ -367,23 +388,51 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         google_place_id: string | null
       }> = {}
 
-      if (parsedBody.status !== undefined) updates.status = parsedBody.status
-      if (parsedBody.firstName !== undefined) updates.first_name = parsedBody.firstName
-      if (parsedBody.lastName !== undefined) updates.last_name = parsedBody.lastName
-      if (parsedBody.email !== undefined) updates.email = parsedBody.email
-      if (parsedBody.mobileNumber !== undefined) updates.mobile_number = parsedBody.mobileNumber
-      if (parsedBody.otherNumber !== undefined) updates.other_number = parsedBody.otherNumber
-      if (parsedBody.birthday !== undefined) updates.birthday = parsedBody.birthday
-      if (parsedBody.emergencyContactName !== undefined)
+      if (parsedBody.status !== undefined) {
+        updates.status = parsedBody.status
+      }
+      if (parsedBody.firstName !== undefined) {
+        updates.first_name = parsedBody.firstName
+      }
+      if (parsedBody.lastName !== undefined) {
+        updates.last_name = parsedBody.lastName
+      }
+      if (parsedBody.email !== undefined) {
+        updates.email = parsedBody.email
+      }
+      if (parsedBody.mobileNumber !== undefined) {
+        updates.mobile_number = parsedBody.mobileNumber
+      }
+      if (parsedBody.otherNumber !== undefined) {
+        updates.other_number = parsedBody.otherNumber
+      }
+      if (parsedBody.birthday !== undefined) {
+        updates.birthday = parsedBody.birthday
+      }
+      if (parsedBody.emergencyContactName !== undefined) {
         updates.emergency_contact_name = parsedBody.emergencyContactName
-      if (parsedBody.emergencyContactMobileNumber !== undefined)
+      }
+      if (parsedBody.emergencyContactMobileNumber !== undefined) {
         updates.emergency_contact_mobile_number = parsedBody.emergencyContactMobileNumber
-      if (parsedBody.profileImageURL !== undefined) updates.profile_image_url = parsedBody.profileImageURL
-      if (parsedBody.company !== undefined) updates.company = parsedBody.company
-      if (parsedBody.notes !== undefined) updates.notes = parsedBody.notes
-      if (parsedBody.location !== undefined) updates.location = parsedBody.location
-      if (parsedBody.address !== undefined) updates.address = parsedBody.address
-      if (parsedBody.googlePlaceId !== undefined) updates.google_place_id = parsedBody.googlePlaceId
+      }
+      if (parsedBody.profileImageURL !== undefined) {
+        updates.profile_image_url = parsedBody.profileImageURL
+      }
+      if (parsedBody.company !== undefined) {
+        updates.company = parsedBody.company
+      }
+      if (parsedBody.notes !== undefined) {
+        updates.notes = parsedBody.notes
+      }
+      if (parsedBody.location !== undefined) {
+        updates.location = parsedBody.location
+      }
+      if (parsedBody.address !== undefined) {
+        updates.address = parsedBody.address
+      }
+      if (parsedBody.googlePlaceId !== undefined) {
+        updates.google_place_id = parsedBody.googlePlaceId
+      }
 
       let updateBuilder = trx.updateTable('client').set(updates)
 
@@ -444,9 +493,9 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
     const client = await fetchClient()
 
-      if (!client) {
-        return createLegacyNotFoundResponse()
-      }
+    if (!client) {
+      return createLegacyNotFoundResponse()
+    }
 
     return NextResponse.json(client)
   } catch (error) {

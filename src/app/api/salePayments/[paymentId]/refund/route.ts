@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import Stripe from 'stripe'
+import type { NextRequest } from 'next/server'
 import BigNumber from 'bignumber.js'
-import { db, sql } from '@/lib/db'
+import { NextResponse } from 'next/server'
+import Stripe from 'stripe'
 import { z, ZodError } from 'zod'
+import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { adaptSalePaymentRow, salePaymentSchema, type SalePaymentRow } from '../../../_lib/salePayments'
 import { getStripeClient, STRIPE_API_VERSION } from '../../../_lib/stripeClient'
@@ -84,7 +85,7 @@ const toBigNumberOrZero = (value: string | number | null | undefined, label: str
   return toBigNumber(value, label)
 }
 
-const sumStripeBalanceEntries = (entries: Array<{ amount: number; currency: string }>) =>
+const sumStripeBalanceEntries = (entries: { amount: number; currency: string }[]) =>
   entries.reduce((total, entry) => total.plus(new BigNumber(entry.amount).shiftedBy(-2)), new BigNumber(0))
 
 export async function POST(request: NextRequest, context: HandlerContext) {

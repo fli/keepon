@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
-import { z } from 'zod'
 import Stripe from 'stripe'
+import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { parseStrictJsonBody } from '../_lib/strictJson'
 import { getStripeClient } from '../_lib/stripeClient'
@@ -34,7 +34,7 @@ const createInvalidBodyResponse = (detail?: string) =>
     buildErrorResponse({
       status: 400,
       title: 'Invalid request body',
-      detail: detail || 'Request body did not match the expected schema.',
+      detail: detail ?? 'Request body did not match the expected schema.',
       type: '/invalid-body',
     }),
     { status: 400 }
@@ -122,7 +122,9 @@ export async function POST(request: Request) {
       .leftJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
       .select((eb) => [
         eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
-        sql<boolean>`(${sql.ref('stripeAccount.object')} #>> '{capabilities,card_payments}') IS NOT NULL`.as('cardPayments'),
+        sql<boolean>`(${sql.ref('stripeAccount.object')} #>> '{capabilities,card_payments}') IS NOT NULL`.as(
+          'cardPayments'
+        ),
         sql<boolean>`(${sql.ref('stripeAccount.object')} #>> '{capabilities,transfers}') IS NOT NULL`.as('transfers'),
         sql<string | null>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('stripeAccountType'),
       ])

@@ -1,16 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
-import type { Database } from '@/lib/db'
-import { z } from 'zod'
 import type { Kysely, Transaction } from 'kysely'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+import type { Database } from '@/lib/db'
+import { db, sql } from '@/lib/db'
+import type { RawClientSessionRow } from '../../../_lib/clientSessionsSchema'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
-import { adaptClientSessionRow, RawClientSessionRow } from '../../../_lib/clientSessionsSchema'
+import { adaptClientSessionRow } from '../../../_lib/clientSessionsSchema'
 
 const paramsSchema = z.object({
-  sessionId: z
-    .string({ message: 'Session id is required.' })
-    .trim()
-    .min(1, 'Session id must not be empty.'),
+  sessionId: z.string({ message: 'Session id is required.' }).trim().min(1, 'Session id must not be empty.'),
 })
 
 const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
@@ -67,10 +66,7 @@ const noteSchema = z
   })
 
 const requestBodySchema = z.object({
-  clientId: z
-    .string({ message: 'clientId is required.' })
-    .trim()
-    .min(1, 'clientId must not be empty.'),
+  clientId: z.string({ message: 'clientId is required.' }).trim().min(1, 'clientId must not be empty.'),
   future: z
     .union([z.boolean(), z.literal('true'), z.literal('false')])
     .transform((value) => value === true || value === 'true'),

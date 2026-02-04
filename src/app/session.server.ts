@@ -20,7 +20,9 @@ export const readSessionFromCookies = cache(async (): Promise<KeeponSession | nu
   const cookieStore = cookieResult as MinimalCookieStore
   const cookie = cookieStore.get(SESSION_COOKIE)
   const value = typeof cookie?.value === 'string' ? cookie.value : null
-  if (!value) return null
+  if (!value) {
+    return null
+  }
 
   try {
     const decoded = decodeURIComponent(value)

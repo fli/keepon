@@ -14,7 +14,9 @@ const authError: ActionResult = {
 
 export async function updateAccountAction(formData: FormData): Promise<ActionResult> {
   const session = await readSessionFromCookies()
-  if (!session) return authError
+  if (!session) {
+    return authError
+  }
 
   const firstName = formData.get('firstName')
   const lastName = formData.get('lastName')
@@ -36,14 +38,16 @@ export async function updateAccountAction(formData: FormData): Promise<ActionRes
     const message = error instanceof Error ? error.message : null
     return {
       status: 'error',
-      message: message || 'Unable to save your changes right now.',
+      message: message ?? 'Unable to save your changes right now.',
     }
   }
 }
 
 export async function changePasswordAction(formData: FormData): Promise<ActionResult> {
   const session = await readSessionFromCookies()
-  if (!session) return authError
+  if (!session) {
+    return authError
+  }
 
   const currentPassword = formData.get('currentPassword')
   const newPassword = formData.get('newPassword')
@@ -59,7 +63,7 @@ export async function changePasswordAction(formData: FormData): Promise<ActionRe
     const message = error instanceof Error ? error.message : null
     return {
       status: 'error',
-      message: message || 'Unable to change your password right now.',
+      message: message ?? 'Unable to change your password right now.',
     }
   }
 }

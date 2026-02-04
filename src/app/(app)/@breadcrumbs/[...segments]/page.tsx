@@ -1,6 +1,6 @@
-import { Fragment, Suspense } from 'react'
-import Link from 'next/link'
 import type { Route } from 'next'
+import Link from 'next/link'
+import { Fragment, Suspense } from 'react'
 
 import { PageContainer } from '@/components/page-container'
 import {
@@ -36,17 +36,29 @@ const TITLE_MAP: Record<string, string> = {
 }
 
 function formatSegment(segment: string, parent?: string): string {
-  if (segment === 'add' && parent === 'clients') return 'Add client'
-  if (segment === 'make' && parent === 'sales') return 'Collect payment'
-  if (segment === 'sell' && parent === 'dashboard') return 'Sell'
-  if (segment === 'credit-pack' && parent === 'sell') return 'Credit pack'
-  if (segment === 'pack' && parent === 'credit-pack') return 'Credit pack'
+  if (segment === 'add' && parent === 'clients') {
+    return 'Add client'
+  }
+  if (segment === 'make' && parent === 'sales') {
+    return 'Collect payment'
+  }
+  if (segment === 'sell' && parent === 'dashboard') {
+    return 'Sell'
+  }
+  if (segment === 'credit-pack' && parent === 'sell') {
+    return 'Credit pack'
+  }
+  if (segment === 'pack' && parent === 'credit-pack') {
+    return 'Credit pack'
+  }
 
   const mapped = TITLE_MAP[segment]
-  if (mapped) return mapped
+  if (mapped) {
+    return mapped
+  }
 
   const words = segment
-    .replace(/-/g, ' ')
+    .replaceAll(/-/g, ' ')
     .split(' ')
     .filter(Boolean)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -57,7 +69,9 @@ function formatSegment(segment: string, parent?: string): string {
 async function buildCrumbs(segments: string[]): Promise<Crumb[]> {
   const normalized = segments.filter(Boolean)
 
-  if (normalized.length === 0) return []
+  if (normalized.length === 0) {
+    return []
+  }
 
   if (normalized[0] === 'dashboard' && normalized[1] === 'sell' && normalized[2] === 'credit-pack') {
     return buildSellCreditPackCrumbs(normalized)

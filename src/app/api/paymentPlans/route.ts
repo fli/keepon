@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
 import { z } from 'zod'
+import { db } from '@/lib/db'
 import { authenticateClientRequest, buildErrorResponse } from '../_lib/accessToken'
 import {
   paymentPlanListSchema,

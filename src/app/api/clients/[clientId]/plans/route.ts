@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import BigNumber from 'bignumber.js'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
@@ -109,11 +110,11 @@ const resolveBrandColor = (value?: string | null) => (value && tailwind600[value
 
 const escapeHtml = (value: string) =>
   value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+    .replaceAll(/&/g, '&amp;')
+    .replaceAll(/</g, '&lt;')
+    .replaceAll(/>/g, '&gt;')
+    .replaceAll(/"/g, '&quot;')
+    .replaceAll(/'/g, '&#39;')
 
 const buildPlanRequestEmail = (options: {
   serviceProviderName: string
@@ -203,7 +204,9 @@ const parseDateOnly = (value: string, label: string) => {
 }
 
 const formatIsoDateLabel = (value: Date | null | undefined) => {
-  if (!value) return ''
+  if (!value) {
+    return ''
+  }
   return value.toISOString().slice(0, 10)
 }
 
@@ -338,7 +341,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       const maxDisplay = new BigNumber(limits.maximumInSmallestUnit).shiftedBy(-limits.smallestUnitDecimals)
 
       throw new InvalidAmountError(
-        `Amount must be between ${minDisplay.toFixed()} and ${maxDisplay.toFixed()} ${currency}.`
+        `Amount must be between ${minDisplay.toFixed(0)} and ${maxDisplay.toFixed(0)} ${currency}.`
       )
     }
 

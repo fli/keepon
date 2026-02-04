@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { authenticateClientRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { createLegacyInvalidJsonResponse, parseStrictJsonBody } from '../../../_lib/strictJson'

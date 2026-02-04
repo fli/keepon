@@ -5,7 +5,7 @@ export type Currency = Readonly<{
 }>
 
 // ISO 4217 currency list with numeric identifiers provided by user.
-export const currencies: ReadonlyArray<Currency> = [
+export const currencies: readonly Currency[] = [
   { id: 8, alphaCode: 'ALL', name: 'Lek' },
   { id: 12, alphaCode: 'DZD', name: 'Algerian Dinar' },
   { id: 32, alphaCode: 'ARS', name: 'Argentine Peso' },

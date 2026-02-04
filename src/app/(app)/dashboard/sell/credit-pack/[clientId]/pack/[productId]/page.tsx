@@ -1,14 +1,14 @@
-import Link from 'next/link'
 import type { Route } from 'next'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 
 import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { PaymentForm } from '../../../payment-form'
-import { loadClients, loadCreditPacks } from '../../../actions'
 import { readSessionFromCookies } from '../../../../../../../session.server'
+import { loadClients, loadCreditPacks } from '../../../actions'
+import { PaymentForm } from '../../../payment-form'
 
 export default async function SellPaymentPage({
   params,
@@ -21,14 +21,18 @@ export default async function SellPaymentPage({
   const qs = (await searchParams) ?? {}
 
   const session = await readSessionFromCookies()
-  if (!session) redirect('/auth')
+  if (!session) {
+    redirect('/auth')
+  }
 
   const clientsPromise = loadClients()
   const creditPacksPromise = loadCreditPacks()
 
   const queryString = new URLSearchParams(
     Object.entries(qs).reduce<Record<string, string>>((acc, [key, value]) => {
-      if (typeof value === 'string') acc[key] = value
+      if (typeof value === 'string') {
+        acc[key] = value
+      }
       return acc
     }, {})
   ).toString()
@@ -86,13 +90,16 @@ async function PaymentFormLoader({
   const client = clients.find((item) => item.id === clientId)
   const pack = creditPacks.find((item) => item.id === productId)
 
-  if (!client) redirect('/dashboard/sell/credit-pack')
-  if (!pack)
+  if (!client) {
+    redirect('/dashboard/sell/credit-pack')
+  }
+  if (!pack) {
     redirect(
       backQuery
         ? (`/dashboard/sell/credit-pack/${clientId}?${backQuery}` as Route)
         : (`/dashboard/sell/credit-pack/${clientId}` as Route)
     )
+  }
 
   return <PaymentForm client={client} pack={pack} />
 }

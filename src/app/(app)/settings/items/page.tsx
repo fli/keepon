@@ -25,7 +25,9 @@ async function loadItems(trainerId: string): Promise<Item[]> {
 
 function formatPrice(amount: string, currency: string) {
   const parsed = Number.parseFloat(amount)
-  if (!Number.isFinite(parsed)) return `${amount} ${currency}`
+  if (!Number.isFinite(parsed)) {
+    return `${amount} ${currency}`
+  }
 
   try {
     return new Intl.NumberFormat(undefined, {
@@ -53,7 +55,7 @@ export default async function ItemsPage() {
     error = cause instanceof Error ? cause.message : 'Unable to load items.'
   }
 
-  const sorted = [...items].sort((a, b) => a.name.localeCompare(b.name))
+  const sorted = [...items].toSorted((a, b) => a.name.localeCompare(b.name))
 
   return (
     <PageContainer className="flex flex-col gap-6 py-8">

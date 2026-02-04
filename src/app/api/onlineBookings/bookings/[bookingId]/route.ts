@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { buildErrorResponse } from '../../../_lib/accessToken'
 
 const paramsSchema = z.object({

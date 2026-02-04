@@ -4,7 +4,7 @@ import type { Route } from 'next'
 
 import { Button } from '@/components/ui/button'
 
-const actionRows: Array<Array<{ label: string; href?: Route }>> = [
+const actionRows: Array<{ label: string; href?: Route }>[] = [
   [
     { label: 'Sell credit pack', href: '/dashboard/sell/credit-pack' },
     { label: 'Sell service' },

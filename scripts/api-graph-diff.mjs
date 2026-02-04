@@ -1,11 +1,11 @@
 import { spawn } from 'node:child_process'
-import net from 'node:net'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import crypto from 'node:crypto'
 import { readdirSync, statSync, readFileSync, mkdirSync, createWriteStream, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import crypto from 'node:crypto'
+import net from 'node:net'
 import os from 'node:os'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 
 const { Client } = pg
@@ -26,7 +26,7 @@ const DEFAULT_NEW_PORT = 3001
 
 const readArg = (name) => {
   const index = process.argv.indexOf(name)
-  return index >= 0 ? process.argv[index + 1] : undefined
+  return index !== -1 ? process.argv[index + 1] : undefined
 }
 const hasFlag = (name) => process.argv.includes(name)
 
@@ -93,7 +93,9 @@ const walkFiles = (dir, predicate) => {
   const stack = [dir]
   while (stack.length) {
     const current = stack.pop()
-    if (!current) continue
+    if (!current) {
+      continue
+    }
     for (const entry of readdirSync(current)) {
       const full = path.join(current, entry)
       const stats = statSync(full)
@@ -123,12 +125,14 @@ const isPortOpen = (port, host) =>
 const isPortAvailable = async (port) => {
   const openV4 = await isPortOpen(port, '127.0.0.1')
   const openV6 = await isPortOpen(port, '::1')
-  return !(openV4 || openV6)
+  return !(openV4 ?? openV6)
 }
 
 const resolvePort = async (desired, label, reserved = new Set()) => {
   const isCandidateAvailable = async (port) => !reserved.has(port) && (await isPortAvailable(port))
-  if (await isCandidateAvailable(desired)) return desired
+  if (await isCandidateAvailable(desired)) {
+    return desired
+  }
   for (let offset = 1; offset <= 20; offset += 1) {
     const candidate = desired + offset
     if (await isCandidateAvailable(candidate)) {
@@ -162,15 +166,15 @@ const listLegacyMigrations = () =>
   readdirSync(LEGACY_MIGRATION_DIR)
     .map((file) => ({ file, match: LEGACY_MIGRATION_RE.exec(file) }))
     .filter((entry) => entry.match)
-    .sort((a, b) => {
-      const first = parseInt(a.match[1].replace(/\./g, ''), 10)
-      const second = parseInt(b.match[1].replace(/\./g, ''), 10)
+    .toSorted((a, b) => {
+      const first = parseInt(a.match[1].replaceAll(/\./g, ''), 10)
+      const second = parseInt(b.match[1].replaceAll(/\./g, ''), 10)
       return first - second
     })
     .map(({ file, match }) => ({
       file,
       version: match[1],
-      description: match[2].replace(/_/g, ' '),
+      description: match[2].replaceAll(/_/g, ' '),
       type: match[3].toLowerCase(),
       fullPath: path.join(LEGACY_MIGRATION_DIR, file),
     }))
@@ -178,30 +182,44 @@ const listLegacyMigrations = () =>
 const isIdentifierNamed = (node, name) => ts.isIdentifier(node) && node.text === name
 
 const getPropertyNameText = (nameNode) => {
-  if (ts.isIdentifier(nameNode)) return nameNode.text
-  if (ts.isStringLiteral(nameNode) || ts.isNoSubstitutionTemplateLiteral(nameNode)) return nameNode.text
+  if (ts.isIdentifier(nameNode)) {
+    return nameNode.text
+  }
+  if (ts.isStringLiteral(nameNode) || ts.isNoSubstitutionTemplateLiteral(nameNode)) {
+    return nameNode.text
+  }
   return null
 }
 
 const resolveExpression = (expr, ctx, seen = new Set()) => {
-  if (!expr || !ts.isIdentifier(expr)) return expr
+  if (!expr || !ts.isIdentifier(expr)) {
+    return expr
+  }
   const name = expr.text
-  if (seen.has(name)) return expr
+  if (seen.has(name)) {
+    return expr
+  }
   const init = ctx.varMap.get(name)
-  if (!init) return expr
+  if (!init) {
+    return expr
+  }
   seen.add(name)
   return resolveExpression(init, ctx, seen)
 }
 
 const extractStringLiteral = (expr, ctx) => {
   const resolved = resolveExpression(expr, ctx)
-  if (!resolved) return null
+  if (!resolved) {
+    return null
+  }
   if (ts.isStringLiteral(resolved) || ts.isNoSubstitutionTemplateLiteral(resolved)) {
     return resolved.text
   }
   if (ts.isPropertyAccessExpression(resolved) && isIdentifierNamed(resolved.expression, 'config')) {
     const value = LEGACY_CONFIG_MAP.get(resolved.name.text)
-    if (value) return value
+    if (value) {
+      return value
+    }
   }
   return null
 }
@@ -212,13 +230,19 @@ const resolveObjectLiteral = (expr, ctx) => {
 }
 
 const getObjectProperty = (objExpr, name) => {
-  if (!objExpr) return null
+  if (!objExpr) {
+    return null
+  }
   for (const prop of objExpr.properties) {
     if (ts.isPropertyAssignment(prop)) {
       const propName = getPropertyNameText(prop.name)
-      if (propName === name) return prop.initializer
+      if (propName === name) {
+        return prop.initializer
+      }
     } else if (ts.isShorthandPropertyAssignment(prop)) {
-      if (prop.name.text === name) return prop.name
+      if (prop.name.text === name) {
+        return prop.name
+      }
     }
   }
   return null
@@ -226,7 +250,9 @@ const getObjectProperty = (objExpr, name) => {
 
 const collectObjectProperties = (objExpr, ctx, stack) => {
   const entries = []
-  if (!objExpr) return entries
+  if (!objExpr) {
+    return entries
+  }
   for (const prop of objExpr.properties) {
     if (ts.isSpreadAssignment(prop)) {
       const spreadObj = resolveObjectLiteral(prop.expression, ctx)
@@ -237,7 +263,9 @@ const collectObjectProperties = (objExpr, ctx, stack) => {
     }
     if (ts.isPropertyAssignment(prop)) {
       const propName = getPropertyNameText(prop.name)
-      if (propName) entries.push([propName, prop.initializer])
+      if (propName) {
+        entries.push([propName, prop.initializer])
+      }
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       entries.push([prop.name.text, prop.name])
     }
@@ -261,38 +289,82 @@ const getCallInfo = (callExpr) => {
 
 const sampleForName = (name, keyHint) => {
   const target = `${name ?? ''} ${keyHint ?? ''}`.toLowerCase()
-  if (target.includes('email')) return SAMPLE_EMAIL
-  if (target.includes('phone')) return SAMPLE_PHONE
-  if (target.includes('datetime')) return SAMPLE_DATETIME
-  if (target.includes('date')) return SAMPLE_DATE
-  if (target.includes('timezone') || target.includes('time_zone')) return SAMPLE_TIMEZONE
-  if (target.includes('locale')) return SAMPLE_LOCALE
-  if (target.includes('currency')) return SAMPLE_CURRENCY
-  if (target.includes('duration')) return SAMPLE_DURATION
-  if (target.includes('url')) return SAMPLE_URL
-  if (target.includes('slug')) return SAMPLE_SLUG
-  if (target.includes('boolean')) return true
-  if (target.includes('color') || target.includes('colour')) return '#abcdef'
-  if (target.includes('uuid') || target.endsWith('id') || target.includes('_id')) return SAMPLE_UUID
-  if (target.includes('number') || target.includes('int') || target.includes('lat') || target.includes('lng')) return 1
+  if (target.includes('email')) {
+    return SAMPLE_EMAIL
+  }
+  if (target.includes('phone')) {
+    return SAMPLE_PHONE
+  }
+  if (target.includes('datetime')) {
+    return SAMPLE_DATETIME
+  }
+  if (target.includes('date')) {
+    return SAMPLE_DATE
+  }
+  if (target.includes('timezone') || target.includes('time_zone')) {
+    return SAMPLE_TIMEZONE
+  }
+  if (target.includes('locale')) {
+    return SAMPLE_LOCALE
+  }
+  if (target.includes('currency')) {
+    return SAMPLE_CURRENCY
+  }
+  if (target.includes('duration')) {
+    return SAMPLE_DURATION
+  }
+  if (target.includes('url')) {
+    return SAMPLE_URL
+  }
+  if (target.includes('slug')) {
+    return SAMPLE_SLUG
+  }
+  if (target.includes('boolean')) {
+    return true
+  }
+  if (target.includes('color') || target.includes('colour')) {
+    return '#abcdef'
+  }
+  if (target.includes('uuid') || target.endsWith('id') || target.includes('_id')) {
+    return SAMPLE_UUID
+  }
+  if (target.includes('number') || target.includes('int') || target.includes('lat') || target.includes('lng')) {
+    return 1
+  }
   if (
     target.includes('money') ||
     target.includes('price') ||
     target.includes('amount') ||
     target.includes('fee') ||
     target.includes('tax')
-  )
+  ) {
     return '1'
-  if (target.includes('total') || target.includes('credit')) return 1
-  if (target.includes('count') || target.includes('quantity') || target.includes('minutes') || target.includes('hours')) return 1
-  if (target.includes('password')) return 'password'
-  if (target.includes('is') || target.includes('has') || target.includes('enabled') || target.includes('active')) return true
+  }
+  if (target.includes('total') || target.includes('credit')) {
+    return 1
+  }
+  if (
+    target.includes('count') ||
+    target.includes('quantity') ||
+    target.includes('minutes') ||
+    target.includes('hours')
+  ) {
+    return 1
+  }
+  if (target.includes('password')) {
+    return 'password'
+  }
+  if (target.includes('is') || target.includes('has') || target.includes('enabled') || target.includes('active')) {
+    return true
+  }
   return 'Test'
 }
 
 const mergeSamples = (samples) => {
   const objectSamples = samples.filter((sample) => sample && typeof sample === 'object' && !Array.isArray(sample))
-  if (!objectSamples.length) return samples.find((sample) => sample !== undefined) ?? null
+  if (!objectSamples.length) {
+    return samples.find((sample) => sample !== undefined) ?? null
+  }
   return Object.assign({}, ...objectSamples)
 }
 
@@ -311,7 +383,9 @@ const TIME_RANGE_START_RE = /(start|from|begin)/i
 const TIME_RANGE_END_RE = /(end|to|until)/i
 
 const collectKeyPaths = (value, predicate, path = [], acc = []) => {
-  if (!value || typeof value !== 'object') return acc
+  if (!value || typeof value !== 'object') {
+    return acc
+  }
   if (Array.isArray(value)) {
     value.forEach((entry, index) => {
       collectKeyPaths(entry, predicate, [...path, index], acc)
@@ -330,15 +404,21 @@ const collectKeyPaths = (value, predicate, path = [], acc = []) => {
 }
 
 const collectRangePairs = (sample) => {
-  if (!sample || typeof sample !== 'object') return []
+  if (!sample || typeof sample !== 'object') {
+    return []
+  }
   const startPaths = collectKeyPaths(sample, (key) => TIME_RANGE_START_RE.test(key))
   const endPaths = collectKeyPaths(sample, (key) => TIME_RANGE_END_RE.test(key))
   const grouped = new Map()
   const addPath = (paths, kind) => {
     for (const path of paths) {
-      if (!path.length) continue
+      if (!path.length) {
+        continue
+      }
       const parent = JSON.stringify(path.slice(0, -1))
-      if (!grouped.has(parent)) grouped.set(parent, {})
+      if (!grouped.has(parent)) {
+        grouped.set(parent, {})
+      }
       grouped.get(parent)[kind] = path
     }
   }
@@ -346,7 +426,9 @@ const collectRangePairs = (sample) => {
   addPath(endPaths, 'end')
   const pairs = []
   for (const entry of grouped.values()) {
-    if (entry.start && entry.end) pairs.push({ startPath: entry.start, endPath: entry.end })
+    if (entry.start && entry.end) {
+      pairs.push({ startPath: entry.start, endPath: entry.end })
+    }
   }
   return pairs
 }
@@ -355,13 +437,15 @@ const formatPath = (pathParts) =>
   pathParts
     .map((part, index) => (typeof part === 'number' ? `[${part}]` : index === 0 ? part : `.${part}`))
     .join('')
-    .replace(/\.\[/g, '[')
+    .replaceAll(/\.\[/g, '[')
 
 const dedupePaths = (paths) => {
   const seen = new Set()
   return paths.filter((path) => {
     const key = formatPath(path)
-    if (seen.has(key)) return false
+    if (seen.has(key)) {
+      return false
+    }
     seen.add(key)
     return true
   })
@@ -375,16 +459,18 @@ const cloneValue = (value) => {
 }
 
 const setValueByPath = (target, path, value) => {
-  if (!target || !path?.length) return false
+  if (!target || !path?.length) {
+    return false
+  }
   let cursor = target
   for (let i = 0; i < path.length - 1; i += 1) {
     const key = path[i]
     const next = path[i + 1]
     if (typeof key === 'number') {
-      if (!Array.isArray(cursor)) return false
-      if (cursor[key] === undefined || cursor[key] === null) {
-        cursor[key] = typeof next === 'number' ? [] : {}
+      if (!Array.isArray(cursor)) {
+        return false
       }
+      cursor[key] ??= typeof next === 'number' ? [] : {}
       cursor = cursor[key]
       continue
     }
@@ -395,7 +481,9 @@ const setValueByPath = (target, path, value) => {
   }
   const last = path[path.length - 1]
   if (typeof last === 'number') {
-    if (!Array.isArray(cursor)) return false
+    if (!Array.isArray(cursor)) {
+      return false
+    }
     cursor[last] = value
     return true
   }
@@ -404,9 +492,13 @@ const setValueByPath = (target, path, value) => {
 }
 
 const collectRequiredKeys = (expr, ctx, stack = new Set()) => {
-  if (!expr) return new Set()
+  if (!expr) {
+    return new Set()
+  }
   const resolved = resolveExpression(expr, ctx, stack)
-  if (!resolved) return new Set()
+  if (!resolved) {
+    return new Set()
+  }
 
   if (ts.isCallExpression(resolved)) {
     if (ts.isCallExpression(resolved.expression)) {
@@ -466,7 +558,9 @@ const collectRequiredKeys = (expr, ctx, stack = new Set()) => {
 
 const sampleFromStruct = (expr, ctx, stack) => {
   const objExpr = resolveObjectLiteral(expr, ctx)
-  if (!objExpr) return {}
+  if (!objExpr) {
+    return {}
+  }
   const entries = collectObjectProperties(objExpr, ctx, stack)
   const result = {}
   for (const [key, valueExpr] of entries) {
@@ -476,9 +570,13 @@ const sampleFromStruct = (expr, ctx, stack) => {
 }
 
 const sampleFromDecoderExpr = (expr, ctx, stack = new Set(), keyHint) => {
-  if (!expr) return sampleForName('', keyHint)
+  if (!expr) {
+    return sampleForName('', keyHint)
+  }
   const resolved = resolveExpression(expr, ctx, stack)
-  if (!resolved) return sampleForName('', keyHint)
+  if (!resolved) {
+    return sampleForName('', keyHint)
+  }
 
   if (ts.isCallExpression(resolved)) {
     if (ts.isCallExpression(resolved.expression)) {
@@ -520,11 +618,21 @@ const sampleFromDecoderExpr = (expr, ctx, stack = new Set(), keyHint) => {
       }
       if (prop === 'literal') {
         const first = resolved.arguments[0]
-        if (first && ts.isStringLiteral(first)) return first.text
-        if (first && ts.isNumericLiteral(first)) return Number(first.text)
-        if (first && first.kind === ts.SyntaxKind.NullKeyword) return null
-        if (first && first.kind === ts.SyntaxKind.TrueKeyword) return true
-        if (first && first.kind === ts.SyntaxKind.FalseKeyword) return false
+        if (first && ts.isStringLiteral(first)) {
+          return first.text
+        }
+        if (first && ts.isNumericLiteral(first)) {
+          return Number(first.text)
+        }
+        if (first && first.kind === ts.SyntaxKind.NullKeyword) {
+          return null
+        }
+        if (first && first.kind === ts.SyntaxKind.TrueKeyword) {
+          return true
+        }
+        if (first && first.kind === ts.SyntaxKind.FalseKeyword) {
+          return false
+        }
         return sampleForName(prop, keyHint)
       }
       if (prop === 'nullable') {
@@ -543,16 +651,24 @@ const sampleFromDecoderExpr = (expr, ctx, stack = new Set(), keyHint) => {
           }
         }
       }
-      if (prop === 'UnknownRecord' || prop === 'unknown') return {}
-      if (prop === 'id') return SAMPLE_UUID
+      if (prop === 'UnknownRecord' || prop === 'unknown') {
+        return {}
+      }
+      if (prop === 'id') {
+        return SAMPLE_UUID
+      }
       if (prop === 'minimum' || prop === 'exclusiveMinimum') {
         const num = resolved.arguments[0]
-        if (num && ts.isNumericLiteral(num)) return Number(num.text) + (prop === 'exclusiveMinimum' ? 1 : 0)
+        if (num && ts.isNumericLiteral(num)) {
+          return Number(num.text) + (prop === 'exclusiveMinimum' ? 1 : 0)
+        }
         return 1
       }
       if (prop === 'maximum') {
         const num = resolved.arguments[0]
-        if (num && ts.isNumericLiteral(num)) return Number(num.text)
+        if (num && ts.isNumericLiteral(num)) {
+          return Number(num.text)
+        }
         return 1
       }
       if (prop === 'minLength') {
@@ -579,10 +695,18 @@ const sampleFromDecoderExpr = (expr, ctx, stack = new Set(), keyHint) => {
     return sampleForName(resolved.text, keyHint)
   }
 
-  if (ts.isStringLiteral(resolved) || ts.isNoSubstitutionTemplateLiteral(resolved)) return resolved.text
-  if (ts.isNumericLiteral(resolved)) return Number(resolved.text)
-  if (resolved.kind === ts.SyntaxKind.TrueKeyword) return true
-  if (resolved.kind === ts.SyntaxKind.FalseKeyword) return false
+  if (ts.isStringLiteral(resolved) || ts.isNoSubstitutionTemplateLiteral(resolved)) {
+    return resolved.text
+  }
+  if (ts.isNumericLiteral(resolved)) {
+    return Number(resolved.text)
+  }
+  if (resolved.kind === ts.SyntaxKind.TrueKeyword) {
+    return true
+  }
+  if (resolved.kind === ts.SyntaxKind.FalseKeyword) {
+    return false
+  }
   if (ts.isObjectLiteralExpression(resolved)) {
     const hasDecode = resolved.properties.some((prop) => {
       if (ts.isPropertyAssignment(prop)) {
@@ -611,12 +735,16 @@ const buildSharedSampleMap = () => {
     const exportNames = new Set()
 
     sourceFile.forEachChild((node) => {
-      if (!ts.isVariableStatement(node)) return
+      if (!ts.isVariableStatement(node)) {
+        return
+      }
       const isExported = node.modifiers?.some((mod) => mod.kind === ts.SyntaxKind.ExportKeyword)
       for (const decl of node.declarationList.declarations) {
         if (ts.isIdentifier(decl.name) && decl.initializer) {
           varMap.set(decl.name.text, decl.initializer)
-          if (isExported) exportNames.add(decl.name.text)
+          if (isExported) {
+            exportNames.add(decl.name.text)
+          }
         }
       }
     })
@@ -624,7 +752,9 @@ const buildSharedSampleMap = () => {
     const ctx = { sourceFile, varMap }
     for (const name of exportNames) {
       const expr = varMap.get(name)
-      if (!expr) continue
+      if (!expr) {
+        continue
+      }
       const sample = sampleFromDecoderExpr(expr, ctx, new Set(), name)
       SHARED_SAMPLE_MAP.set(name, sample)
     }
@@ -643,7 +773,9 @@ const parseLegacyRoutes = () => {
     const sourceFile = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
     const varMap = new Map()
     sourceFile.forEachChild((node) => {
-      if (!ts.isVariableStatement(node)) return
+      if (!ts.isVariableStatement(node)) {
+        return
+      }
       for (const decl of node.declarationList.declarations) {
         if (ts.isIdentifier(decl.name) && decl.initializer) {
           varMap.set(decl.name.text, decl.initializer)
@@ -668,11 +800,15 @@ const parseLegacyRoutes = () => {
               let security = null
               if (securityExpr) {
                 const securityValue = extractStringLiteral(securityExpr, ctx)
-                if (securityValue) security = securityValue
-                if (securityExpr.kind === ts.SyntaxKind.NullKeyword) security = null
+                if (securityValue) {
+                  security = securityValue
+                }
+                if (securityExpr.kind === ts.SyntaxKind.NullKeyword) {
+                  security = null
+                }
               }
               const bodyExpr =
-                (optionsObj ? getObjectProperty(optionsObj, 'bodyParameters') : null) ||
+                (optionsObj ? getObjectProperty(optionsObj, 'bodyParameters') : null) ??
                 (optionsObj ? getObjectProperty(optionsObj, 'requestBody') : null)
               const queryExpr = optionsObj ? getObjectProperty(optionsObj, 'queryParameters') : null
 
@@ -680,15 +816,10 @@ const parseLegacyRoutes = () => {
               const querySample = queryExpr ? sampleFromDecoderExpr(queryExpr, ctx) : null
               const bodyRequiredKeys = bodyExpr ? [...collectRequiredKeys(bodyExpr, ctx)] : []
               const queryRequiredKeys = queryExpr ? [...collectRequiredKeys(queryExpr, ctx)] : []
-              const bodyIdPaths = bodySample
-                ? dedupePaths(collectKeyPaths(bodySample, (key) => isIdKey(key)))
-                : []
+              const bodyIdPaths = bodySample ? dedupePaths(collectKeyPaths(bodySample, (key) => isIdKey(key))) : []
               const bodyNumericPaths = bodySample
                 ? dedupePaths(
-                    collectKeyPaths(
-                      bodySample,
-                      (key, entry) => typeof entry === 'number' || isNumericKeyName(key)
-                    )
+                    collectKeyPaths(bodySample, (key, entry) => typeof entry === 'number' || isNumericKeyName(key))
                   )
                 : []
               const queryIdPaths =
@@ -698,10 +829,7 @@ const parseLegacyRoutes = () => {
               const queryNumericPaths =
                 querySample && typeof querySample === 'object' && !Array.isArray(querySample)
                   ? dedupePaths(
-                      collectKeyPaths(
-                        querySample,
-                        (key, entry) => typeof entry === 'number' || isNumericKeyName(key)
-                      )
+                      collectKeyPaths(querySample, (key, entry) => typeof entry === 'number' || isNumericKeyName(key))
                     )
                   : []
               const bodyTimeRangePairs = bodySample ? collectRangePairs(bodySample) : []
@@ -753,7 +881,9 @@ const normalizePathParams = (path) => {
 const normalizeRouteKey = (route) => `${route.method} /api${route.path}`
 
 const matchesRouteFilter = (route, filter) => {
-  if (!filter) return true
+  if (!filter) {
+    return true
+  }
   const normalizedFilter = filter.includes('/api') ? filter : filter.replace(/^\s*(\w+)\s+/, '$1 /api')
   const normalizedRoute = normalizeRouteKey(route)
   return normalizedRoute.toLowerCase() === normalizedFilter.trim().toLowerCase()
@@ -761,9 +891,9 @@ const matchesRouteFilter = (route, filter) => {
 
 const toSnake = (value) =>
   value
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .replace(/\W+/g, '_')
-    .replace(/^_+|_+$/g, '')
+    .replaceAll(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replaceAll(/\W+/g, '_')
+    .replaceAll(/^_+|_+$/g, '')
     .toLowerCase()
 
 const buildToken = () => crypto.randomUUID()
@@ -776,7 +906,9 @@ const waitForUrl = async (url, timeoutMs = 120000) => {
       const timer = setTimeout(() => controller.abort(), 2000)
       const res = await fetch(url, { method: 'GET', signal: controller.signal })
       clearTimeout(timer)
-      if (res) return true
+      if (res) {
+        return true
+      }
     } catch {
       // ignore
     }
@@ -798,7 +930,9 @@ const spawnServer = (command, args, options) =>
   spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'], detached: true, ...options })
 
 const stopProcess = (proc) => {
-  if (!proc || proc.killed) return
+  if (!proc || proc.killed) {
+    return
+  }
   try {
     process.kill(-proc.pid, 'SIGTERM')
   } catch {
@@ -820,7 +954,10 @@ const databaseExists = async (client, name) => {
 }
 
 const dropDatabase = async (client, name) => {
-  await client.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=$1 AND pid <> pg_backend_pid()', [name])
+  await client.query(
+    'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=$1 AND pid <> pg_backend_pid()',
+    [name]
+  )
   await client.query(`DROP DATABASE IF EXISTS ${name}`)
 }
 
@@ -846,26 +983,23 @@ const createDbClient = async (dbName) => {
 
 const selectSingleValue = async (client, query, params = []) => {
   const result = await client.query(query, params)
-  if (!result.rows.length) return null
+  if (!result.rows.length) {
+    return null
+  }
   const first = result.rows[0]
   return Object.values(first)[0]
 }
 
 const ensureEnumValue = async (client, table, column, value) => {
-  await client.query(
-    `INSERT INTO ${table} (${column}) VALUES ($1) ON CONFLICT (${column}) DO NOTHING`,
-    [value]
-  )
+  await client.query(`INSERT INTO ${table} (${column}) VALUES ($1) ON CONFLICT (${column}) DO NOTHING`, [value])
 }
 
 const ensureReferenceData = async (client) => {
   const insertMany = async (table, column, values) => {
-    const exists = await selectSingleValue(
-      client,
-      "SELECT to_regclass($1) IS NOT NULL",
-      [`public.${table}`]
-    )
-    if (!exists) return
+    const exists = await selectSingleValue(client, 'SELECT to_regclass($1) IS NOT NULL', [`public.${table}`])
+    if (!exists) {
+      return
+    }
     for (const value of values) {
       await ensureEnumValue(client, table, column, value)
     }
@@ -875,26 +1009,39 @@ const ensureReferenceData = async (client) => {
   await insertMany('client_status', 'status', ['current', 'past', 'lead'])
   await insertMany('payment_status', 'status', ['paid', 'rejected', 'requested', 'refunded', 'pending'])
   await insertMany('payment_plan_status', 'status', ['active', 'paused', 'pending', 'cancelled', 'ended'])
-  await insertMany('payment_plan_payment_status', 'status', ['paid', 'rejected', 'refunded', 'cancelled', 'paused', 'pending'])
+  await insertMany('payment_plan_payment_status', 'status', [
+    'paid',
+    'rejected',
+    'refunded',
+    'cancelled',
+    'paused',
+    'pending',
+  ])
   await insertMany('payment_method', 'method', ['cash', 'card'])
-  await insertMany('client_session_state', 'state', ['maybe', 'cancelled', 'invited', 'confirmed', 'accepted', 'declined'])
+  await insertMany('client_session_state', 'state', [
+    'maybe',
+    'cancelled',
+    'invited',
+    'confirmed',
+    'accepted',
+    'declined',
+  ])
   await insertMany('booking_payment_type', 'type', ['hidePrice', 'noPrepayment', 'fullPrepayment'])
   await insertMany('booking_question_state', 'state', ['optional', 'required'])
   await insertMany('request_client_address_online_type', 'type', ['optional', 'required'])
   await insertMany('mail_bounce_type', 'type', ['hard', 'soft'])
   await insertMany('client_appointment_reminder_type', 'type', ['email', 'sms'])
-  await insertMany('service_provider_appointment_reminder_type', 'type', ['email', 'notification', 'emailAndNotification'])
+  await insertMany('service_provider_appointment_reminder_type', 'type', [
+    'email',
+    'notification',
+    'emailAndNotification',
+  ])
 }
 
 const createTrainer = async (client, label) => {
   await ensureReferenceData(client)
-  let countryId = await selectSingleValue(
-    client,
-    'SELECT country_id FROM supported_country_currency LIMIT 1'
-  )
-  if (!countryId) {
-    countryId = await selectSingleValue(client, 'SELECT id FROM country LIMIT 1')
-  }
+  let countryId = await selectSingleValue(client, 'SELECT country_id FROM supported_country_currency LIMIT 1')
+  countryId ??= await selectSingleValue(client, 'SELECT id FROM country LIMIT 1')
   const fixtureIds = FIXTURE_IDS[label]
   const userId = fixtureIds?.trainerUserId ?? crypto.randomUUID()
   const trainerId = fixtureIds?.trainerId ?? crypto.randomUUID()
@@ -913,16 +1060,11 @@ const createTrainer = async (client, label) => {
          terms_accepted = EXCLUDED.terms_accepted`,
     [trainerId, userId, countryId, trainerEmail, `Trainer ${label}`]
   )
-  const hasTaxTable = await selectSingleValue(
-    client,
-    "SELECT to_regclass('public.tax') IS NOT NULL"
-  )
+  const hasTaxTable = await selectSingleValue(client, "SELECT to_regclass('public.tax') IS NOT NULL")
   if (hasTaxTable) {
-    const existingCount = await selectSingleValue(
-      client,
-      'SELECT count(*)::int FROM tax WHERE trainer_id = $1',
-      [trainerId]
-    )
+    const existingCount = await selectSingleValue(client, 'SELECT count(*)::int FROM tax WHERE trainer_id = $1', [
+      trainerId,
+    ])
     const needed = Math.max(0, 3 - (existingCount ?? 0))
     if (needed > 0) {
       const values = Array.from({ length: needed }, () => '($1)').join(', ')
@@ -942,10 +1084,7 @@ const createTrainer = async (client, label) => {
       WHERE id = $5`,
     [calendarSlug, smsCheckoutId, pageUrlSlug, SAMPLE_DATETIME, trainerId]
   )
-  const accountTableExists = await selectSingleValue(
-    client,
-    "SELECT to_regclass('stripe.account') IS NOT NULL"
-  )
+  const accountTableExists = await selectSingleValue(client, "SELECT to_regclass('stripe.account') IS NOT NULL")
   if (accountTableExists) {
     const stripeAccountId = `acct_codex_${label.toLowerCase()}`
     const bankAccountId = `ba_codex_${label.toLowerCase()}`
@@ -1066,10 +1205,10 @@ const getTables = async (client) => {
 }
 
 const ensureSchemaHistoryTable = async (client) => {
-  const result = await client.query(
-    "SELECT to_regclass('public.schema_history') is not null as exists"
-  )
-  if (result.rows[0]?.exists) return
+  const result = await client.query("SELECT to_regclass('public.schema_history') is not null as exists")
+  if (result.rows[0]?.exists) {
+    return
+  }
   await client.query(`CREATE TABLE schema_history(
     installed_rank int GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
     version text UNIQUE,
@@ -1087,7 +1226,9 @@ const ensureSchemaHistoryTable = async (client) => {
 const applyLegacyMigrations = async (client) => {
   const migrations = listLegacyMigrations()
   for (const migration of migrations) {
-    if (migration.type !== 'sql') continue
+    if (migration.type !== 'sql') {
+      continue
+    }
     let content = awaitReadFile(migration.fullPath)
     if (migration.file === 'V55__Notification_foreign_keys_should_cascade.sql') {
       content = `
@@ -1163,10 +1304,7 @@ ALTER TABLE payment_plan_charge ADD CONSTRAINT payment_plan_charge_payment_plan_
 `
     }
     if (migration.file === 'V137__Create_sales_table.sql') {
-      content = content.replace(
-        /DROP\s+CONSTRAINT\s+(?!IF\s+EXISTS)([^;]+);/gi,
-        'DROP CONSTRAINT IF EXISTS $1;'
-      )
+      content = content.replaceAll(/DROP\s+CONSTRAINT\s+(?!IF\s+EXISTS)([^;]+);/gi, 'DROP CONSTRAINT IF EXISTS $1;')
     }
     if (migration.file === 'V165__Remove_sale_ordered_product.sql') {
       content = content.replace(
@@ -1174,10 +1312,7 @@ ALTER TABLE payment_plan_charge ADD CONSTRAINT payment_plan_charge_payment_plan_
         'DROP TABLE IF EXISTS sale_ordered_product CASCADE;'
       )
     }
-    content = content.replace(
-      /DROP\s+CONSTRAINT\s+(?!IF\s+EXISTS)([^;]+);/gi,
-      'DROP CONSTRAINT IF EXISTS $1;'
-    )
+    content = content.replaceAll(/DROP\s+CONSTRAINT\s+(?!IF\s+EXISTS)([^;]+);/gi, 'DROP CONSTRAINT IF EXISTS $1;')
     try {
       await client.query(content)
     } catch (error) {
@@ -1190,7 +1325,9 @@ ALTER TABLE payment_plan_charge ADD CONSTRAINT payment_plan_charge_payment_plan_
 const markMigrationsApplied = async (client) => {
   await ensureSchemaHistoryTable(client)
   const count = await client.query('SELECT count(*)::int as count FROM schema_history')
-  if ((count.rows[0]?.count ?? 0) > 0) return
+  if ((count.rows[0]?.count ?? 0) > 0) {
+    return
+  }
 
   const migrations = listLegacyMigrations()
   for (const migration of migrations) {
@@ -1209,30 +1346,39 @@ const markMigrationsApplied = async (client) => {
         success
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
       ON CONFLICT (script) DO NOTHING`,
-      [
-        migration.version,
-        migration.description,
-        type,
-        migration.file,
-        checksum,
-        process.env.USER ?? 'codex',
-        0,
-        true,
-      ]
+      [migration.version, migration.description, type, migration.file, checksum, process.env.USER ?? 'codex', 0, true]
     )
   }
 }
 
 const overrideValueForKey = (key, state) => {
-  if (!key) return undefined
-  if (state?.ids?.[key]) return state.ids[key]
-  if (key === 'trainerId') return state?.ids?.trainerId
-  if (key === 'clientId') return state?.ids?.clientId
-  if (key === 'userId') return state?.trainerUserId ?? state?.clientUserId
-  if (key === 'email') return state?.trainerEmail ?? state?.clientEmail ?? SAMPLE_EMAIL
-  if (key === 'password') return 'password'
-  if (key === 'currentPassword') return 'password'
-  if (key === 'newPassword') return 'newpassword'
+  if (!key) {
+    return undefined
+  }
+  if (state?.ids?.[key]) {
+    return state.ids[key]
+  }
+  if (key === 'trainerId') {
+    return state?.ids?.trainerId
+  }
+  if (key === 'clientId') {
+    return state?.ids?.clientId
+  }
+  if (key === 'userId') {
+    return state?.trainerUserId ?? state?.clientUserId
+  }
+  if (key === 'email') {
+    return state?.trainerEmail ?? state?.clientEmail ?? SAMPLE_EMAIL
+  }
+  if (key === 'password') {
+    return 'password'
+  }
+  if (key === 'currentPassword') {
+    return 'password'
+  }
+  if (key === 'newPassword') {
+    return 'newpassword'
+  }
   return undefined
 }
 
@@ -1252,20 +1398,36 @@ const applyOverridesToValue = (value, state) => {
 }
 
 const makeWrongType = (value) => {
-  if (Array.isArray(value)) return 'invalid'
-  if (value === null || value === undefined) return 'invalid'
-  if (typeof value === 'string') return 1
-  if (typeof value === 'number') return 'invalid'
-  if (typeof value === 'boolean') return 'invalid'
-  if (typeof value === 'object') return 'invalid'
+  if (Array.isArray(value)) {
+    return 'invalid'
+  }
+  if (value === null || value === undefined) {
+    return 'invalid'
+  }
+  if (typeof value === 'string') {
+    return 1
+  }
+  if (typeof value === 'number') {
+    return 'invalid'
+  }
+  if (typeof value === 'boolean') {
+    return 'invalid'
+  }
+  if (typeof value === 'object') {
+    return 'invalid'
+  }
   return 'invalid'
 }
 
 const buildQueryString = (query) => {
-  if (!query || typeof query !== 'object') return ''
+  if (!query || typeof query !== 'object') {
+    return ''
+  }
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query)) {
-    if (value === undefined || value === null) continue
+    if (value === undefined || value === null) {
+      continue
+    }
     if (Array.isArray(value)) {
       value.forEach((entry) => params.append(key, String(entry)))
     } else if (typeof value === 'object') {
@@ -1296,7 +1458,9 @@ const buildMultipartBody = ({ fields, fileField, fileName, mimeType, fileContent
   }
   if (fields && typeof fields === 'object') {
     for (const [key, value] of Object.entries(fields)) {
-      if (value === undefined || value === null) continue
+      if (value === undefined || value === null) {
+        continue
+      }
       appendField(key, value)
     }
   }
@@ -1309,10 +1473,18 @@ const buildMultipartBody = ({ fields, fileField, fileName, mimeType, fileContent
 }
 
 const resolveParamValue = async ({ param, route, client, tables, state }) => {
-  if (state?.ids?.[param]) return state.ids[param]
-  if (param === 'userId' && state?.trainerUserId) return state.trainerUserId
-  if (param === 'memberId' && state?.trainerUserId) return state.trainerUserId
-  if (param === 'imageUrl') return 'test.jpg'
+  if (state?.ids?.[param]) {
+    return state.ids[param]
+  }
+  if (param === 'userId' && state?.trainerUserId) {
+    return state.trainerUserId
+  }
+  if (param === 'memberId' && state?.trainerUserId) {
+    return state.trainerUserId
+  }
+  if (param === 'imageUrl') {
+    return 'test.jpg'
+  }
   if (param === 'pageUrlSlug') {
     const value = await selectSingleValue(client, 'SELECT online_bookings_page_url_slug FROM trainer LIMIT 1')
     return value ?? 'test'
@@ -1413,14 +1585,20 @@ const BODY_OVERRIDES = [
 
 const getBodyOverride = (route, method, state, env) => {
   for (const override of BODY_OVERRIDES) {
-    if (override.method !== method) continue
-    if (override.path === route) return override.build(state, env)
+    if (override.method !== method) {
+      continue
+    }
+    if (override.path === route) {
+      return override.build(state, env)
+    }
   }
   return null
 }
 
 const buildRequestBody = (route, method, state, baseUrl, env, bodySample, scenario, multipartFields) => {
-  if (!METHOD_HAS_BODY.has(method)) return null
+  if (!METHOD_HAS_BODY.has(method)) {
+    return null
+  }
 
   if (route === '/mandrillEvents') {
     const events = JSON.stringify([{ event: 'test', _id: 'evt_1', ts: Date.now() }])
@@ -1441,13 +1619,14 @@ const buildRequestBody = (route, method, state, baseUrl, env, bodySample, scenar
     const secret = env.STRIPE_WEBHOOK_SECRET ?? 'whsec_mock'
     const signatureMode = scenario?.signatureMode
     let stripeSignature = computeStripeSignature({ secret, payload })
-    if (signatureMode === 'invalid') stripeSignature = 'bad'
+    if (signatureMode === 'invalid') {
+      stripeSignature = 'bad'
+    }
     if (signatureMode === 'expired') {
       const oldTimestamp = Math.floor(Date.now() / 1000) - 86400
       stripeSignature = computeStripeSignature({ secret, payload, timestamp: oldTimestamp })
     }
-    const extraHeaders =
-      signatureMode === 'missing' ? {} : { 'stripe-signature': stripeSignature }
+    const extraHeaders = signatureMode === 'missing' ? {} : { 'stripe-signature': stripeSignature }
     return { type: 'raw', body: payload, extraHeaders }
   }
 
@@ -1460,13 +1639,16 @@ const buildRequestBody = (route, method, state, baseUrl, env, bodySample, scenar
     const fieldKey = Array.isArray(fieldPath) ? fieldPath[0] : fieldPath
     const fileField = fieldKey ? String(fieldKey) : 'file'
     const multipartMode = scenario?.multipartMode ?? 'valid'
-    const fields =
-      hydrated && typeof hydrated === 'object' && !Array.isArray(hydrated) ? { ...hydrated } : {}
+    const fields = hydrated && typeof hydrated === 'object' && !Array.isArray(hydrated) ? { ...hydrated } : {}
     delete fields[fileField]
     const useField = multipartMode === 'wrong_field' ? `${fileField}_wrong` : fileField
     let fileContent = 'test'
-    if (multipartMode === 'missing') fileContent = null
-    if (multipartMode === 'empty') fileContent = ''
+    if (multipartMode === 'missing') {
+      fileContent = null
+    }
+    if (multipartMode === 'empty') {
+      fileContent = ''
+    }
     const mimeType = multipartMode === 'wrong_mime' ? 'text/plain' : 'image/png'
     const fileName = multipartMode === 'wrong_mime' ? 'test.txt' : 'test.png'
     const { body, contentType } = buildMultipartBody({
@@ -1541,7 +1723,7 @@ const buildRequestBody = (route, method, state, baseUrl, env, bodySample, scenar
 const computeMandrillSignature = ({ baseUrl, formBody }) => {
   const url = new URL('/api/mandrillEvents', baseUrl).toString()
   const params = new URLSearchParams(formBody)
-  const sortedEntries = [...params.entries()].sort(([a], [b]) => a.localeCompare(b))
+  const sortedEntries = [...params.entries()].toSorted(([a], [b]) => a.localeCompare(b))
   const signedData = url + sortedEntries.map(([key, value]) => key + value).join('')
   const hmac = crypto.createHmac('sha1', 'mock-auth-key')
   hmac.update(signedData)
@@ -1558,7 +1740,7 @@ const computeTwilioSignature = ({ authToken, url, formBody }) => {
     // ignore
   }
   const params = new URLSearchParams(formBody)
-  const sortedEntries = [...params.entries()].sort(([a], [b]) => a.localeCompare(b))
+  const sortedEntries = [...params.entries()].toSorted(([a], [b]) => a.localeCompare(b))
   const data = signedUrl + sortedEntries.map(([key, value]) => key + value).join('')
   return crypto.createHmac('sha1', authToken).update(data).digest('base64')
 }
@@ -1590,30 +1772,38 @@ const diffSnapshots = (before, after) => {
 }
 
 const snapshotRowById = async (client, table, id) => {
-  if (!table || !id) return null
+  if (!table || !id) {
+    return null
+  }
   const result = await client.query(`SELECT * FROM ${table} WHERE id = $1`, [id])
   return result.rows[0] ?? null
 }
 
 const restoreRow = async (client, table, row) => {
-  if (!row || !table) return
+  if (!row || !table) {
+    return
+  }
   const columns = Object.keys(row).filter((col) => col !== 'id')
-  if (!columns.length) return
+  if (!columns.length) {
+    return
+  }
   const setClauses = columns.map((col, idx) => `${col} = $${idx + 2}`).join(', ')
   const values = columns.map((col) => row[col])
   await client.query(`UPDATE ${table} SET ${setClauses} WHERE id = $1`, [row.id, ...values])
 }
 
 const upsertRow = async (client, table, row, conflictColumns = ['id']) => {
-  if (!row || !table) return
+  if (!row || !table) {
+    return
+  }
   const columns = Object.keys(row)
-  if (!columns.length) return
+  if (!columns.length) {
+    return
+  }
   const columnList = columns.join(', ')
   const placeholders = columns.map((_, idx) => `$${idx + 1}`).join(', ')
   const updateColumns = columns.filter((col) => !conflictColumns.includes(col))
-  const updateClause = updateColumns.length
-    ? updateColumns.map((col) => `${col} = EXCLUDED.${col}`).join(', ')
-    : ''
+  const updateClause = updateColumns.length ? updateColumns.map((col) => `${col} = EXCLUDED.${col}`).join(', ') : ''
   const conflictTarget = conflictColumns.join(', ')
   const values = columns.map((col) => row[col])
   const query = `INSERT INTO ${table} (${columnList}) VALUES (${placeholders})
@@ -1624,15 +1814,16 @@ const upsertRow = async (client, table, row, conflictColumns = ['id']) => {
 const diffRow = (beforeRow, afterRow) => {
   const before = beforeRow ? normalizeResponseValue(beforeRow, { sortArrays: true }) : null
   const after = afterRow ? normalizeResponseValue(afterRow, { sortArrays: true }) : null
-  if (!before && !after) return {}
+  if (!before && !after) {
+    return {}
+  }
   const ignoredKeys = new Set(['password_hash'])
-  const keys = new Set([
-    ...Object.keys(before ?? {}),
-    ...Object.keys(after ?? {}),
-  ])
+  const keys = new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])
   const diff = {}
   for (const key of keys) {
-    if (ignoredKeys.has(key)) continue
+    if (ignoredKeys.has(key)) {
+      continue
+    }
     const beforeValue = before?.[key]
     const afterValue = after?.[key]
     if (JSON.stringify(beforeValue) !== JSON.stringify(afterValue)) {
@@ -1644,7 +1835,9 @@ const diffRow = (beforeRow, afterRow) => {
 
 const tablesForRoute = (route, tables) => {
   const segment = route.split('/').filter(Boolean)[1]
-  if (!segment) return []
+  if (!segment) {
+    return []
+  }
   const snake = toSnake(segment)
   const extras = {
     saleProducts: ['ordered_product', 'sale', 'sale_ordered_product'],
@@ -1666,7 +1859,9 @@ const tablesForRoute = (route, tables) => {
   if (extras[segment]) {
     return extras[segment].filter((table) => tables.has(table))
   }
-  if (tables.has(snake)) return [snake]
+  if (tables.has(snake)) {
+    return [snake]
+  }
   return []
 }
 
@@ -1690,7 +1885,9 @@ const tableMetaCache = new Map()
 const fkCache = new Map()
 
 const getTableColumns = async (client, table) => {
-  if (tableColumnsCache.has(table)) return tableColumnsCache.get(table)
+  if (tableColumnsCache.has(table)) {
+    return tableColumnsCache.get(table)
+  }
   const result = await client.query(
     'SELECT column_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2',
     ['public', table]
@@ -1701,7 +1898,9 @@ const getTableColumns = async (client, table) => {
 }
 
 const getTableMetadata = async (client, table) => {
-  if (tableMetaCache.has(table)) return tableMetaCache.get(table)
+  if (tableMetaCache.has(table)) {
+    return tableMetaCache.get(table)
+  }
   const columns = await client.query(
     `SELECT column_name, data_type, udt_name, is_nullable
      FROM information_schema.columns
@@ -1761,11 +1960,16 @@ const getDistinctValues = async (client, table, column, limit = 50) => {
 
 const STATEFUL_COLUMN_RE = /(status|state|type|mode|phase|color|reminder|subscription|payment|plan)/i
 const TIME_COLUMN_RE = /(start|end|expire|expires|due|cancel|cancelled|canceled|scheduled|trial|booking|paid|refund)/i
-const SKIP_STATE_COLUMN_RE = /^(user_id|user_type|trainer_id|client_id|owner_id|email|password_hash|first_name|last_name|created_at|updated_at)$/i
+const SKIP_STATE_COLUMN_RE =
+  /^(user_id|user_type|trainer_id|client_id|owner_id|email|password_hash|first_name|last_name|created_at|updated_at)$/i
 
 const buildStateVariants = async (client, table) => {
-  if (!table) return []
-  if (table === 'user_') return []
+  if (!table) {
+    return []
+  }
+  if (table === 'user_') {
+    return []
+  }
   const meta = await getTableMetadata(client, table)
   const variants = []
   for (const column of meta.columns) {
@@ -1804,7 +2008,10 @@ const buildStateVariants = async (client, table) => {
       continue
     }
 
-    if (STATEFUL_COLUMN_RE.test(name) && (dataType.includes('character') || dataType === 'text' || dataType === 'citext')) {
+    if (
+      STATEFUL_COLUMN_RE.test(name) &&
+      (dataType.includes('character') || dataType === 'text' || dataType === 'citext')
+    ) {
       const values = await getDistinctValues(client, table, name, 20)
       for (const value of values) {
         variants.push({ column: name, value, label: `state.${name}=${value}` })
@@ -1966,10 +2173,14 @@ const buildCompositeStateVariants = async (client, table) => {
 }
 
 const applyDbVariant = async (client, table, id, variant) => {
-  if (!variant || !table || !id) return { applied: false, restore: async () => {} }
+  if (!variant || !table || !id) {
+    return { applied: false, restore: async () => {} }
+  }
   const rowResult = await client.query(`SELECT * FROM ${table} WHERE id = $1`, [id])
   const originalRow = rowResult.rows[0]
-  if (!originalRow) return { applied: false, restore: async () => {} }
+  if (!originalRow) {
+    return { applied: false, restore: async () => {} }
+  }
 
   let updates = {}
   if (variant.updatesFn) {
@@ -1981,7 +2192,9 @@ const applyDbVariant = async (client, table, id, variant) => {
   }
 
   const columns = Object.keys(updates)
-  if (!columns.length) return { applied: false, restore: async () => {} }
+  if (!columns.length) {
+    return { applied: false, restore: async () => {} }
+  }
 
   const values = columns.map((col) => updates[col])
   const setClauses = columns.map((col, idx) => `${col} = $${idx + 2}`).join(', ')
@@ -2012,44 +2225,59 @@ const applyDbVariant = async (client, table, id, variant) => {
 }
 
 const selectLatestId = async (client, table) => {
-  if (!table) return null
+  if (!table) {
+    return null
+  }
   const columns = await getTableColumns(client, table)
-  if (!columns.has('id')) return null
+  if (!columns.has('id')) {
+    return null
+  }
   let orderBy = 'id'
-  if (columns.has('created_at')) orderBy = 'created_at'
-  else if (columns.has('updated_at')) orderBy = 'updated_at'
+  if (columns.has('created_at')) {
+    orderBy = 'created_at'
+  } else if (columns.has('updated_at')) {
+    orderBy = 'updated_at'
+  }
   const result = await client.query(`SELECT id FROM ${table} ORDER BY ${orderBy} DESC LIMIT 1`)
   return result.rows[0]?.id ?? null
 }
 
 const extractIdFromResponse = (value) => {
-  if (!value) return null
+  if (!value) {
+    return null
+  }
   if (Array.isArray(value)) {
     for (const entry of value) {
       const found = extractIdFromResponse(entry)
-      if (found) return found
+      if (found) {
+        return found
+      }
     }
     return null
   }
   if (typeof value === 'object') {
-    if (typeof value.id === 'string') return value.id
+    if (typeof value.id === 'string') {
+      return value.id
+    }
     for (const [key, entry] of Object.entries(value)) {
-      if (typeof entry === 'string' && /id$/i.test(key)) return entry
+      if (typeof entry === 'string' && /id$/i.test(key)) {
+        return entry
+      }
     }
     for (const entry of Object.values(value)) {
       const found = extractIdFromResponse(entry)
-      if (found) return found
+      if (found) {
+        return found
+      }
     }
   }
   return null
 }
 
 const looksLikeUuid = (value) =>
-  typeof value === 'string' &&
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 
-const looksLikeIsoDate = (value) =>
-  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}(T|$)/.test(value)
+const looksLikeIsoDate = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}(T|$)/.test(value)
 
 const shouldStripKey = (key) =>
   /(^id$|_id$|Id$|createdAt$|updatedAt$|deletedAt$|token$|accessToken$|refreshToken$|password$)/.test(key)
@@ -2065,16 +2293,22 @@ const normalizeResponseValue = (value, options = {}) => {
   }
   if (value && typeof value === 'object') {
     const output = {}
-    const keys = Object.keys(value).sort()
+    const keys = Object.keys(value).toSorted()
     for (const key of keys) {
       const entry = value[key]
-      if (shouldStripKey(key)) continue
+      if (shouldStripKey(key)) {
+        continue
+      }
       output[key] = normalizeResponseValue(entry, options)
     }
     return output
   }
-  if (looksLikeUuid(value)) return '<uuid>'
-  if (looksLikeIsoDate(value)) return '<date>'
+  if (looksLikeUuid(value)) {
+    return '<uuid>'
+  }
+  if (looksLikeIsoDate(value)) {
+    return '<date>'
+  }
   return value
 }
 
@@ -2084,15 +2318,19 @@ const normalizeErrorShape = (value) => {
   }
   if (value && typeof value === 'object') {
     const output = {}
-    const keys = Object.keys(value).sort()
+    const keys = Object.keys(value).toSorted()
     for (const key of keys) {
       const entry = value[key]
-      if (shouldStripKey(key)) continue
+      if (shouldStripKey(key)) {
+        continue
+      }
       output[key] = normalizeErrorShape(entry)
     }
     return output
   }
-  if (value === null) return 'null'
+  if (value === null) {
+    return 'null'
+  }
   return typeof value
 }
 
@@ -2128,7 +2366,9 @@ const executeRoute = async ({ route, state, client, tables, baseUrl, env, authHe
 
   let querySample = route.querySample ? applyOverridesToValue(route.querySample, state) : null
   if (scenario?.queryOverrides) {
-    if (!querySample || typeof querySample !== 'object') querySample = {}
+    if (!querySample || typeof querySample !== 'object') {
+      querySample = {}
+    }
     querySample = { ...querySample, ...scenario.queryOverrides }
   }
   if (scenario?.queryMode === 'missing') {
@@ -2148,7 +2388,9 @@ const executeRoute = async ({ route, state, client, tables, baseUrl, env, authHe
     }
   } else if (scenario?.queryMode === 'invalid_id') {
     const targetPath = scenario.queryPath ?? (scenario.queryKey ? [scenario.queryKey] : null)
-    if (!querySample || typeof querySample !== 'object') querySample = {}
+    if (!querySample || typeof querySample !== 'object') {
+      querySample = {}
+    }
     if (targetPath) {
       const copy = cloneValue(querySample)
       const applied = setValueByPath(copy, targetPath, 'not-a-uuid')
@@ -2158,7 +2400,9 @@ const executeRoute = async ({ route, state, client, tables, baseUrl, env, authHe
     }
   } else if (scenario?.queryMode === 'negative') {
     const targetPath = scenario.queryPath ?? (scenario.queryKey ? [scenario.queryKey] : null)
-    if (!querySample || typeof querySample !== 'object') querySample = {}
+    if (!querySample || typeof querySample !== 'object') {
+      querySample = {}
+    }
     if (targetPath) {
       const copy = cloneValue(querySample)
       const applied = setValueByPath(copy, targetPath, -1)
@@ -2169,7 +2413,9 @@ const executeRoute = async ({ route, state, client, tables, baseUrl, env, authHe
   } else if (scenario?.queryMode === 'invalid_time_range') {
     const startPath = scenario.queryStartPath
     const endPath = scenario.queryEndPath
-    if (!querySample || typeof querySample !== 'object') querySample = {}
+    if (!querySample || typeof querySample !== 'object') {
+      querySample = {}
+    }
     if (startPath && endPath) {
       const copy = cloneValue(querySample)
       const future = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
@@ -2273,9 +2519,13 @@ const SEED_ROUTES = [
 
 const seedResources = async ({ routesByKey, state, client, tables, baseUrl, env, authHeader, force = false }) => {
   for (const seed of SEED_ROUTES) {
-    if (!force && state.ids[seed.idKey]) continue
+    if (!force && state.ids[seed.idKey]) {
+      continue
+    }
     const route = routesByKey.get(`${seed.method} ${seed.path}`)
-    if (!route) continue
+    if (!route) {
+      continue
+    }
     const { parsed } = await executeRoute({
       route,
       state,
@@ -2290,28 +2540,35 @@ const seedResources = async ({ routesByKey, state, client, tables, baseUrl, env,
       const extracted = extractIdFromResponse(parsed.body)
       const fallback = extracted ? null : await selectLatestId(client, seed.table)
       const id = extracted ?? fallback
-      if (id) state.ids[seed.idKey] = id
+      if (id) {
+        state.ids[seed.idKey] = id
+      }
     }
   }
 }
 
 const buildAuthHeader = (route, scenario, tokens) => {
-  if (!route.security) return null
+  if (!route.security) {
+    return null
+  }
   const authMode = scenario.authMode ?? AUTH_VALID
-  if (authMode === AUTH_NONE) return null
-  if (authMode === AUTH_INVALID) return 'Bearer invalid'
+  if (authMode === AUTH_NONE) {
+    return null
+  }
+  if (authMode === AUTH_INVALID) {
+    return 'Bearer invalid'
+  }
 
-  const isServiceProvider =
-    route.security === 'serviceProvider' || route.security === 'serviceProviderOrClient'
+  const isServiceProvider = route.security === 'serviceProvider' || route.security === 'serviceProviderOrClient'
 
   if (authMode === AUTH_EXPIRED) {
-    return isServiceProvider
-      ? `Bearer ${tokens.trainerExpired}`
-      : `Bearer ${tokens.clientExpired}`
+    return isServiceProvider ? `Bearer ${tokens.trainerExpired}` : `Bearer ${tokens.clientExpired}`
   }
 
   if (authMode === AUTH_WRONG_TYPE) {
-    if (route.security === 'client') return `Bearer ${tokens.trainerA}`
+    if (route.security === 'client') {
+      return `Bearer ${tokens.trainerA}`
+    }
     return `Bearer ${tokens.clientA}`
   }
 
@@ -2319,12 +2576,16 @@ const buildAuthHeader = (route, scenario, tokens) => {
     return `Bearer ${tokens.clientA}`
   }
 
-  if (isServiceProvider) return `Bearer ${tokens.trainerA}`
+  if (isServiceProvider) {
+    return `Bearer ${tokens.trainerA}`
+  }
   return `Bearer ${tokens.clientA}`
 }
 
 const buildParamOverrides = (route, mode, state) => {
-  if (mode !== 'not_found' && mode !== 'invalid') return null
+  if (mode !== 'not_found' && mode !== 'invalid') {
+    return null
+  }
   const overrides = {}
   const params = normalizePathParams(route.path)
   for (const param of params) {
@@ -2353,11 +2614,21 @@ const buildParamOverrides = (route, mode, state) => {
 }
 
 const shouldForceSeed = (route, scenario) => {
-  if (METHOD_MUTATES.has(route.method)) return true
-  if (scenario?.actionRepeat) return true
-  if (scenario?.repeatCount && scenario.repeatCount > 1) return true
-  if (route.method === 'DELETE') return true
-  if (scenario?.paramMode === 'not_found') return true
+  if (METHOD_MUTATES.has(route.method)) {
+    return true
+  }
+  if (scenario?.actionRepeat) {
+    return true
+  }
+  if (scenario?.repeatCount && scenario.repeatCount > 1) {
+    return true
+  }
+  if (route.method === 'DELETE') {
+    return true
+  }
+  if (scenario?.paramMode === 'not_found') {
+    return true
+  }
   return false
 }
 
@@ -2431,19 +2702,29 @@ const getPrimaryResource = (route, tables) => {
 }
 
 const getResourceId = async (client, state, idParam, table) => {
-  if (idParam && state?.ids?.[idParam]) return state.ids[idParam]
+  if (idParam && state?.ids?.[idParam]) {
+    return state.ids[idParam]
+  }
   if (table) {
     const latest = await selectLatestId(client, table)
-    if (latest) return latest
+    if (latest) {
+      return latest
+    }
   }
   return null
 }
 
 const resolvePrimaryId = async (client, state, table) => {
-  if (!table) return null
+  if (!table) {
+    return null
+  }
   if (state?.ids) {
-    if (table === 'trainer' && state.ids.trainerId) return state.ids.trainerId
-    if (table === 'client' && state.ids.clientId) return state.ids.clientId
+    if (table === 'trainer' && state.ids.trainerId) {
+      return state.ids.trainerId
+    }
+    if (table === 'client' && state.ids.clientId) {
+      return state.ids.clientId
+    }
   }
   return selectLatestId(client, table)
 }
@@ -2468,7 +2749,9 @@ const buildScenariosForRoute = (route) => {
   const defaultBodyMode = isBody ? (isMultipartRoute ? 'multipart' : 'valid') : 'none'
 
   const addScenario = (scenario) => {
-    if (scenarioNames.has(scenario.name)) return
+    if (scenarioNames.has(scenario.name)) {
+      return
+    }
     scenarioNames.add(scenario.name)
     scenarios.push({
       name: scenario.name,
@@ -2590,9 +2873,7 @@ const buildScenariosForRoute = (route) => {
       }
     }
 
-    const pathLooksMultipart = /(upload|image|photo|avatar|file|document|attachment)/i.test(
-      route.path
-    )
+    const pathLooksMultipart = /(upload|image|photo|avatar|file|document|attachment)/i.test(route.path)
     if ((route.multipartFields?.length ?? 0) > 0 || pathLooksMultipart) {
       const fieldPath = route.multipartFields?.[0]
       addScenario({
@@ -2637,10 +2918,22 @@ const buildScenariosForRoute = (route) => {
     addScenario({ name: 'webhook.repeat', repeatCount: 2 })
   }
 
-  const actionKeywords = ['cancel', 'refund', 'accept', 'retry', 'pause', 'unpause', 'invite', 'confirm', 'share', 'logout', 'reset', 'delete']
+  const actionKeywords = [
+    'cancel',
+    'refund',
+    'accept',
+    'retry',
+    'pause',
+    'unpause',
+    'invite',
+    'confirm',
+    'share',
+    'logout',
+    'reset',
+    'delete',
+  ]
   const isActionRoute =
-    route.method === 'DELETE' ||
-    actionKeywords.some((keyword) => route.path.toLowerCase().includes(keyword))
+    route.method === 'DELETE' || actionKeywords.some((keyword) => route.path.toLowerCase().includes(keyword))
   if (isActionRoute) {
     addScenario({ name: 'action.repeat', actionRepeat: true })
   }
@@ -2713,10 +3006,7 @@ const run = async () => {
     const templateExists = await databaseExists(admin, templateDb)
     if (templateExists) {
       const templateClient = await createDbClient(templateDb)
-      const hasTaxTable = await selectSingleValue(
-        templateClient,
-        "SELECT to_regclass('public.tax') IS NOT NULL"
-      )
+      const hasTaxTable = await selectSingleValue(templateClient, "SELECT to_regclass('public.tax') IS NOT NULL")
       await templateClient.end()
       if (!hasTaxTable) {
         templateDbName = fallbackTemplateDb
@@ -3015,17 +3305,25 @@ const run = async () => {
       const baseStateVariants = primaryTable ? await buildStateVariants(legacyDbClient, primaryTable) : []
       const compositeVariants = primaryTable ? await buildCompositeStateVariants(legacyDbClient, primaryTable) : []
       const stateVariants = [...baseStateVariants, ...compositeVariants]
-      const actionKeywords = ['cancel', 'refund', 'accept', 'retry', 'pause', 'unpause', 'invite', 'confirm', 'share', 'logout', 'reset', 'delete']
+      const actionKeywords = [
+        'cancel',
+        'refund',
+        'accept',
+        'retry',
+        'pause',
+        'unpause',
+        'invite',
+        'confirm',
+        'share',
+        'logout',
+        'reset',
+        'delete',
+      ]
       const isActionRoute =
-        route.method === 'DELETE' ||
-        actionKeywords.some((keyword) => route.path.toLowerCase().includes(keyword))
+        route.method === 'DELETE' || actionKeywords.some((keyword) => route.path.toLowerCase().includes(keyword))
       const statePathLooksMultipart = /(upload|image|photo|avatar|file|document|attachment)/i.test(route.path)
       const stateMultipartRoute = (route.multipartFields?.length ?? 0) > 0 || statePathLooksMultipart
-      const stateBodyMode = METHOD_HAS_BODY.has(route.method)
-        ? stateMultipartRoute
-          ? 'multipart'
-          : 'valid'
-        : 'none'
+      const stateBodyMode = METHOD_HAS_BODY.has(route.method) ? (stateMultipartRoute ? 'multipart' : 'valid') : 'none'
       for (const variant of stateVariants) {
         scenarios.push({
           name: variant.label,
@@ -3365,7 +3663,6 @@ const run = async () => {
     console.log(`Order mismatches: ${orderMismatches.length}`)
     console.log(`Row mismatches: ${rowMismatches.length}`)
     console.log(`Results written to ${outputPath}`)
-
   } finally {
     stopProcess(legacyProc)
     stopProcess(newProc)

@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'node:crypto'
 import sharp, { type Sharp } from 'sharp'
 import { db } from '@/lib/db'
 import { getProductById } from '@/server/products'
@@ -206,7 +206,7 @@ export async function POST(request: Request, context: HandlerContext) {
       const normalizedExt = detected.ext.toLowerCase()
       const format: OutputFormat = normalizedExt === 'png' || normalizedExt === 'gif' ? 'png' : 'jpg'
 
-      const square = 'square' in field && field.square === true
+      const square = 'square' in field && field.square
 
       const transformed = await transformImage(buffer, {
         square,

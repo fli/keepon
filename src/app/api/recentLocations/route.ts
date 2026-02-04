@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
 import { z } from 'zod'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 
 const geoSchema = z
@@ -152,7 +152,7 @@ const dedupeAndSortLocations = (rows: RawLocationRow[]) => {
     }
   }
 
-  return Array.from(map.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  return Array.from(map.values()).toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 }
 
 export async function GET(request: Request) {

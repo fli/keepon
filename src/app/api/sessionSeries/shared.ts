@@ -1,3 +1,5 @@
+import { z } from 'zod'
+import type { Selectable, VwLegacySessionSeries2 } from '@/lib/db'
 import {
   adaptNotes,
   clientSessionListSchema,
@@ -7,8 +9,6 @@ import {
   noteSchema,
   parseNullableString,
 } from '../_lib/clientSessionsSchema'
-import { z } from 'zod'
-import { type Selectable, type VwLegacySessionSeries2 } from '@/lib/db'
 
 type RawRow = Selectable<VwLegacySessionSeries2>
 
@@ -198,7 +198,7 @@ const normalizeBookingPaymentType = (
   }
 
   if (typeof value !== 'string') {
-    throw new Error(`${label} is missing or invalid`)
+    throw new TypeError(`${label} is missing or invalid`)
   }
 
   const trimmed = value.trim()
@@ -286,7 +286,7 @@ const parseInvitations = (value: unknown, label: string) =>
       if (error instanceof z.ZodError) {
         throw error
       }
-      throw new Error(`${label}[${index}] was invalid`)
+      throw new Error(`${label}[${index}] was invalid`, { cause: error })
     }
   })
 
@@ -295,7 +295,7 @@ const normalizeRequestClientAddressOnline = (value: unknown, label: string) => {
     return null
   }
   if (typeof value !== 'string') {
-    throw new Error(`${label} is missing or invalid`)
+    throw new TypeError(`${label} is missing or invalid`)
   }
   const trimmed = value.trim()
   if (trimmed.length === 0) {
@@ -313,7 +313,7 @@ const normalizeBookingQuestionState = (value: unknown, label: string) => {
     return null
   }
   if (typeof value !== 'string') {
-    throw new Error(`${label} is missing or invalid`)
+    throw new TypeError(`${label} is missing or invalid`)
   }
   const trimmed = value.trim()
   if (trimmed.length === 0) {
@@ -468,6 +468,6 @@ export const normalizeSessionSeriesRow = (row: RawSessionSeriesRow, index: numbe
     if (error instanceof z.ZodError) {
       throw error
     }
-    throw new Error(`${label} was invalid`)
+    throw new Error(`${label} was invalid`, { cause: error })
   }
 }

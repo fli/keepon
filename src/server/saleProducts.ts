@@ -1,5 +1,5 @@
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { adaptSaleProductRow, fetchSaleProducts, saleProductSchema } from '../app/api/saleProducts/shared'
 
 const createSaleProductSchema = z.object({

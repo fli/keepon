@@ -1,6 +1,6 @@
-import { Buffer } from 'node:buffer'
-import Stripe from 'stripe'
+import type Stripe from 'stripe'
 import { NextResponse } from 'next/server'
+import { Buffer } from 'node:buffer'
 
 import { db, type Json } from '@/lib/db'
 

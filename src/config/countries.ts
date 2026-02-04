@@ -6,7 +6,7 @@ export type Country = Readonly<{
 }>
 
 // ISO 3166-1 country list with numeric identifiers provided by user.
-export const countries: ReadonlyArray<Country> = [
+export const countries: readonly Country[] = [
   { id: 4, alpha2: 'AF', alpha3: 'AFG', name: 'Afghanistan' },
   { id: 8, alpha2: 'AL', alpha3: 'ALB', name: 'Albania' },
   { id: 10, alpha2: 'AQ', alpha3: 'ATA', name: 'Antarctica' },

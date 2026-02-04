@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { z } from 'zod'
 
@@ -9,10 +10,10 @@ import {
 } from '@/config/referenceData'
 import { db, sql } from '@/lib/db'
 import { isIsoDuration } from '@/lib/reminders'
+import { getTrainerProfile } from '@/server/trainerProfile'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { getStripeClient, STRIPE_API_VERSION } from '../../_lib/stripeClient'
-import { getTrainerProfile } from '@/server/trainerProfile'
 
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]'>
 
@@ -38,7 +39,9 @@ const invalidParametersResponse = (detail: string) =>
   )
 
 const parseLegacyQueryValue = (value: string | null) => {
-  if (value === null) return undefined
+  if (value === null) {
+    return undefined
+  }
   try {
     return JSON.parse(value)
   } catch {
@@ -110,7 +113,7 @@ const invalidBodyResponse = (detail?: string) =>
     buildErrorResponse({
       status: 400,
       title: 'Invalid request body',
-      detail: detail || 'Request body did not match the expected schema.',
+      detail: detail ?? 'Request body did not match the expected schema.',
       type: '/invalid-body',
     }),
     { status: 400 }
@@ -212,7 +215,9 @@ const bankAccountCurrencyNotSupportedResponse = (currency: string) =>
 let clientReminderTypeCache: string[] | null = null
 
 const loadClientReminderTypes = async () => {
-  if (clientReminderTypeCache) return clientReminderTypeCache
+  if (clientReminderTypeCache) {
+    return clientReminderTypeCache
+  }
 
   const rows = await db.selectFrom('client_appointment_reminder_type').select('type').execute()
   clientReminderTypeCache = rows.map((row) => row.type)
@@ -220,12 +225,20 @@ const loadClientReminderTypes = async () => {
 }
 
 const mapClientReminderTypeToDb = async (type: string | null | undefined) => {
-  if (!type) return sql`DEFAULT`
-  if (type !== 'emailAndSms') return type
+  if (!type) {
+    return sql`DEFAULT`
+  }
+  if (type !== 'emailAndSms') {
+    return type
+  }
 
   const allowed = await loadClientReminderTypes()
-  if (allowed.includes('emailAndSms')) return 'emailAndSms'
-  if (allowed.includes('email_and_sms')) return 'email_and_sms'
+  if (allowed.includes('emailAndSms')) {
+    return 'emailAndSms'
+  }
+  if (allowed.includes('email_and_sms')) {
+    return 'email_and_sms'
+  }
   return type
 }
 
@@ -585,24 +598,44 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
   const updates: Record<string, unknown> = {}
 
-  if (body.firstName !== undefined) updates.first_name = body.firstName
-  if (body.lastName !== undefined) updates.last_name = body.lastName ?? null
-  if (body.email !== undefined) updates.email = body.email
+  if (body.firstName !== undefined) {
+    updates.first_name = body.firstName
+  }
+  if (body.lastName !== undefined) {
+    updates.last_name = body.lastName ?? null
+  }
+  if (body.email !== undefined) {
+    updates.email = body.email
+  }
 
   if (body.deviceId !== undefined) {
     updates.last_ios_id_for_vendor = normalizeDeviceId(body.deviceId)
   }
 
-  if (body.timezone !== undefined) updates.timezone = body.timezone
-  if (body.locale !== undefined) updates.locale = body.locale
-  if (body.termsAccepted !== undefined) updates.terms_accepted = body.termsAccepted
-  if (body.businessName !== undefined) updates.business_name = body.businessName
-  if (body.brandColor !== undefined) updates.brand_color = body.brandColor
-  if (body.industry !== undefined) updates.industry = body.industry
-  if (body.defaultCanClientsCancelAppointment !== undefined)
+  if (body.timezone !== undefined) {
+    updates.timezone = body.timezone
+  }
+  if (body.locale !== undefined) {
+    updates.locale = body.locale
+  }
+  if (body.termsAccepted !== undefined) {
+    updates.terms_accepted = body.termsAccepted
+  }
+  if (body.businessName !== undefined) {
+    updates.business_name = body.businessName
+  }
+  if (body.brandColor !== undefined) {
+    updates.brand_color = body.brandColor
+  }
+  if (body.industry !== undefined) {
+    updates.industry = body.industry
+  }
+  if (body.defaultCanClientsCancelAppointment !== undefined) {
     updates.default_can_clients_cancel_appointment = body.defaultCanClientsCancelAppointment
-  if (body.defaultCancellationAdvanceNoticeDuration !== undefined)
+  }
+  if (body.defaultCancellationAdvanceNoticeDuration !== undefined) {
     updates.default_cancellation_advance_notice_duration = body.defaultCancellationAdvanceNoticeDuration
+  }
 
   if (body.defaultServiceProviderAppointmentReminder1 !== undefined) {
     updates.default_service_provider_appointment_reminder_1 =

@@ -1,7 +1,7 @@
-const http = require('http')
-const https = require('https')
-const { PassThrough } = require('stream')
-const { URL } = require('url')
+const http = require('node:http')
+const https = require('node:https')
+const { PassThrough } = require('node:stream')
+const { URL } = require('node:url')
 
 const ORIGINAL_HTTP_REQUEST = http.request
 const ORIGINAL_HTTPS_REQUEST = https.request
@@ -189,12 +189,22 @@ const buildStripeCharge = () => ({
 })
 
 const mockStripeResponse = (url, method) => {
-  const path = url.pathname || ''
-  if (path.startsWith('/v1/billing_portal/sessions')) return buildStripeBillingPortalSession()
-  if (path.startsWith('/v1/checkout/sessions')) return buildStripeCheckoutSession()
-  if (path.startsWith('/v1/account_links')) return buildStripeAccountLink()
-  if (path.startsWith('/v1/setup_intents')) return buildStripeSetupIntent()
-  if (path.startsWith('/v1/payment_intents')) return buildStripePaymentIntent()
+  const path = url.pathname ?? ''
+  if (path.startsWith('/v1/billing_portal/sessions')) {
+    return buildStripeBillingPortalSession()
+  }
+  if (path.startsWith('/v1/checkout/sessions')) {
+    return buildStripeCheckoutSession()
+  }
+  if (path.startsWith('/v1/account_links')) {
+    return buildStripeAccountLink()
+  }
+  if (path.startsWith('/v1/setup_intents')) {
+    return buildStripeSetupIntent()
+  }
+  if (path.startsWith('/v1/payment_intents')) {
+    return buildStripePaymentIntent()
+  }
   if (path.startsWith('/v1/payment_methods')) {
     const segments = path.split('/').filter(Boolean)
     if (path.endsWith('/detach')) {
@@ -205,16 +215,28 @@ const mockStripeResponse = (url, method) => {
     }
     return buildStripeList([])
   }
-  if (path.startsWith('/v1/customers')) return buildStripeCustomer()
+  if (path.startsWith('/v1/customers')) {
+    return buildStripeCustomer()
+  }
   if (path.startsWith('/v1/subscriptions')) {
     const segments = path.split('/').filter(Boolean)
-    if (segments.length <= 2) return buildStripeList([])
+    if (segments.length <= 2) {
+      return buildStripeList([])
+    }
     return buildStripeSubscription()
   }
-  if (path.startsWith('/v1/balance')) return buildStripeBalance()
-  if (path.startsWith('/v1/refunds')) return buildStripeRefund()
-  if (path.startsWith('/v1/charges')) return buildStripeCharge()
-  if (path.startsWith('/v1/tokens')) return buildStripeToken()
+  if (path.startsWith('/v1/balance')) {
+    return buildStripeBalance()
+  }
+  if (path.startsWith('/v1/refunds')) {
+    return buildStripeRefund()
+  }
+  if (path.startsWith('/v1/charges')) {
+    return buildStripeCharge()
+  }
+  if (path.startsWith('/v1/tokens')) {
+    return buildStripeToken()
+  }
   if (path.startsWith('/v1/accounts')) {
     if (path.includes('/external_accounts')) {
       return method === 'GET' ? buildStripeList([buildStripeBankAccount()]) : buildStripeExternalAccount()
@@ -296,13 +318,15 @@ const handleMockRequest = (urlString, options = {}) => {
     return null
   }
 
-  if (!MOCK_HOSTS.has(url.hostname)) return null
+  if (!MOCK_HOSTS.has(url.hostname)) {
+    return null
+  }
 
   if (url.hostname === 'mandrillapp.com') {
     return jsonResponse([
       {
         id: 1,
-        url: process.env.BASE_URL || 'http://localhost:3001/api/mandrillEvents',
+        url: process.env.BASE_URL ?? 'http://localhost:3001/api/mandrillEvents',
         auth_key: 'mock-auth-key',
         events: [],
       },
@@ -311,7 +335,7 @@ const handleMockRequest = (urlString, options = {}) => {
 
   if (url.hostname === 'api.twilio.com') {
     const parts = url.pathname.split('/')
-    const messageSid = parts[parts.length - 1]?.replace(/\.json$/, '') || 'SMXXXXXXXXXXXXXXXX'
+    const messageSid = parts[parts.length - 1]?.replace(/\.json$/, '') ?? 'SMXXXXXXXXXXXXXXXX'
     return jsonResponse(buildTwilioMessage(messageSid))
   }
 
@@ -342,15 +366,18 @@ const handleMockRequest = (urlString, options = {}) => {
 
 const wrapRequest = (originalRequest) => {
   return function patchedRequest(options, callback) {
-    const urlString = typeof options === 'string' ? options : (() => {
-      const protocol = options.protocol || 'https:'
-      const host = options.hostname || options.host || 'localhost'
-      const port = options.port ? `:${options.port}` : ''
-      const path = options.path || '/'
-      return `${protocol}//${host}${port}${path}`
-    })()
+    const urlString =
+      typeof options === 'string'
+        ? options
+        : (() => {
+            const protocol = options.protocol ?? 'https:'
+            const host = options.hostname ?? options.host ?? 'localhost'
+            const port = options.port ? `:${options.port}` : ''
+            const path = options.path ?? '/'
+            return `${protocol}//${host}${port}${path}`
+          })()
 
-    const method = typeof options === 'string' ? 'GET' : options.method || 'GET'
+    const method = typeof options === 'string' ? 'GET' : (options.method ?? 'GET')
     const mocked = handleMockRequest(urlString, { method })
     if (mocked) {
       const req = new PassThrough()
@@ -362,7 +389,9 @@ const wrapRequest = (originalRequest) => {
       req.setSocketKeepAlive = () => {}
       req.abort = () => {}
       process.nextTick(() => {
-        if (callback) callback(mocked)
+        if (callback) {
+          callback(mocked)
+        }
         req.emit('response', mocked)
         req.emit('finish')
       })
@@ -379,9 +408,7 @@ https.request = wrapRequest(ORIGINAL_HTTPS_REQUEST)
 if (typeof ORIGINAL_FETCH === 'function') {
   global.fetch = async (input, init) => {
     const urlString = typeof input === 'string' ? input : input?.url
-    const mocked = urlString
-      ? handleMockRequest(urlString, { method: init?.method ?? 'GET', body: init?.body })
-      : null
+    const mocked = urlString ? handleMockRequest(urlString, { method: init?.method ?? 'GET', body: init?.body }) : null
     if (mocked) {
       const chunks = []
       return new Promise((resolve) => {

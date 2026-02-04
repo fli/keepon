@@ -1,10 +1,12 @@
 'use client'
 
-import { useCallback, useMemo } from 'react'
-import Link from 'next/link'
 import type { Route } from 'next'
+import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useMemo } from 'react'
 
+import { Plus } from 'lucide-react'
+import type { Client } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,8 +16,6 @@ import {
   statusOptions,
   type StatusFilter,
 } from '@/lib/app/features/clients/shared'
-import type { Client } from '@/lib/api'
-import { Plus } from 'lucide-react'
 
 type Props = {
   clients: Client[]
@@ -37,8 +37,11 @@ export function ClientPicker({ clients }: Props) {
       const params = new URLSearchParams(searchParams.toString())
 
       if (updates.status !== undefined) {
-        if (updates.status === 'all') params.delete('status')
-        else params.set('status', updates.status)
+        if (updates.status === 'all') {
+          params.delete('status')
+        } else {
+          params.set('status', updates.status)
+        }
       }
 
       const qs = params.toString()
@@ -147,9 +150,9 @@ export function ClientPicker({ clients }: Props) {
                     </Badge>
                   </div>
                   <p className="truncate text-sm text-muted-foreground">
-                    {client.email || client.mobileNumber || 'No contact info'}
+                    {client.email ?? client.mobileNumber ?? 'No contact info'}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground/80">{client.company || 'Individual'}</p>
+                  <p className="truncate text-xs text-muted-foreground/80">{client.company ?? 'Individual'}</p>
                 </div>
               </button>
             )

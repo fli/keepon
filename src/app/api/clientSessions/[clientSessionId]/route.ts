@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import type { DB } from '@/lib/db'
 import type { Insertable } from 'kysely'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z, ZodError } from 'zod'
+import type { DB } from '@/lib/db'
+import { db } from '@/lib/db'
+import type { RawClientSessionRow } from '../../_lib/clientSessionsSchema'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { adaptClientSessionRow } from '../../_lib/clientSessionsSchema'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
-import { adaptClientSessionRow, RawClientSessionRow } from '../../_lib/clientSessionsSchema'
 
 const paramsSchema = z.object({
   clientSessionId: z.string().trim().min(1, 'Client session id is required'),
@@ -223,7 +225,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
         if (parsedBody.attended !== undefined) {
           updates.state = parsedBody.attended ? 'confirmed' : 'cancelled'
-          if (parsedBody.attended === true) {
+          if (parsedBody.attended) {
             updates.confirm_time = new Date()
           }
         }

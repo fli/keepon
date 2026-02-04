@@ -122,7 +122,7 @@ export type RawSessionRow = {
 
 const parseRequiredString = (value: unknown, label: string) => {
   if (typeof value !== 'string') {
-    throw new Error(`Session row is missing ${label}`)
+    throw new TypeError(`Session row is missing ${label}`)
   }
   const trimmed = value.trim()
   if (trimmed.length === 0) {
@@ -133,14 +133,14 @@ const parseRequiredString = (value: unknown, label: string) => {
 
 const parseRequiredBoolean = (value: unknown, label: string) => {
   if (typeof value !== 'boolean') {
-    throw new Error(`Session row is missing ${label}`)
+    throw new TypeError(`Session row is missing ${label}`)
   }
   return value
 }
 
 const parseLength = (value: unknown) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new Error('Session row is missing length')
+    throw new TypeError('Session row is missing length')
   }
   return value
 }
@@ -164,7 +164,7 @@ const parseNullableNumber = (value: unknown, label: string) => {
   }
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(`Invalid ${label} value`)
+      throw new TypeError(`Invalid ${label} value`)
     }
     return value
   }
@@ -175,7 +175,7 @@ const parseNullableNumber = (value: unknown, label: string) => {
     }
     const parsed = Number(trimmed)
     if (!Number.isFinite(parsed)) {
-      throw new Error(`Invalid ${label} value`)
+      throw new TypeError(`Invalid ${label} value`)
     }
     return parsed
   }
@@ -187,7 +187,7 @@ const parseSessionType = (value: unknown) => {
     return null
   }
   if (typeof value !== 'string') {
-    throw new Error('Session row has invalid type field')
+    throw new TypeError('Session row has invalid type field')
   }
   const trimmed = value.trim()
   if (trimmed.length === 0) {
@@ -205,7 +205,7 @@ const parseBookingPaymentType = (value: unknown) => {
     return null
   }
   if (typeof value !== 'string') {
-    throw new Error('Session row has invalid booking payment type')
+    throw new TypeError('Session row has invalid booking payment type')
   }
   const trimmed = value.trim()
   if (trimmed.length === 0) {
@@ -223,7 +223,7 @@ const parseRequestClientAddressOnline = (value: unknown) => {
     return null
   }
   if (typeof value !== 'string') {
-    throw new Error('Session row has invalid requestClientAddressOnline value')
+    throw new TypeError('Session row has invalid requestClientAddressOnline value')
   }
   const trimmed = value.trim()
   if (trimmed.length === 0) {
@@ -241,7 +241,7 @@ const parseBookingQuestionState = (value: unknown) => {
     return null
   }
   if (typeof value !== 'string') {
-    throw new Error('Session row has invalid bookingQuestionState value')
+    throw new TypeError('Session row has invalid bookingQuestionState value')
   }
   const trimmed = value.trim()
   if (trimmed.length === 0) {
@@ -259,7 +259,7 @@ const parseGeo = (value: unknown) => {
     return null
   }
   if (typeof value !== 'object') {
-    throw new Error('Session row has invalid geo value')
+    throw new TypeError('Session row has invalid geo value')
   }
   return geoSchema.parse(value)
 }
@@ -269,7 +269,7 @@ const parseInvitations = (value: unknown) => {
     return [] as z.infer<typeof invitationSchema>[]
   }
   if (!Array.isArray(value)) {
-    throw new Error('Session row has invalid invitations value')
+    throw new TypeError('Session row has invalid invitations value')
   }
   return z.array(invitationSchema).parse(value)
 }
@@ -279,7 +279,7 @@ const parseReminder = <TSchema extends z.ZodTypeAny>(value: unknown, schema: TSc
     return null
   }
   if (typeof value !== 'object') {
-    throw new Error('Session row has invalid reminder value')
+    throw new TypeError('Session row has invalid reminder value')
   }
   return schema.parse(value)
 }
@@ -289,7 +289,7 @@ const adaptClientSessions = (value: unknown) => {
     return [] as z.infer<typeof clientSessionListSchema>
   }
   if (!Array.isArray(value)) {
-    throw new Error('Session row has invalid clientSessions value')
+    throw new TypeError('Session row has invalid clientSessions value')
   }
 
   const sessions = value.map((item) => {
@@ -301,7 +301,7 @@ const adaptClientSessions = (value: unknown) => {
     const clientId = record.clientId
     const sessionId = record.sessionId
     if (typeof id !== 'string' || typeof clientId !== 'string' || typeof sessionId !== 'string') {
-      throw new Error('Client session entry was missing identifiers')
+      throw new TypeError('Client session entry was missing identifiers')
     }
     if (record.createdAt === null || record.createdAt === undefined) {
       throw new Error('Client session entry was missing createdAt')

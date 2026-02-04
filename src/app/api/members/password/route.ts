@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 
 const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
@@ -24,7 +24,7 @@ const invalidBodyResponse = (detail?: string) =>
     buildErrorResponse({
       status: 400,
       title: 'Invalid request body',
-      detail: detail || 'Request body did not match the expected schema.',
+      detail: detail ?? 'Request body did not match the expected schema.',
       type: '/invalid-body',
     }),
     { status: 400 }

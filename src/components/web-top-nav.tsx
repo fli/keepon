@@ -1,7 +1,7 @@
 'use client'
 
-import Link from 'next/link'
 import type { Route } from 'next'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import {
@@ -10,8 +10,8 @@ import {
   NavigationMenuLink,
   NavigationMenuList,
 } from '@/components/ui/navigation-menu'
-import { PageContainer } from './page-container'
 import { KeeponLogo } from './keepon-logo'
+import { PageContainer } from './page-container'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard' },
@@ -19,11 +19,15 @@ const NAV_ITEMS = [
   { label: 'Finance', href: '/finance' },
   { label: 'Clients', href: '/clients' },
   { label: 'Settings', href: '/settings' },
-] as const satisfies ReadonlyArray<{ label: string; href: Route }>
+] as const satisfies readonly { label: string; href: Route }[]
 
 function isActive(pathname: string | null, href: Route) {
-  if (!pathname) return false
-  if (href === '/dashboard') return pathname === '/' || pathname.startsWith('/dashboard')
+  if (!pathname) {
+    return false
+  }
+  if (href === '/dashboard') {
+    return pathname === '/' || pathname.startsWith('/dashboard')
+  }
   return pathname.startsWith(href)
 }
 

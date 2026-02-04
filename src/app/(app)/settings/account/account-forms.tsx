@@ -18,7 +18,9 @@ type AccountDetails = {
 type FormAction = (formData: FormData) => Promise<ActionResult>
 
 function StatusMessage({ state }: { state: ActionResult | null }) {
-  if (!state) return null
+  if (!state) {
+    return null
+  }
 
   const tone = state.status === 'success' ? 'text-emerald-600' : 'text-destructive'
 

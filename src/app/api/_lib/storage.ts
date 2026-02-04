@@ -1,6 +1,6 @@
+import type { Sharp } from 'sharp'
 import { Storage } from '@google-cloud/storage'
 import sharp from 'sharp'
-import type { Sharp } from 'sharp'
 
 type UploadToPublicBucketArgs = {
   buffer: Buffer

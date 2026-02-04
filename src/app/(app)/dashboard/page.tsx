@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { Suspense, use } from 'react'
 import { redirect } from 'next/navigation'
+import { Suspense, use } from 'react'
 
 import { AlertCircle, Bell, Calendar, ChevronRight, Clock, PenSquare } from 'lucide-react'
 
@@ -11,7 +11,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { getDashboardSummary, type DashboardSummary } from '@/server/dashboard'
 import { readSessionFromCookies } from '../../session.server'
 import { DashboardActions } from './dashboard-actions'
-import { ProjectedPaidCard } from './projected-paid-card'
 import {
   DashboardHeaderSkeleton,
   NextAppointmentSkeleton,
@@ -19,6 +18,7 @@ import {
   PaymentsSkeleton,
   SubscriptionsSkeleton,
 } from './dashboard-skeletons'
+import { ProjectedPaidCard } from './projected-paid-card'
 
 type DashboardResult = {
   data: DashboardSummary | null
@@ -84,9 +84,13 @@ function DashboardHeader({ dashboardPromise }: { dashboardPromise: Promise<Dashb
 
   const greeting = (() => {
     const hour = new Date().getHours()
-    const name = data?.trainer.firstName?.trim() || 'trainer'
-    if (hour < 12) return `Good morning, ${name}`
-    if (hour < 17) return `Good afternoon, ${name}`
+    const name = data?.trainer.firstName?.trim() ?? 'trainer'
+    if (hour < 12) {
+      return `Good morning, ${name}`
+    }
+    if (hour < 17) {
+      return `Good afternoon, ${name}`
+    }
     return `Good evening, ${name}`
   })()
 

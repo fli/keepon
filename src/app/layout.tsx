@@ -1,6 +1,6 @@
+import './globals.css'
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
-import './globals.css'
 import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = {

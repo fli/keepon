@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import { headers } from 'next/headers'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db, sql } from '@/lib/db'
 import { authenticateClientRequest, buildErrorResponse } from '../../../_lib/accessToken'
@@ -57,10 +58,10 @@ const extractClientIp = async () => {
   }
 
   const realIp = headerStore.get('x-real-ip')
-  return realIp?.trim() || undefined
+  return realIp?.trim() ?? undefined
 }
 
-const joinName = (...parts: Array<string | null | undefined>) =>
+const joinName = (...parts: (string | null | undefined)[]) =>
   parts
     .map((part) => part?.trim())
     .filter((part): part is string => Boolean(part && part.length > 0))

@@ -5,8 +5,8 @@ import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-import { monthDays, upcomingEvents } from './data'
 import type { CalendarEvent } from './types'
+import { monthDays, upcomingEvents } from './data'
 
 const weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 

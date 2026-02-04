@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
+import { uuidOrNil } from '@/lib/uuid'
 import { authenticateTrainerOrClientRequest, authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import {
   adaptSaleProductRow,
@@ -10,7 +11,6 @@ import {
   saleProductSchema,
   saleProductTypeSchema,
 } from './shared'
-import { uuidOrNil } from '@/lib/uuid'
 
 type PgError = { code?: string; constraint?: string }
 
@@ -288,9 +288,7 @@ const validateSaleProductBody = (body: Record<string, unknown>) => {
   const price = priceRaw as string
   const currency = currencyRaw as string
   const name = nameRaw as string
-  const productId = toNullableTrimmedString(
-    typeof productIdRaw === 'string' ? productIdRaw : null
-  )
+  const productId = toNullableTrimmedString(typeof productIdRaw === 'string' ? productIdRaw : null)
 
   if (typeRaw === 'creditPack') {
     return {
@@ -317,10 +315,7 @@ const validateSaleProductBody = (body: Record<string, unknown>) => {
         currency,
         name,
         productId,
-        quantity:
-          typeof body.quantity === 'number' && !Number.isNaN(body.quantity)
-            ? (body.quantity as number)
-            : 1,
+        quantity: typeof body.quantity === 'number' && !Number.isNaN(body.quantity) ? body.quantity : 1,
       },
     }
   }
@@ -342,12 +337,12 @@ const validateSaleProductBody = (body: Record<string, unknown>) => {
       durationMinutes: body.durationMinutes as number,
       location: toNullableTrimmedString(typeof locationRaw === 'string' ? locationRaw : null),
       address: toNullableTrimmedString(typeof addressRaw === 'string' ? addressRaw : null),
-      googlePlaceId: toNullableTrimmedString(
-        typeof googlePlaceIdRaw === 'string' ? googlePlaceIdRaw : null
-      ),
+      googlePlaceId: toNullableTrimmedString(typeof googlePlaceIdRaw === 'string' ? googlePlaceIdRaw : null),
       geo:
         geoRaw && typeof geoRaw === 'object' && !Array.isArray(geoRaw)
-          ? (geoSchema.safeParse(geoRaw).success ? (geoRaw as { lat: number; lng: number }) : null)
+          ? geoSchema.safeParse(geoRaw).success
+            ? (geoRaw as { lat: number; lng: number })
+            : null
           : null,
     },
   }

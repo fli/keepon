@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { buildErrorResponse } from '../../../../_lib/accessToken'
 import { APP_EMAIL, APP_NAME, NO_REPLY_EMAIL } from '../../../../_lib/constants'
 
@@ -49,15 +50,15 @@ class CannotCancelBookingError extends Error {
 
 const escapeHtml = (value: string) =>
   value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+    .replaceAll(/&/g, '&amp;')
+    .replaceAll(/</g, '&lt;')
+    .replaceAll(/>/g, '&gt;')
+    .replaceAll(/"/g, '&quot;')
+    .replaceAll(/'/g, '&#39;')
 
 const isAppleRelayEmail = (email: string) => email.toLowerCase().endsWith('@privaterelay.appleid.com')
 
-const joinNames = (...parts: Array<string | null | undefined>) =>
+const joinNames = (...parts: (string | null | undefined)[]) =>
   parts
     .map((part) => part?.trim())
     .filter(Boolean)
@@ -181,7 +182,7 @@ const createInvalidParamsResponse = (detail?: string) =>
     buildErrorResponse({
       status: 400,
       title: 'Invalid booking identifier',
-      detail: detail || 'Request parameters did not match the expected booking identifier schema.',
+      detail: detail ?? 'Request parameters did not match the expected booking identifier schema.',
       type: '/invalid-parameter',
     }),
     { status: 400 }
@@ -346,7 +347,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
       const trainerSubject = `${clientName || 'A client'} has cancelled their booking`
 
-      const tasks: Array<Promise<unknown>> = []
+      const tasks: Promise<unknown>[] = []
 
       if (details.clientEmail) {
         const clientHtml = buildClientEmailHtml({

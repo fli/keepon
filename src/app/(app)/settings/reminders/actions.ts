@@ -47,7 +47,9 @@ const parseReminder = <TType extends string, TResult extends { type: TType; time
 
 export async function updateRemindersAction(formData: FormData): Promise<ActionResult> {
   const session = await readSessionFromCookies()
-  if (!session) return authError
+  if (!session) {
+    return authError
+  }
 
   try {
     const payload: ReminderSettingsInput = {

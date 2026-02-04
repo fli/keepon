@@ -1,6 +1,6 @@
+import type { PoolConfig } from 'pg'
 import { Kysely, PostgresDialect } from 'kysely'
 import { Pool, types as pgTypes } from 'pg'
-import type { PoolConfig } from 'pg'
 import type { DB } from './generated'
 
 export type Database = DB
@@ -21,7 +21,9 @@ export type DbConfig = {
 pgTypes.setTypeParser(1186, (value) => value)
 
 const parseOptionalNumber = (value: string | undefined) => {
-  if (!value) return undefined
+  if (!value) {
+    return undefined
+  }
   const parsed = Number.parseInt(value, 10)
   return Number.isNaN(parsed) ? undefined : parsed
 }

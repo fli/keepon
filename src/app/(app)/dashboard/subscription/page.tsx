@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react'
+import { CalendarClock, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { CalendarClock, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 
 import { PageContainer } from '@/components/page-container'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { readSessionFromCookies } from '../../../session.server'
 import { getDashboardSummary } from '@/server/dashboard'
+import { readSessionFromCookies } from '../../../session.server'
 import { SubscriptionPaywall } from './paywall-client'
 
 type SubscriptionPlan = {
@@ -29,7 +29,9 @@ const loadPlan = async (token: string, origin: string): Promise<SubscriptionPlan
       cache: 'no-store',
     })
 
-    if (!res.ok) return null
+    if (!res.ok) {
+      return null
+    }
 
     const json = (await res.json()) as unknown
 
@@ -64,7 +66,9 @@ const getPublishableKey = (): string | null => {
 
 const formatCurrency = (amount: string | number, currency: string) => {
   const numeric = typeof amount === 'number' ? amount : Number.parseFloat(amount)
-  if (!Number.isFinite(numeric)) return amount.toString()
+  if (!Number.isFinite(numeric)) {
+    return amount.toString()
+  }
   try {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(numeric)
   } catch {

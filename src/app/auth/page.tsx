@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation'
 
+import { KeeponLogo } from '@/components/keepon-logo'
+import { PageContainer } from '@/components/page-container'
 import { readSessionFromCookies } from '../session.server'
 import { LoginForm } from './login-form'
-import { PageContainer } from '@/components/page-container'
-import { KeeponLogo } from '@/components/keepon-logo'
 
 export default async function AuthPage() {
   const session = await readSessionFromCookies()

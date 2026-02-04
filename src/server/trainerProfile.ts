@@ -1,17 +1,21 @@
+import type Stripe from 'stripe'
 import BigNumber from 'bignumber.js'
-import Stripe from 'stripe'
 import { z } from 'zod'
 
-import { db, sql } from '@/lib/db'
 import {
   normalizeSessionSeriesRow,
   sessionSeriesSchema,
   type RawSessionSeriesRow,
 } from '@/app/api/sessionSeries/shared'
+import { db, sql } from '@/lib/db'
 
 const toIsoString = (value: unknown): string | null => {
-  if (value === null || value === undefined) return null
-  if (value instanceof Date) return value.toISOString()
+  if (value === null || value === undefined) {
+    return null
+  }
+  if (value instanceof Date) {
+    return value.toISOString()
+  }
   if (typeof value === 'number') {
     const date = new Date(value)
     return Number.isNaN(date.getTime()) ? null : date.toISOString()
@@ -248,7 +252,9 @@ const computeBalance = (balance: Stripe.Balance | null, currency: string): Train
 }
 
 const buildBankAccount = (account: Stripe.BankAccount | null): TrainerProfile['bankAccount'] => {
-  if (!account) return null
+  if (!account) {
+    return null
+  }
 
   return {
     bankName: account.bank_name ?? null,
@@ -336,7 +342,9 @@ export const getTrainerProfile = async (
   `.execute(db)
 
   const row = rowResult.rows[0]
-  if (!row) return null
+  if (!row) {
+    return null
+  }
 
   const parsedRow = trainerRowSchema.parse(row)
 

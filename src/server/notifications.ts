@@ -1,10 +1,7 @@
+import type { z } from 'zod'
 import { db } from '@/lib/db'
-import { z } from 'zod'
-import {
-  parseNotificationRows,
-  notificationListSchema,
-  type RawNotificationRow,
-} from '../app/api/trainers/[trainerId]/notifications/_shared'
+import type { notificationListSchema } from '../app/api/trainers/[trainerId]/notifications/_shared'
+import { parseNotificationRows, type RawNotificationRow } from '../app/api/trainers/[trainerId]/notifications/_shared'
 
 export type NotificationList = z.infer<typeof notificationListSchema>
 

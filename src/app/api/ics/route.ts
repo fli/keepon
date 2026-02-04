@@ -1,7 +1,7 @@
+import { NextResponse } from 'next/server'
+import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { randomUUID } from 'node:crypto'
-import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
 
@@ -108,7 +108,7 @@ const wrapLines = (input: string) => {
   return result.join('\n')
 }
 
-const escapeNewlines = (value: string) => value.replace(/\n/g, '\\n')
+const escapeNewlines = (value: string) => value.replaceAll(/\n/g, '\\n')
 
 const formatDateTimeInTimeZone = (date: Date, timeZone: string) => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -130,7 +130,7 @@ const formatDateTimeInTimeZone = (date: Date, timeZone: string) => {
 const buildDtStamp = () =>
   new Date()
     .toISOString()
-    .replace(/[-:]/g, '')
+    .replaceAll(/[-:]/g, '')
     .replace(/\.\d+Z$/, 'Z')
 
 const makeCalendarEvent = (args: {

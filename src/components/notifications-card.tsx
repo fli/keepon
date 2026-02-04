@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 
+import type { NotificationList } from '@/server/notifications'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import type { NotificationList } from '@/server/notifications'
 
 type Notification = NotificationList[number]
 
@@ -17,9 +17,13 @@ type NotificationsCardProps = {
 }
 
 function formatNotificationDate(value?: string) {
-  if (!value) return 'Unknown time'
+  if (!value) {
+    return 'Unknown time'
+  }
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Unknown time'
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown time'
+  }
   return date.toLocaleString(undefined, {
     month: 'short',
     day: 'numeric',

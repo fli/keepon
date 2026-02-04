@@ -4,7 +4,7 @@ import type { Selectable, VwLegacyClient } from '@/lib/db'
 const isoDateTimeString = z.union([z.string(), z.date()]).transform((value) => {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error('Invalid date-time value')
+    throw new TypeError('Invalid date-time value')
   }
   return date.toISOString()
 })
@@ -12,7 +12,7 @@ const isoDateTimeString = z.union([z.string(), z.date()]).transform((value) => {
 const isoDateString = z.union([z.string(), z.date()]).transform((value) => {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error('Invalid date value')
+    throw new TypeError('Invalid date value')
   }
   return date.toISOString().slice(0, 10)
 })

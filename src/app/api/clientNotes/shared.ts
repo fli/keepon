@@ -27,7 +27,7 @@ export type ClientNoteRow = {
 const toIsoString = (value: Date | string, label: string) => {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error(`Invalid ${label} value encountered in client note record`)
+    throw new TypeError(`Invalid ${label} value encountered in client note record`)
   }
   return date.toISOString()
 }

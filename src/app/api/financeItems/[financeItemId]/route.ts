@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { adaptFinanceItemRow, financeItemSchema, type FinanceItemRow } from '../shared'
@@ -25,7 +26,7 @@ const requestBodySchema = z
       .transform((value) => {
         const date = value instanceof Date ? value : new Date(value)
         if (Number.isNaN(date.getTime())) {
-          throw new Error('startDate must be a valid date-time value.')
+          throw new TypeError('startDate must be a valid date-time value.')
         }
         return date
       })
@@ -271,10 +272,18 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       image_url: null
     }> = {}
 
-    if (parsedBody.name !== undefined) updates.name = parsedBody.name
-    if (parsedBody.amount !== undefined) updates.amount = parsedBody.amount
-    if (parsedBody.startDate !== undefined) updates.start_date = parsedBody.startDate
-    if (parsedBody.imageUrl !== undefined) updates.image_url = parsedBody.imageUrl
+    if (parsedBody.name !== undefined) {
+      updates.name = parsedBody.name
+    }
+    if (parsedBody.amount !== undefined) {
+      updates.amount = parsedBody.amount
+    }
+    if (parsedBody.startDate !== undefined) {
+      updates.start_date = parsedBody.startDate
+    }
+    if (parsedBody.imageUrl !== undefined) {
+      updates.image_url = parsedBody.imageUrl
+    }
 
     const updated = await db
       .updateTable('finance_item')

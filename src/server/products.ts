@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { db, sql, type Point } from '@/lib/db'
 import { uuidOrNil } from '@/lib/uuid'
-import { z } from 'zod'
 import { buildErrorResponse } from '../app/api/_lib/accessToken'
 
 export const moneyString = z
@@ -126,7 +126,7 @@ type ProductType = z.infer<typeof productTypeSchema>
 const ensureDate = (value: Date | string, label: string) => {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error(`Invalid ${label} value encountered in product record`)
+    throw new TypeError(`Invalid ${label} value encountered in product record`)
   }
   return date
 }
@@ -136,7 +136,7 @@ const formatIso = (value: Date | string, label: string) => ensureDate(value, lab
 const formatMoney = (value: string, label: string) => {
   const numeric = Number.parseFloat(value)
   if (!Number.isFinite(numeric)) {
-    throw new Error(`Invalid ${label} value encountered in product record`)
+    throw new TypeError(`Invalid ${label} value encountered in product record`)
   }
   return numeric.toFixed(2)
 }
@@ -147,11 +147,11 @@ const parseInteger = (value: number | string | null, label: string, options: { m
   }
   const numeric = typeof value === 'number' ? value : Number.parseFloat(String(value))
   if (!Number.isFinite(numeric)) {
-    throw new Error(`Invalid ${label} value encountered in product record`)
+    throw new TypeError(`Invalid ${label} value encountered in product record`)
   }
   const rounded = Math.round(numeric)
   if (!Number.isInteger(rounded)) {
-    throw new Error(`Invalid ${label} value encountered in product record`)
+    throw new TypeError(`Invalid ${label} value encountered in product record`)
   }
   if (options.minimum !== undefined && rounded < options.minimum) {
     throw new Error(`${label} must be at least ${options.minimum} but was ${rounded}`)
@@ -165,7 +165,7 @@ const normalizeGeo = (value: Point | null): z.infer<typeof geoSchema> | null => 
   }
   const { x, y } = value
   if (!Number.isFinite(x) || !Number.isFinite(y)) {
-    throw new Error('Invalid geo coordinates encountered in product record')
+    throw new TypeError('Invalid geo coordinates encountered in product record')
   }
   return { lat: x, lng: y }
 }
@@ -249,7 +249,7 @@ const mapRowToProduct = (row: RawProductRow) => {
 
   const bookableOnline = row.bookableOnline
   if (typeof bookableOnline !== 'boolean') {
-    throw new Error('Missing bookableOnline flag for service product')
+    throw new TypeError('Missing bookableOnline flag for service product')
   }
 
   return {

@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
-import type { Database, Interval } from '@/lib/db'
 import type { Kysely, Transaction, Insertable } from 'kysely'
-import type { Point } from '@/lib/db/generated'
 import type { IPostgresInterval } from 'postgres-interval'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import type { Database, Interval } from '@/lib/db'
+import type { Point } from '@/lib/db/generated'
+import { db, sql } from '@/lib/db'
 import { buildErrorResponse } from '../_lib/accessToken'
 import { parseStrictJsonBody } from '../_lib/strictJson'
 
@@ -146,7 +146,9 @@ type ExistingClient = {
 }
 
 const toNumber = (value: string | number | null | undefined) => {
-  if (value === null || value === undefined) return 0
+  if (value === null || value === undefined) {
+    return 0
+  }
   const numeric = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(numeric) ? numeric : 0
 }
@@ -239,9 +241,15 @@ const maybeUpdateClient = async (
   }
 
   const updates: Partial<Insertable<Database['client']>> = {}
-  if (data.location !== undefined) updates.location = data.location
-  if (data.address !== undefined) updates.address = data.address
-  if (data.googlePlaceId !== undefined) updates.google_place_id = data.googlePlaceId
+  if (data.location !== undefined) {
+    updates.location = data.location
+  }
+  if (data.address !== undefined) {
+    updates.address = data.address
+  }
+  if (data.googlePlaceId !== undefined) {
+    updates.google_place_id = data.googlePlaceId
+  }
   if (data.geo !== undefined) {
     updates.geo = data.geo ? ({ x: data.geo.lat, y: data.geo.lng } satisfies Point) : null
   }
@@ -438,7 +446,7 @@ const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) 
 
       const bookingStartsAt = new Date(details.bookingStartsAt)
       if (Number.isNaN(bookingStartsAt.getTime())) {
-        throw new Error('Invalid booking start time')
+        throw new TypeError('Invalid booking start time')
       }
 
       const sessionSeries = await trx
@@ -683,7 +691,7 @@ const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) 
 
       const bookingStartsAt = new Date(details.bookingStartsAt)
       if (Number.isNaN(bookingStartsAt.getTime())) {
-        throw new Error('Invalid booking start time')
+        throw new TypeError('Invalid booking start time')
       }
 
       const clientAlreadyBooked = await trx

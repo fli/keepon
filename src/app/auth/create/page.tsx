@@ -1,11 +1,11 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
+import { KeeponLogo } from '@/components/keepon-logo'
+import { PageContainer } from '@/components/page-container'
+import { supportedCountryCodes, supportedCountries } from '@/lib/supportedCountries'
 import { readSessionFromCookies } from '../../session.server'
 import { CreateAccountForm } from '../create-account-form'
-import { PageContainer } from '@/components/page-container'
-import { KeeponLogo } from '@/components/keepon-logo'
-import { supportedCountryCodes, supportedCountries } from '@/lib/supportedCountries'
 
 const DEFAULT_COUNTRY =
   supportedCountries.find((country) => country.code === 'US')?.code ?? supportedCountries[0]?.code ?? 'US'
@@ -20,7 +20,9 @@ const inferDefaultCountry = (reqHeaders: Headers) => {
   if (acceptLanguage) {
     for (const part of acceptLanguage.split(',')) {
       const tag = part.split(';')[0]?.trim()
-      if (!tag) continue
+      if (!tag) {
+        continue
+      }
 
       const match = tag.match(/[-_]([A-Za-z]{2})$/)
       const code = match?.[1]?.toUpperCase()

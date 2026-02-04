@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { adaptFinanceItemRow, financeItemListSchema, type FinanceItemRow } from '../../../financeItems/shared'
 
@@ -16,7 +17,7 @@ const requestBodySchema = z.array(
       startDate: z.union([z.string(), z.date()]).transform((value) => {
         const date = value instanceof Date ? value : new Date(value)
         if (Number.isNaN(date.getTime())) {
-          throw new Error('startDate must be a valid date-time value.')
+          throw new TypeError('startDate must be a valid date-time value.')
         }
         return date
       }),
@@ -40,7 +41,7 @@ const invalidBodyResponse = (detail?: string) =>
     buildErrorResponse({
       status: 400,
       title: 'Your parameters were invalid.',
-      detail: detail || 'Your parameters were invalid.',
+      detail: detail ?? 'Your parameters were invalid.',
       type: '/invalid-parameters',
     }),
     { status: 400 }

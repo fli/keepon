@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import BigNumber from 'bignumber.js'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
@@ -119,11 +120,11 @@ const resolveBrandColor = (value?: string | null) => (value && tailwind600[value
 
 const escapeHtml = (value: string) =>
   value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+    .replaceAll(/&/g, '&amp;')
+    .replaceAll(/</g, '&lt;')
+    .replaceAll(/>/g, '&gt;')
+    .replaceAll(/"/g, '&quot;')
+    .replaceAll(/'/g, '&#39;')
 
 const buildPlanUpdateEmail = (options: {
   serviceProviderName: string
@@ -373,7 +374,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         const maxDisplay = new BigNumber(limits.maximumInSmallestUnit).shiftedBy(-limits.smallestUnitDecimals)
 
         throw new InvalidAmountError(
-          `Amount must be between ${minDisplay.toFixed()} and ${maxDisplay.toFixed()} ${currency}.`
+          `Amount must be between ${minDisplay.toFixed(0)} and ${maxDisplay.toFixed(0)} ${currency}.`
         )
       }
 
@@ -413,7 +414,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       }
 
       const existingEndDate = toDateOrThrow(details.end, 'Subscription end date')
-      const newEndDate = updatedEndDate === null ? MAX_TIME : updatedEndDate
+      const newEndDate = updatedEndDate ?? MAX_TIME
 
       let requiresClientAcceptance = false
       const messages: string[] = []

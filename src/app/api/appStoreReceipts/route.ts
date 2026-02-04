@@ -296,7 +296,7 @@ const processReceipt = async ({
 
       const { latest_receipt_info, latest_receipt, pending_renewal_info } = parsed.data
 
-      const sortedReceipts = [...latest_receipt_info].sort(
+      const sortedReceipts = [...latest_receipt_info].toSorted(
         (a, b) => Number(a.purchase_date_ms) - Number(b.purchase_date_ms)
       )
 

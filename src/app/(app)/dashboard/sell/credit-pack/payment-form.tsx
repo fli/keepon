@@ -1,17 +1,18 @@
 'use client'
 
-import { useCallback, useMemo, useState, useTransition, type FormEvent } from 'react'
 import type { Route } from 'next'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useMemo, useState, useTransition, type FormEvent } from 'react'
 
+import { CheckCircle2, Clock, Send, Wallet } from 'lucide-react'
+import type { Client } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
-import type { Client } from '@/lib/api'
-import { CheckCircle2, Clock, Send, Wallet } from 'lucide-react'
-import { CreditPack, completeCreditPackSale } from './actions'
+import type { CreditPack } from './actions'
+import { completeCreditPackSale } from './actions'
 
 type PaymentKind = 'record' | 'request'
 type RecordMethod = 'cash' | 'eft'
@@ -29,7 +30,9 @@ const EFT_OPTIONS = [
 
 const formatPrice = (amount: string, currency: string) => {
   const parsed = Number.parseFloat(amount)
-  if (!Number.isFinite(parsed)) return `${amount} ${currency}`
+  if (!Number.isFinite(parsed)) {
+    return `${amount} ${currency}`
+  }
 
   try {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(parsed)
@@ -71,8 +74,11 @@ export function PaymentForm({ client, pack }: Props) {
   const setParam = useCallback(
     (key: string, value?: string | null) => {
       const params = new URLSearchParams(searchParams.toString())
-      if (value === null || value === undefined || value.trim() === '') params.delete(key)
-      else params.set(key, value)
+      if (value === null || value === undefined || value.trim() === '') {
+        params.delete(key)
+      } else {
+        params.set(key, value)
+      }
 
       const qs = params.toString()
       const href = (qs ? `${pathname}?${qs}` : pathname) as Route
@@ -129,7 +135,9 @@ export function PaymentForm({ client, pack }: Props) {
   const paymentLabel = paymentKind === 'request' ? 'Send request' : 'Record payment'
 
   const statusBadge = useMemo(() => {
-    if (!result) return null
+    if (!result) {
+      return null
+    }
     const isPaid = result.status === 'paid'
     const Icon = isPaid ? CheckCircle2 : Clock
     const bg = isPaid ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-900'

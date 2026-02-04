@@ -1,16 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
-import { z } from 'zod'
-import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
 import type { CountryCode } from 'libphonenumber-js'
+import type { NextRequest } from 'next/server'
+import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../_lib/constants'
 
 const paramsSchema = z.object({
-  clientSessionId: z
-    .string()
-    .trim()
-    .min(1, 'Client session id must not be empty.'),
+  clientSessionId: z.string().trim().min(1, 'Client session id must not be empty.'),
 })
 
 const bodySchema = z.object({
@@ -116,7 +114,7 @@ const parseSmsCredits = (value: unknown): bigint => {
   }
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error('Invalid sms credit balance')
+      throw new TypeError('Invalid sms credit balance')
     }
     return BigInt(Math.trunc(value))
   }
@@ -136,11 +134,11 @@ const parseSmsCredits = (value: unknown): bigint => {
 
 const escapeHtml = (value: string) =>
   value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+    .replaceAll(/&/g, '&amp;')
+    .replaceAll(/</g, '&lt;')
+    .replaceAll(/>/g, '&gt;')
+    .replaceAll(/"/g, '&quot;')
+    .replaceAll(/'/g, '&#39;')
 
 const formatPhoneNumber = (raw: string, countryCode: string) => {
   const normalized = countryCode.toUpperCase() as CountryCode

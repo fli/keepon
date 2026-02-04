@@ -1,12 +1,12 @@
 'use client'
 
-import { useActionState } from 'react'
 import Link from 'next/link'
+import { useActionState } from 'react'
 
-import { loginAction } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { loginAction } from './actions'
 
 const initialState = { error: null as string | null }
 

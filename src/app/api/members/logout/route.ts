@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { authenticateTrainerOrClientRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { logout } from '@/server/auth'
+import { authenticateTrainerOrClientRequest, buildErrorResponse } from '../../_lib/accessToken'
 
 const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
 

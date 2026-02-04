@@ -1,5 +1,5 @@
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { AppleSignInError, verifyAppleIdentityToken } from '../app/api/_lib/appleSignIn'
 
 const passwordLoginSchema = z.object({
@@ -83,7 +83,7 @@ async function loginWithApple(body: z.infer<typeof appleLoginSchema>): Promise<L
     })
   } catch (error) {
     if (error instanceof AppleSignInError) {
-      throw new Error('appleTokenInvalid')
+      throw new TypeError('appleTokenInvalid', { cause: error })
     }
     throw error
   }

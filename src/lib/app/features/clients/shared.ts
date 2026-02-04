@@ -23,13 +23,19 @@ export const emptyForm = {
 }
 
 export function normalizeStatus(status?: string | null): StatusFilter {
-  if (status === 'lead') return 'lead'
-  if (status === 'past') return 'past'
+  if (status === 'lead') {
+    return 'lead'
+  }
+  if (status === 'past') {
+    return 'past'
+  }
   return 'current'
 }
 
 export function optionalValue(value?: string | null) {
-  if (value === undefined || value === null) return null
+  if (value === undefined || value === null) {
+    return null
+  }
   const trimmed = value.trim()
   return trimmed.length === 0 ? null : trimmed
 }

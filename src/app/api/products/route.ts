@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
-import { z } from 'zod'
-import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
-import { sanitizeProductQuery, listProducts } from '@/server/products'
 import type { Insertable } from 'kysely'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import type { Service } from '@/lib/db/generated'
+import { db, sql } from '@/lib/db'
+import { sanitizeProductQuery, listProducts } from '@/server/products'
+import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 
 const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
 
@@ -14,8 +14,12 @@ const nullableTrimmedToNull = z
   .union([z.string(), z.null()])
   .optional()
   .transform((value) => {
-    if (value === undefined) return undefined
-    if (value === null) return null
+    if (value === undefined) {
+      return undefined
+    }
+    if (value === null) {
+      return null
+    }
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
   })
@@ -157,7 +161,7 @@ export async function POST(request: Request) {
     return invalidParametersResponse('name  should be non empty')
   }
 
-  if (!Object.prototype.hasOwnProperty.call(body, 'description')) {
+  if (!Object.hasOwn(body, 'description')) {
     return invalidParametersResponse('description  not provided or  not provided')
   }
   const descriptionValue = body.description
@@ -172,7 +176,7 @@ export async function POST(request: Request) {
   }
 
   let displayOrder: number | null | undefined = undefined
-  if (Object.prototype.hasOwnProperty.call(body, 'displayOrder')) {
+  if (Object.hasOwn(body, 'displayOrder')) {
     const displayOrderValue = body.displayOrder
     if (displayOrderValue === null) {
       displayOrder = null
@@ -183,65 +187,54 @@ export async function POST(request: Request) {
     }
   }
 
-  if (Object.prototype.hasOwnProperty.call(body, 'bookableOnline') && typeof body.bookableOnline !== 'boolean') {
+  if (Object.hasOwn(body, 'bookableOnline') && typeof body.bookableOnline !== 'boolean') {
     return invalidParametersResponse('bookableOnline  should be boolean')
   }
 
-  if (
-    Object.prototype.hasOwnProperty.call(body, 'showPriceOnline') &&
-    typeof body.showPriceOnline !== 'boolean'
-  ) {
+  if (Object.hasOwn(body, 'showPriceOnline') && typeof body.showPriceOnline !== 'boolean') {
     return invalidParametersResponse('showPriceOnline  should be boolean')
   }
 
   if (
-    Object.prototype.hasOwnProperty.call(body, 'bookingPaymentType') &&
+    Object.hasOwn(body, 'bookingPaymentType') &&
     body.bookingPaymentType !== null &&
     typeof body.bookingPaymentType !== 'string'
   ) {
     return invalidParametersResponse('bookingPaymentType  should be string or  should be null')
   }
 
-  if (
-    Object.prototype.hasOwnProperty.call(body, 'location') &&
-    body.location !== null &&
-    typeof body.location !== 'string'
-  ) {
+  if (Object.hasOwn(body, 'location') && body.location !== null && typeof body.location !== 'string') {
     return invalidParametersResponse('location  should be string or  should be null')
   }
 
-  if (
-    Object.prototype.hasOwnProperty.call(body, 'address') &&
-    body.address !== null &&
-    typeof body.address !== 'string'
-  ) {
+  if (Object.hasOwn(body, 'address') && body.address !== null && typeof body.address !== 'string') {
     return invalidParametersResponse('address  should be string or  should be null')
   }
 
-  if (
-    Object.prototype.hasOwnProperty.call(body, 'googlePlaceId') &&
-    body.googlePlaceId !== null &&
-    typeof body.googlePlaceId !== 'string'
-  ) {
+  if (Object.hasOwn(body, 'googlePlaceId') && body.googlePlaceId !== null && typeof body.googlePlaceId !== 'string') {
     return invalidParametersResponse('googlePlaceId  should be string or  should be null')
   }
 
   if (
-    Object.prototype.hasOwnProperty.call(body, 'bufferMinutesBefore') &&
-    (typeof body.bufferMinutesBefore !== 'number' || !Number.isInteger(body.bufferMinutesBefore) || body.bufferMinutesBefore < 0)
+    Object.hasOwn(body, 'bufferMinutesBefore') &&
+    (typeof body.bufferMinutesBefore !== 'number' ||
+      !Number.isInteger(body.bufferMinutesBefore) ||
+      body.bufferMinutesBefore < 0)
   ) {
     return invalidParametersResponse('bufferMinutesBefore  should be integer')
   }
 
   if (
-    Object.prototype.hasOwnProperty.call(body, 'bufferMinutesAfter') &&
-    (typeof body.bufferMinutesAfter !== 'number' || !Number.isInteger(body.bufferMinutesAfter) || body.bufferMinutesAfter < 0)
+    Object.hasOwn(body, 'bufferMinutesAfter') &&
+    (typeof body.bufferMinutesAfter !== 'number' ||
+      !Number.isInteger(body.bufferMinutesAfter) ||
+      body.bufferMinutesAfter < 0)
   ) {
     return invalidParametersResponse('bufferMinutesAfter  should be integer')
   }
 
   if (
-    Object.prototype.hasOwnProperty.call(body, 'timeSlotFrequencyMinutes') &&
+    Object.hasOwn(body, 'timeSlotFrequencyMinutes') &&
     (typeof body.timeSlotFrequencyMinutes !== 'number' ||
       !Number.isInteger(body.timeSlotFrequencyMinutes) ||
       body.timeSlotFrequencyMinutes < 1)
@@ -250,16 +243,18 @@ export async function POST(request: Request) {
   }
 
   if (
-    Object.prototype.hasOwnProperty.call(body, 'requestClientAddressOnline') &&
+    Object.hasOwn(body, 'requestClientAddressOnline') &&
     body.requestClientAddressOnline !== null &&
     body.requestClientAddressOnline !== 'optional' &&
     body.requestClientAddressOnline !== 'required'
   ) {
-    return invalidParametersResponse('requestClientAddressOnline  should be "optional" or  should be "required" or  should be null')
+    return invalidParametersResponse(
+      'requestClientAddressOnline  should be "optional" or  should be "required" or  should be null'
+    )
   }
 
   if (
-    Object.prototype.hasOwnProperty.call(body, 'bookingQuestion') &&
+    Object.hasOwn(body, 'bookingQuestion') &&
     body.bookingQuestion !== null &&
     typeof body.bookingQuestion !== 'string'
   ) {
@@ -267,18 +262,20 @@ export async function POST(request: Request) {
   }
 
   if (
-    Object.prototype.hasOwnProperty.call(body, 'bookingQuestionState') &&
+    Object.hasOwn(body, 'bookingQuestionState') &&
     body.bookingQuestionState !== null &&
     body.bookingQuestionState !== 'optional' &&
     body.bookingQuestionState !== 'required'
   ) {
-    return invalidParametersResponse('bookingQuestionState  should be "optional" or  should be "required" or  should be null')
+    return invalidParametersResponse(
+      'bookingQuestionState  should be "optional" or  should be "required" or  should be null'
+    )
   }
 
   let totalCredits: number | null = null
   let durationMinutes: number | null = null
   if (typeValue === 'creditPack') {
-    if (!Object.prototype.hasOwnProperty.call(body, 'totalCredits')) {
+    if (!Object.hasOwn(body, 'totalCredits')) {
       return invalidParametersResponse('totalCredits  not provided')
     }
     const creditsValue = body.totalCredits
@@ -292,7 +289,7 @@ export async function POST(request: Request) {
   }
 
   if (typeValue === 'service') {
-    if (!Object.prototype.hasOwnProperty.call(body, 'durationMinutes')) {
+    if (!Object.hasOwn(body, 'durationMinutes')) {
       return invalidParametersResponse('durationMinutes  not provided')
     }
     const durationValue = body.durationMinutes

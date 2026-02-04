@@ -1,7 +1,7 @@
-import { db, type Point, type Selectable, type VwLegacyClient } from '@/lib/db'
-import { z } from 'zod'
-import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
 import type { CountryCode } from 'libphonenumber-js'
+import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
+import { z } from 'zod'
+import { db, type Point, type Selectable, type VwLegacyClient } from '@/lib/db'
 import { supportedCountryCodes } from '@/lib/supportedCountries'
 import { adaptClientRow, clientListSchema } from '../app/api/clients/shared'
 
@@ -9,7 +9,9 @@ export type ClientList = z.infer<typeof clientListSchema>
 export type ClientItem = ClientList[number]
 
 const nullableTrimmedBase = z.union([z.string(), z.null()]).transform((value) => {
-  if (value === null) return null
+  if (value === null) {
+    return null
+  }
   const trimmed = value.trim()
   return trimmed.length === 0 ? null : trimmed
 })
@@ -25,8 +27,12 @@ const nullableEmail = nullableTrimmedBase
 const nullablePhoneString = nullableTrimmedString
 
 const birthdaySchema = z.preprocess((value) => {
-  if (value === undefined) return undefined
-  if (value === null) return null
+  if (value === undefined) {
+    return undefined
+  }
+  if (value === null) {
+    return null
+  }
   if (typeof value === 'string') {
     const trimmed = value.trim()
     return trimmed.length === 0 ? null : trimmed
@@ -43,7 +49,9 @@ const formatDateOnly = (date: Date) => date.toISOString().slice(0, 10)
 
 const normalizePhoneNumber = (value?: string | null): string | null => {
   const raw = value?.trim()
-  if (!raw) return null
+  if (!raw) {
+    return null
+  }
 
   for (const country of supportedCountryCodes) {
     const parsed = parsePhoneNumberFromString(raw, country as CountryCode)

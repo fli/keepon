@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
 import { z } from 'zod'
+import { db } from '@/lib/db'
 import { buildErrorResponse } from '../../_lib/accessToken'
 
 const querySchema = z.object({

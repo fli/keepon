@@ -1,5 +1,5 @@
-import { db, sql, type Point } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql, type Point } from '@/lib/db'
 
 const moneyString = z.string().regex(/^-?\d+(?:\.\d{2})$/, 'Money values must be formatted with two decimal places')
 
@@ -75,7 +75,7 @@ export type RawSaleProductRow = {
 const ensureDate = (value: Date | string, label: string) => {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error(`Invalid ${label} value encountered in sale product record`)
+    throw new TypeError(`Invalid ${label} value encountered in sale product record`)
   }
   return date
 }
@@ -85,7 +85,7 @@ const formatIso = (value: Date | string, label: string) => ensureDate(value, lab
 const formatMoney = (value: string, label: string) => {
   const numeric = Number.parseFloat(value)
   if (!Number.isFinite(numeric)) {
-    throw new Error(`Invalid ${label} value encountered in sale product record`)
+    throw new TypeError(`Invalid ${label} value encountered in sale product record`)
   }
   return numeric.toFixed(2)
 }
@@ -96,11 +96,11 @@ const parseInteger = (value: number | string | null | undefined, label: string, 
   }
   const numeric = typeof value === 'number' ? value : Number.parseFloat(String(value))
   if (!Number.isFinite(numeric)) {
-    throw new Error(`Invalid ${label} value encountered in sale product record`)
+    throw new TypeError(`Invalid ${label} value encountered in sale product record`)
   }
   const rounded = Math.round(numeric)
   if (!Number.isInteger(rounded)) {
-    throw new Error(`Invalid ${label} value encountered in sale product record`)
+    throw new TypeError(`Invalid ${label} value encountered in sale product record`)
   }
   if (options.minimum !== undefined && rounded < options.minimum) {
     throw new Error(`${label} must be at least ${options.minimum} but was ${rounded}`)
@@ -114,7 +114,7 @@ const normalizeGeo = (value: Point | null): z.infer<typeof geoSchema> | null => 
   }
   const { x, y } = value
   if (!Number.isFinite(x) || !Number.isFinite(y)) {
-    throw new Error('Invalid geo coordinates encountered in sale product record')
+    throw new TypeError('Invalid geo coordinates encountered in sale product record')
   }
   return { lat: x, lng: y }
 }

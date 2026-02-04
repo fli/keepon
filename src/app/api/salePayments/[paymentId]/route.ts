@@ -1,18 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import {
   authenticateTrainerOrClientRequest,
   authenticateTrainerRequest,
   buildErrorResponse,
 } from '../../_lib/accessToken'
-import { parseStrictJsonBody } from '../../_lib/strictJson'
 import {
   adaptSalePaymentRow,
   manualMethodSchema,
   salePaymentSchema,
   type SalePaymentRow,
 } from '../../_lib/salePayments'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 
 type HandlerContext = RouteContext<'/api/salePayments/[paymentId]'>
 
@@ -73,8 +74,12 @@ const patchRequestBodySchema = z
       .union([z.string(), z.null()])
       .optional()
       .transform((value) => {
-        if (value === undefined) return undefined
-        if (value === null) return null
+        if (value === undefined) {
+          return undefined
+        }
+        if (value === null) {
+          return null
+        }
         const trimmed = value.trim()
         return trimmed.length > 0 ? trimmed : null
       }),
@@ -95,7 +100,7 @@ type PaymentTypeFlags = {
 type SalePaymentType = 'manual' | 'creditPack' | 'subscription' | 'stripe'
 
 const detectPaymentType = (flags: PaymentTypeFlags): SalePaymentType => {
-  const candidates: Array<{ type: SalePaymentType; value: boolean }> = [
+  const candidates: { type: SalePaymentType; value: boolean }[] = [
     { type: 'manual', value: flags.isManual === true },
     { type: 'creditPack', value: flags.isCreditPack === true },
     { type: 'subscription', value: flags.isSubscription === true },
@@ -400,16 +405,16 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         if (paymentType === 'manual') {
           const updatePayload: Record<string, unknown> = {}
 
-          if (Object.prototype.hasOwnProperty.call(parsedBody, 'method')) {
+          if (Object.hasOwn(parsedBody, 'method')) {
             updatePayload.method = parsedBody.method
           }
 
-          if (Object.prototype.hasOwnProperty.call(parsedBody, 'specificMethodName')) {
+          if (Object.hasOwn(parsedBody, 'specificMethodName')) {
             updatePayload.specific_method_name = parsedBody.specificMethodName ?? null
           }
 
-          if (Object.prototype.hasOwnProperty.call(parsedBody, 'transactedAt')) {
-            updatePayload.transaction_time = new Date(parsedBody.transactedAt as string)
+          if (Object.hasOwn(parsedBody, 'transactedAt')) {
+            updatePayload.transaction_time = new Date(parsedBody.transactedAt!)
           }
 
           if (Object.keys(updatePayload).length > 0) {
@@ -427,16 +432,16 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         if (paymentType === 'creditPack') {
           const updatePayload: Record<string, unknown> = {}
 
-          if (Object.prototype.hasOwnProperty.call(parsedBody, 'saleCreditPackId')) {
+          if (Object.hasOwn(parsedBody, 'saleCreditPackId')) {
             updatePayload.sale_credit_pack_id = parsedBody.saleCreditPackId
           }
 
-          if (Object.prototype.hasOwnProperty.call(parsedBody, 'creditsUsed')) {
+          if (Object.hasOwn(parsedBody, 'creditsUsed')) {
             updatePayload.credits_used = parsedBody.creditsUsed
           }
 
-          if (Object.prototype.hasOwnProperty.call(parsedBody, 'transactedAt')) {
-            updatePayload.transaction_time = new Date(parsedBody.transactedAt as string)
+          if (Object.hasOwn(parsedBody, 'transactedAt')) {
+            updatePayload.transaction_time = new Date(parsedBody.transactedAt!)
           }
 
           if (Object.keys(updatePayload).length > 0) {
@@ -452,7 +457,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         }
 
         if (paymentType === 'subscription') {
-          if (Object.prototype.hasOwnProperty.call(parsedBody, 'paymentPlanId')) {
+          if (Object.hasOwn(parsedBody, 'paymentPlanId')) {
             await trx
               .updateTable('payment_subscription')
               .set({

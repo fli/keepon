@@ -1,15 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { adaptClientNoteRow, clientNoteSchema, type ClientNoteRow } from '../shared'
 
 const paramsSchema = z.object({
-  clientNoteId: z
-    .string()
-    .trim()
-    .min(1, 'Client note id is required'),
+  clientNoteId: z.string().trim().min(1, 'Client note id is required'),
 })
 
 const patchRequestBodySchema = z
@@ -225,12 +223,12 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
   const updatePayload: Partial<Pick<ClientNoteRow, 'title' | 'body'>> = {}
   let hasUpdates = false
 
-  if (Object.prototype.hasOwnProperty.call(parsedBody, 'title')) {
+  if (Object.hasOwn(parsedBody, 'title')) {
     updatePayload.title = parsedBody.title ?? null
     hasUpdates = true
   }
 
-  if (Object.prototype.hasOwnProperty.call(parsedBody, 'body')) {
+  if (Object.hasOwn(parsedBody, 'body')) {
     updatePayload.body = parsedBody.body ?? null
     hasUpdates = true
   }

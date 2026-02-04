@@ -14,17 +14,13 @@ export const reminderOptions = [
 export type ClientReminderType = 'email' | 'sms' | 'emailAndSms'
 export type ServiceProviderReminderType = 'email' | 'notification' | 'emailAndNotification'
 
-export const clientReminderTypeValues = [
-  'email',
-  'sms',
-  'emailAndSms',
-] as const satisfies ReadonlyArray<ClientReminderType>
+export const clientReminderTypeValues = ['email', 'sms', 'emailAndSms'] as const satisfies readonly ClientReminderType[]
 
 export const serviceProviderReminderTypeValues = [
   'email',
   'notification',
   'emailAndNotification',
-] as const satisfies ReadonlyArray<ServiceProviderReminderType>
+] as const satisfies readonly ServiceProviderReminderType[]
 
 export type ClientReminder = {
   type: ClientReminderType
@@ -36,19 +32,19 @@ export type ServiceProviderReminder = {
   timeBeforeStart: string
 }
 
-export const clientReminderTypes: ReadonlyArray<{
+export const clientReminderTypes: readonly {
   label: string
   value: ClientReminderType
-}> = [
+}[] = [
   { label: 'Email', value: 'email' },
   { label: 'Text', value: 'sms' },
   { label: 'Email & text', value: 'emailAndSms' },
 ]
 
-export const serviceProviderReminderTypes: ReadonlyArray<{
+export const serviceProviderReminderTypes: readonly {
   label: string
   value: ServiceProviderReminderType
-}> = [
+}[] = [
   { label: 'Email', value: 'email' },
   { label: 'Notification', value: 'notification' },
   { label: 'Email & notification', value: 'emailAndNotification' },

@@ -1,8 +1,8 @@
-import { Buffer } from 'node:buffer'
-import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
-import { db, sql } from '@/lib/db'
+import { NextResponse } from 'next/server'
+import { Buffer } from 'node:buffer'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { buildErrorResponse } from '../_lib/accessToken'
 
 const clientSchema = z.object({
@@ -48,14 +48,14 @@ const createLegacyInternalErrorResponse = () =>
 
 export async function GET(_request: Request) {
   const headerValue = (await headers()).get('authorization')
-  const [authType, encodedCredentials] = headerValue?.split(' ') || []
+  const [authType, encodedCredentials] = headerValue?.split(' ') ?? []
   let email = ''
   let code = ''
 
   try {
     const decoded = Buffer.from(encodedCredentials, 'base64').toString('utf8')
     const separatorIndex = decoded.indexOf(':')
-    if (separatorIndex >= 0) {
+    if (separatorIndex !== -1) {
       email = decoded.slice(0, separatorIndex)
       code = decoded.slice(separatorIndex + 1)
     }

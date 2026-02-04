@@ -6,7 +6,9 @@ const numericString = z.union([z.string(), z.number()]).transform((value) => {
 })
 
 const dateOrString = z.union([z.string(), z.date()]).transform((value) => {
-  if (value instanceof Date) return value
+  if (value instanceof Date) {
+    return value
+  }
   const parsed = new Date(value)
   return Number.isNaN(parsed.getTime()) ? null : parsed
 })

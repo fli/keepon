@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 
 const taxSchema = z.object({
@@ -29,7 +30,7 @@ const parsePercent = (value: string | number | null): number | null => {
   const numeric = typeof value === 'number' ? value : Number.parseFloat(value.trim())
 
   if (!Number.isFinite(numeric)) {
-    throw new Error('Invalid percent value encountered in tax record')
+    throw new TypeError('Invalid percent value encountered in tax record')
   }
 
   return numeric

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { buildErrorResponse } from '../_lib/accessToken'
 import { parseAmount } from '../paymentPlans/shared'
 
@@ -69,7 +69,7 @@ const toIsoString = (value: Date | string | null, label: string) => {
   }
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error(`Invalid ${label} value encountered in event record`)
+    throw new TypeError(`Invalid ${label} value encountered in event record`)
   }
   return date.toISOString()
 }
@@ -91,11 +91,11 @@ const parseInteger = (value: number | string | null, label: string, options: { m
   }
   const numeric = typeof value === 'number' ? value : Number.parseFloat(String(value))
   if (!Number.isFinite(numeric)) {
-    throw new Error(`Invalid ${label} value encountered in event record`)
+    throw new TypeError(`Invalid ${label} value encountered in event record`)
   }
   const rounded = Math.round(numeric)
   if (!Number.isInteger(rounded)) {
-    throw new Error(`Invalid ${label} value encountered in event record`)
+    throw new TypeError(`Invalid ${label} value encountered in event record`)
   }
   if (options.minimum !== undefined && rounded < options.minimum) {
     throw new Error(`${label} must be at least ${options.minimum} but was ${rounded}`)
@@ -112,7 +112,7 @@ const parseOptionalInteger = (value: number | string | null, label: string, opti
 
 const parseBookingPaymentType = (value: string | null) => {
   if (typeof value !== 'string') {
-    throw new Error('Missing bookingPaymentType in event record')
+    throw new TypeError('Missing bookingPaymentType in event record')
   }
   const parsed = bookingPaymentTypeSchema.safeParse(value.trim())
   if (!parsed.success) {
@@ -157,7 +157,7 @@ const formatPrice = (value: string | number | null): string | null => {
   }
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error('Invalid price value encountered in event record')
+      throw new TypeError('Invalid price value encountered in event record')
     }
     return value.toFixed(2)
   }
@@ -167,7 +167,7 @@ const formatPrice = (value: string | number | null): string | null => {
   }
   const parsed = Number.parseFloat(trimmed)
   if (!Number.isFinite(parsed)) {
-    throw new Error('Invalid price value encountered in event record')
+    throw new TypeError('Invalid price value encountered in event record')
   }
   return parsed.toFixed(2)
 }
@@ -265,14 +265,14 @@ export async function GET(request: Request) {
       .executeTakeFirst()
 
     if (!provider) {
-        return NextResponse.json(
-          buildErrorResponse({
-            status: 404,
-            title: 'Service provider not found',
-            type: '/resource-not-found',
-          }),
-          { status: 404 }
-        )
+      return NextResponse.json(
+        buildErrorResponse({
+          status: 404,
+          title: 'Service provider not found',
+          type: '/resource-not-found',
+        }),
+        { status: 404 }
+      )
     }
 
     const rows = (await db

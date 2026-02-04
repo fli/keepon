@@ -1,12 +1,12 @@
-import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
 import { PageContainer } from '@/components/page-container'
 import { getReminderSettings } from '@/server/reminders'
 
 import { readSessionFromCookies } from '../../../../../../session.server'
-import { ReminderSingleForm } from '../../../reminder-single-form'
 import { updateRemindersAction } from '../../../actions'
+import { ReminderSingleForm } from '../../../reminder-single-form'
 
 type TargetParam = 'service-provider' | 'client'
 

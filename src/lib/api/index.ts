@@ -1,6 +1,6 @@
-import { orpcClient, getOrpcEndpoint } from '@/lib/orpc'
 import { z } from 'zod'
-import { brandColors } from '@/config/referenceData'
+import type { brandColors } from '@/config/referenceData'
+import { orpcClient, getOrpcEndpoint } from '@/lib/orpc'
 import {
   clientSchema,
   productSchema,
@@ -180,7 +180,9 @@ export async function createClient(payload: CreateClientPayload, session: Keepon
   }
 
   const normalize = (value?: string | null) => {
-    if (value === undefined || value === null) return undefined
+    if (value === undefined || value === null) {
+      return undefined
+    }
     const trimmed = value.trim()
     return trimmed.length === 0 ? undefined : trimmed
   }
@@ -265,7 +267,7 @@ export async function createSalePayment(
     saleId: normalizedPayload.saleId,
     amount: normalizedPayload.amount,
     currency: normalizedPayload.currency,
-    method: normalizedPayload.method as 'cash' | 'electronic',
+    method: normalizedPayload.method!,
     specificMethodName: normalizedPayload.specificMethodName ?? null,
   })
 
@@ -274,7 +276,9 @@ export async function createSalePayment(
 }
 
 export async function createPaymentRequest(saleId: string, session: KeeponSession): Promise<SalePaymentResult> {
-  if (!saleId) throw new Error('saleId is required to request payment')
+  if (!saleId) {
+    throw new Error('saleId is required to request payment')
+  }
 
   await orpcClient.sales.requestPayment({
     token: session.token,
@@ -286,7 +290,9 @@ export async function createPaymentRequest(saleId: string, session: KeeponSessio
 
 export function formatPrice(value: number | string): string {
   const numeric = typeof value === 'number' ? value : Number.parseFloat(value)
-  if (!Number.isFinite(numeric)) return '0.00'
+  if (!Number.isFinite(numeric)) {
+    return '0.00'
+  }
   return numeric.toFixed(2)
 }
 

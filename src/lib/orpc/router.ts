@@ -1,15 +1,15 @@
-import { os } from '@orpc/server'
 import type { RouterClient } from '@orpc/server'
+import { os } from '@orpc/server'
 import { z } from 'zod'
 
-import { login, logout } from '@/server/auth'
-import { createTrainerAccount, trainerSignupSchema } from '@/server/trainers'
-import { listProducts } from '@/server/products'
-import { listClientsForTrainer, createClientForTrainer } from '@/server/clients'
-import { createSaleForTrainer, requestPaymentForSale } from '@/server/sales'
-import { createSaleProductForTrainer } from '@/server/saleProducts'
-import { createManualSalePaymentForTrainer } from '@/server/salePayments'
 import { validateTrainerToken } from '@/app/api/_lib/accessToken'
+import { login, logout } from '@/server/auth'
+import { listClientsForTrainer, createClientForTrainer } from '@/server/clients'
+import { listProducts } from '@/server/products'
+import { createManualSalePaymentForTrainer } from '@/server/salePayments'
+import { createSaleProductForTrainer } from '@/server/saleProducts'
+import { createSaleForTrainer, requestPaymentForSale } from '@/server/sales'
+import { createTrainerAccount, trainerSignupSchema } from '@/server/trainers'
 
 const greetingInputSchema = z
   .object({
@@ -181,7 +181,9 @@ export const appRouter = os.router({
         const { trainerId } = await validateTrainerToken(token)
 
         const normalize = (value?: string) => {
-          if (value === undefined) return undefined
+          if (value === undefined) {
+            return undefined
+          }
           const trimmed = value.trim()
           return trimmed.length === 0 ? null : trimmed
         }

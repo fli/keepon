@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { buildErrorResponse } from '../../_lib/accessToken'
 import { APP_EMAIL, APP_NAME, KEEPON_LOGO_COLOR_URL } from '../../_lib/constants'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
@@ -23,7 +23,7 @@ const createInvalidBodyResponse = (detail: string | undefined) =>
     buildErrorResponse({
       status: 400,
       title: 'Invalid request body',
-      detail: detail || 'Request body did not match the expected schema.',
+      detail: detail ?? 'Request body did not match the expected schema.',
       type: '/invalid-body',
     }),
     { status: 400 }
@@ -52,11 +52,11 @@ const createInternalErrorResponse = () =>
 
 const escapeHtml = (value: string) =>
   value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+    .replaceAll(/&/g, '&amp;')
+    .replaceAll(/</g, '&lt;')
+    .replaceAll(/>/g, '&gt;')
+    .replaceAll(/"/g, '&quot;')
+    .replaceAll(/'/g, '&#39;')
 
 const buildEmailHtml = (firstName: string, resetUrl: URL) => `
 <!doctype html>

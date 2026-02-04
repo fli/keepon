@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
-import { parseNotificationRows, RawNotificationRow } from '../_shared'
+import { db } from '@/lib/db'
+import type { RawNotificationRow } from '../_shared'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
+import { parseNotificationRows } from '../_shared'
 
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/notifications/new'>
 

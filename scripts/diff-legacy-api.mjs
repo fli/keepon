@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { createWriteStream, readFileSync, readdirSync, statSync, mkdtempSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import { tmpdir } from 'node:os'
+import path from 'node:path'
 
 const LEGACY_ROOT = '/Users/francis/repos/keepon-full/api-server'
 const LEGACY_ROUTES = path.join(LEGACY_ROOT, 'src/routes')
@@ -13,7 +13,7 @@ const DEFAULT_LEGACY_PORT = 3002
 
 const readArg = (name) => {
   const index = process.argv.indexOf(name)
-  return index >= 0 ? process.argv[index + 1] : undefined
+  return index !== -1 ? process.argv[index + 1] : undefined
 }
 
 const hasFlag = (name) => process.argv.includes(name)
@@ -30,7 +30,9 @@ const walkFiles = (dir, predicate) => {
   const stack = [dir]
   while (stack.length) {
     const current = stack.pop()
-    if (!current) continue
+    if (!current) {
+      continue
+    }
     for (const entry of readdirSync(current)) {
       const full = path.join(current, entry)
       const stats = statSync(full)
@@ -50,14 +52,16 @@ const parseLegacyRoutes = (root) => {
   for (const file of files) {
     const content = readFileSync(file, 'utf8')
     const match = content.match(/router\.(get|post|put|patch|delete|head|options)\s*\(\s*(['"`])([^'"`]+)\2/)
-    if (!match) continue
+    if (!match) {
+      continue
+    }
     const method = match[1].toUpperCase()
     const routePath = match[3]
     let security = null
     const securityMatch = content.match(/security:\s*(['"`])([^'"`]+)\1/)
     if (securityMatch) {
       security = securityMatch[2]
-    } else if (content.match(/security:\s*null/)) {
+    } else if (/security:\s*null/.test(content)) {
       security = null
     }
     routes.push({ method, path: routePath, security, file })
@@ -71,9 +75,13 @@ const buildEnvFromDotenv = (filePath) => {
     const env = {}
     for (const line of content.split(/\r?\n/)) {
       const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#')) continue
+      if (!trimmed || trimmed.startsWith('#')) {
+        continue
+      }
       const index = trimmed.indexOf('=')
-      if (index === -1) continue
+      if (index === -1) {
+        continue
+      }
       const key = trimmed.slice(0, index).trim()
       const value = trimmed.slice(index + 1).trim()
       env[key] = value
@@ -116,11 +124,21 @@ const buildLegacyEnv = () => {
   if (databaseUrlArg) {
     Object.assign(legacyEnv, parseDatabaseUrl(databaseUrlArg))
   }
-  if (baseEnv.PGHOST) legacyEnv.PGHOST = baseEnv.PGHOST
-  if (baseEnv.PGPORT) legacyEnv.PGPORT = baseEnv.PGPORT
-  if (baseEnv.PGUSER) legacyEnv.PGUSER = baseEnv.PGUSER
-  if (baseEnv.PGPASSWORD) legacyEnv.PGPASSWORD = baseEnv.PGPASSWORD
-  if (baseEnv.PGDATABASE) legacyEnv.PGDATABASE = baseEnv.PGDATABASE
+  if (baseEnv.PGHOST) {
+    legacyEnv.PGHOST = baseEnv.PGHOST
+  }
+  if (baseEnv.PGPORT) {
+    legacyEnv.PGPORT = baseEnv.PGPORT
+  }
+  if (baseEnv.PGUSER) {
+    legacyEnv.PGUSER = baseEnv.PGUSER
+  }
+  if (baseEnv.PGPASSWORD) {
+    legacyEnv.PGPASSWORD = baseEnv.PGPASSWORD
+  }
+  if (baseEnv.PGDATABASE) {
+    legacyEnv.PGDATABASE = baseEnv.PGDATABASE
+  }
 
   legacyEnv.PORT = String(legacyPort)
   legacyEnv.BASE_URL = `http://localhost:${legacyPort}`
@@ -136,7 +154,9 @@ const waitForUrl = async (url, timeoutMs = 60000) => {
       const timer = setTimeout(() => controller.abort(), 2000)
       const res = await fetch(url, { method: 'GET', signal: controller.signal })
       clearTimeout(timer)
-      if (res) return true
+      if (res) {
+        return true
+      }
     } catch {
       // ignore
     }
@@ -147,15 +167,23 @@ const waitForUrl = async (url, timeoutMs = 60000) => {
 
 const placeholderValue = (name) => {
   const lower = name.toLowerCase()
-  if (lower.includes('imageurl')) return 'test.jpg'
-  if (lower.includes('slug')) return 'test'
-  if (lower.includes('token')) return 'test-token'
-  if (lower.includes('id')) return '00000000-0000-0000-0000-000000000000'
+  if (lower.includes('imageurl')) {
+    return 'test.jpg'
+  }
+  if (lower.includes('slug')) {
+    return 'test'
+  }
+  if (lower.includes('token')) {
+    return 'test-token'
+  }
+  if (lower.includes('id')) {
+    return '00000000-0000-0000-0000-000000000000'
+  }
   return 'test'
 }
 
 const fillParams = (routePath) =>
-  routePath.replace(/:([A-Za-z0-9_]+)/g, (_, name) => encodeURIComponent(placeholderValue(name)))
+  routePath.replaceAll(/:([A-Za-z0-9_]+)/g, (_, name) => encodeURIComponent(placeholderValue(name)))
 
 const buildRequestInit = (method, security) => {
   const headers = {}
@@ -247,8 +275,8 @@ const startServers = async () => {
     'node',
     ['-r', 'ts-node/register/transpile-only', '-r', 'dotenv/config', 'src/index.js'],
     {
-    cwd: LEGACY_ROOT,
-    env: legacyEnv,
+      cwd: LEGACY_ROOT,
+      env: legacyEnv,
     }
   )
   const newProc = spawnServer('pnpm', ['dev'], {
@@ -268,7 +296,9 @@ const startServers = async () => {
 }
 
 const stopProcess = (proc) => {
-  if (!proc || proc.killed) return
+  if (!proc || proc.killed) {
+    return
+  }
   try {
     process.kill(-proc.pid, 'SIGTERM')
   } catch {
@@ -284,7 +314,9 @@ const main = async () => {
   let cleanedUp = false
 
   const cleanup = () => {
-    if (cleanedUp) return
+    if (cleanedUp) {
+      return
+    }
     cleanedUp = true
     if (procs) {
       stopProcess(procs.legacyProc)

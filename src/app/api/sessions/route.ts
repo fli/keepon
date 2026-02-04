@@ -1,15 +1,12 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
 import { z } from 'zod'
+import { db } from '@/lib/db'
+import type { RawSessionRow } from './shared'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
-import { sessionListSchema, adaptSessionRow, RawSessionRow } from './shared'
+import { sessionListSchema, adaptSessionRow } from './shared'
 
 const querySchema = z.object({
-  sessionSeriesId: z
-    .string()
-    .trim()
-    .min(1, 'sessionSeriesId must not be empty')
-    .optional(),
+  sessionSeriesId: z.string().trim().min(1, 'sessionSeriesId must not be empty').optional(),
   updatedAfter: z
     .string()
     .trim()

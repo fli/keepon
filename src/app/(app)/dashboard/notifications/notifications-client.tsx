@@ -1,13 +1,13 @@
 'use client'
 
-import { useCallback, useMemo, useState, useTransition } from 'react'
 import type { Route } from 'next'
 import { useRouter } from 'next/navigation'
+import { useCallback, useMemo, useState, useTransition } from 'react'
 
-import { Button } from '@/components/ui/button'
-import type { NotificationList } from '@/server/notifications'
-import { markAllNotificationsAsViewedAction, markNotificationAsViewedAction } from './actions'
 import { BellOff } from 'lucide-react'
+import type { NotificationList } from '@/server/notifications'
+import { Button } from '@/components/ui/button'
+import { markAllNotificationsAsViewedAction, markNotificationAsViewedAction } from './actions'
 
 type Notification = NotificationList[number]
 
@@ -63,7 +63,9 @@ export default function NotificationsClient({ initialNotifications, initialError
   )
 
   const handleMarkAll = useCallback(() => {
-    if (!hasNew || isMarkingAll) return
+    if (!hasNew || isMarkingAll) {
+      return
+    }
 
     const previous = notifications
     setIsMarkingAll(true)

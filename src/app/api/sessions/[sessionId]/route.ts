@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
+import type { RawSessionRow } from '../shared'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
-import { adaptSessionRow, RawSessionRow } from '../shared'
+import { adaptSessionRow } from '../shared'
 
 const paramsSchema = z.object({
   sessionId: z.string().trim().min(1, 'sessionId must not be empty'),
@@ -13,8 +15,12 @@ const nullableTrimmedString = z
   .union([z.string(), z.null()])
   .optional()
   .transform((value) => {
-    if (value === undefined) return undefined
-    if (value === null) return null
+    if (value === undefined) {
+      return undefined
+    }
+    if (value === null) {
+      return null
+    }
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
   })

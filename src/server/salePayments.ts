@@ -1,5 +1,5 @@
-import { db } from '@/lib/db'
 import { z } from 'zod'
+import { db } from '@/lib/db'
 import { salePaymentSchema } from '../app/api/_lib/salePayments'
 
 const createManualPaymentSchema = z.object({

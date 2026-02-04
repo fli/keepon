@@ -1,5 +1,5 @@
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 
 const nullableString = z
   .string()

@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
-import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 import { listTrainerNotifications } from '@/server/notifications'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/notifications/all'>
 

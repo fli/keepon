@@ -1,13 +1,13 @@
-import { Suspense } from 'react'
-import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { db } from '@/lib/db'
 
+import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { PageContainer } from '@/components/page-container'
 
 import { readSessionFromCookies } from '../../../../session.server'
 
@@ -17,7 +17,7 @@ const getFormString = (formData: FormData, key: string, fallback = '') => {
 }
 
 const normalizePrice = (raw: string) => {
-  const parsed = Number.parseFloat(raw.replace(/,/g, ''))
+  const parsed = Number.parseFloat(raw.replaceAll(/,/g, ''))
   if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new Error('Enter a valid price greater than 0')
   }

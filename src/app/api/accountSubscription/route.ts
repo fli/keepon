@@ -1,14 +1,14 @@
-import { NextResponse } from 'next/server'
-import { headers } from 'next/headers'
 import BigNumber from 'bignumber.js'
-import { db, sql } from '@/lib/db'
-import { z } from 'zod'
+import { headers } from 'next/headers'
+import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
+import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
-import { parseStrictJsonBody } from '../_lib/strictJson'
 import { getAccountSubscriptionPricingForCountry } from '../_lib/accountSubscriptionPricing'
-import { currencyChargeLimits } from '../_lib/transactionFees'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 import { getStripeClient, STRIPE_API_VERSION } from '../_lib/stripeClient'
+import { currencyChargeLimits } from '../_lib/transactionFees'
 
 const patchRequestBodySchema = z.object({
   cancelAtPeriodEnd: z.boolean().optional(),
@@ -75,7 +75,7 @@ const extractClientIp = async () => {
   }
 
   const realIp = headerStore.get('x-real-ip')
-  return realIp?.trim() || undefined
+  return realIp?.trim() ?? undefined
 }
 
 const buildAlreadySubscribedResponse = () =>
@@ -382,7 +382,7 @@ export async function PUT(request: Request) {
       buildErrorResponse({
         status: 500,
         title: 'Failed to parse trainer data',
-        detail: detail || 'Trainer data did not match the expected schema.',
+        detail: detail ?? 'Trainer data did not match the expected schema.',
         type: '/invalid-database-response',
       }),
       { status: 500 }

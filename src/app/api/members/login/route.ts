@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { login, loginRequestSchema } from '@/server/auth'
 import { buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
-import { login, loginRequestSchema } from '@/server/auth'
 
 const responseSchema = z.object({
   id: z.string(),
@@ -15,7 +15,7 @@ const invalidBodyResponse = (detail?: string) =>
     buildErrorResponse({
       status: 400,
       title: 'Invalid request body',
-      detail: detail || 'Request body did not match the expected schema.',
+      detail: detail ?? 'Request body did not match the expected schema.',
       type: '/invalid-body',
     }),
     { status: 400 }

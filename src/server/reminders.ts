@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
+import type { ClientReminder, ServiceProviderReminder } from '@/lib/reminders'
 import { db, sql } from '@/lib/db'
-import { type ClientReminder, type ServiceProviderReminder } from '@/lib/reminders'
 
 const serviceProviderReminderSchema = z.object({
   type: z.enum(['email', 'notification', 'emailAndNotification']),
@@ -25,24 +25,36 @@ export type ReminderSettings = z.infer<typeof reminderSettingsSchema>
 let clientReminderTypeCache: string[] | null = null
 
 const loadClientReminderTypes = async () => {
-  if (clientReminderTypeCache) return clientReminderTypeCache
+  if (clientReminderTypeCache) {
+    return clientReminderTypeCache
+  }
   const rows = await db.selectFrom('client_appointment_reminder_type').select('type').execute()
   clientReminderTypeCache = rows.map((row) => row.type)
   return clientReminderTypeCache
 }
 
 const normalizeClientTypeFromDb = (type: string | null | undefined) => {
-  if (!type) return type
+  if (!type) {
+    return type
+  }
   return type === 'email_and_sms' ? 'emailAndSms' : type
 }
 
 const mapClientTypeToDb = async (type: string | null | undefined) => {
-  if (!type) return sql`DEFAULT`
-  if (type !== 'emailAndSms') return type
+  if (!type) {
+    return sql`DEFAULT`
+  }
+  if (type !== 'emailAndSms') {
+    return type
+  }
 
   const allowed = await loadClientReminderTypes()
-  if (allowed.includes('emailAndSms')) return 'emailAndSms'
-  if (allowed.includes('email_and_sms')) return 'email_and_sms'
+  if (allowed.includes('emailAndSms')) {
+    return 'emailAndSms'
+  }
+  if (allowed.includes('email_and_sms')) {
+    return 'email_and_sms'
+  }
   return type
 }
 
@@ -87,7 +99,7 @@ export async function getReminderSettings(trainerId: string): Promise<ReminderSe
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      throw new Error('Reminder settings are stored in an unexpected format.')
+      throw new TypeError('Reminder settings are stored in an unexpected format.', { cause: error })
     }
     throw error
   }

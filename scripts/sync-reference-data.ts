@@ -1,13 +1,7 @@
-/* Idempotent sync of reference data (countries, currencies, enums).
- * Source data lives in ./src/config.
- * Run with: pnpm sync:reference-data
- */
-import { createDb } from '../src/lib/db/index'
-import type { DB } from '../src/lib/db/index'
 import type { Insertable } from 'kysely'
+import type { DB } from '../src/lib/db/index'
 import { countries } from '../src/config/countries'
 import { currencies } from '../src/config/currencies'
-import { supportedCountryCurrency } from '../src/config/supportedCountryCurrency'
 import {
   accessTokenTypes,
   bookingPaymentTypes,
@@ -26,6 +20,12 @@ import {
   subscriptionFrequencies,
   userTypes,
 } from '../src/config/referenceData'
+import { supportedCountryCurrency } from '../src/config/supportedCountryCurrency'
+/* Idempotent sync of reference data (countries, currencies, enums).
+ * Source data lives in ./src/config.
+ * Run with: pnpm sync:reference-data
+ */
+import { createDb } from '../src/lib/db/index'
 
 async function sync() {
   const db = createDb()
@@ -75,7 +75,7 @@ async function sync() {
       const upsertSimple = async <TTable extends keyof DB, TColumn extends keyof DB[TTable] & string>(
         table: TTable,
         column: TColumn,
-        values: ReadonlyArray<DB[TTable][TColumn]>
+        values: readonly DB[TTable][TColumn][]
       ) => {
         for (const value of values) {
           await trx

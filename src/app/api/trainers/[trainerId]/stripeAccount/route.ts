@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { getStripeClient } from '../../../_lib/stripeClient'
 
@@ -94,14 +95,14 @@ const parseTimestamp = (value: unknown, label: string) => {
 
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
-      throw new Error(`Invalid ${label} value encountered in database row`)
+      throw new TypeError(`Invalid ${label} value encountered in database row`)
     }
     return value
   }
 
   const date = new Date(value as string | number)
   if (Number.isNaN(date.getTime())) {
-    throw new Error(`Invalid ${label} value encountered in database row`)
+    throw new TypeError(`Invalid ${label} value encountered in database row`)
   }
   return date
 }
@@ -110,7 +111,7 @@ const parseStripeAmount = (value: string | number, label: string) => {
   const numeric = typeof value === 'number' ? value : Number.parseFloat(value.trim())
 
   if (!Number.isFinite(numeric)) {
-    throw new Error(`Invalid ${label} amount encountered in Stripe data`)
+    throw new TypeError(`Invalid ${label} amount encountered in Stripe data`)
   }
 
   return numeric

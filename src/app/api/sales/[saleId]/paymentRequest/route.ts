@@ -1,14 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
-import { adaptSaleRow, fetchSales, saleSchema } from '../../shared'
+import { db } from '@/lib/db'
 import {
   AccessTokenCreationError,
   ClientHasNoEmailError,
   SaleNotFoundError,
   requestPaymentForSale,
 } from '@/server/sales'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
+import { adaptSaleRow, fetchSales, saleSchema } from '../../shared'
 
 const paramsSchema = z.object({
   saleId: z.string(),

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { parseStrictJsonBody } from '../_lib/strictJson'
 import { normalizeSessionSeriesRow, type RawSessionSeriesRow } from './shared'
@@ -11,8 +11,12 @@ const nullableTrimmedString = z
   .union([z.string(), z.null()])
   .optional()
   .transform((value) => {
-    if (value === undefined) return undefined
-    if (value === null) return null
+    if (value === undefined) {
+      return undefined
+    }
+    if (value === null) {
+      return null
+    }
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
   })
@@ -37,10 +41,14 @@ const geoSchema = z.object({ lat: z.number(), lng: z.number() }).nullable().opti
 
 const nonNegativeNumberSchema = z.preprocess(
   (value) => {
-    if (value === null || value === undefined) return value
+    if (value === null || value === undefined) {
+      return value
+    }
     if (typeof value === 'string') {
       const trimmed = value.trim()
-      if (trimmed.length === 0) return Number.NaN
+      if (trimmed.length === 0) {
+        return Number.NaN
+      }
       return Number(trimmed)
     }
     return value
@@ -50,10 +58,14 @@ const nonNegativeNumberSchema = z.preprocess(
 
 const nullableNonNegativeNumberSchema = z.preprocess(
   (value) => {
-    if (value === null || value === undefined) return value
+    if (value === null || value === undefined) {
+      return value
+    }
     if (typeof value === 'string') {
       const trimmed = value.trim()
-      if (trimmed.length === 0) return Number.NaN
+      if (trimmed.length === 0) {
+        return Number.NaN
+      }
       return Number(trimmed)
     }
     return value
@@ -404,7 +416,7 @@ export async function POST(request: Request) {
         : sql`NULL`
       const clientReminder2Type = data.clientReminder2?.type ?? 'email'
 
-      const cancellationInterval = sql`${(data.cancellationAdvanceNoticeDuration ?? 'P1D') as string}::interval`
+      const cancellationInterval = sql`${data.cancellationAdvanceNoticeDuration ?? 'P1D'}::interval`
 
       const sessionInsert = await sql<{ id: string; start: Date }>`
         INSERT INTO session (

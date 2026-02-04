@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
 import { X } from 'lucide-react'
+import { useMemo, useState, useTransition } from 'react'
 
+import type { ReminderSettings } from '@/server/reminders'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -13,7 +14,6 @@ import {
   type ClientReminder,
   type ServiceProviderReminder,
 } from '@/lib/reminders'
-import { type ReminderSettings } from '@/server/reminders'
 import type { ActionResult } from './actions'
 
 type Target = 'serviceProvider' | 'client'

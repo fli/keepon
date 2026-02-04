@@ -5,9 +5,9 @@ import { z } from 'zod'
 
 import { listClientsForTrainer } from '@/server/clients'
 import { listProducts } from '@/server/products'
-import { createSaleForTrainer, requestPaymentForSale } from '@/server/sales'
-import { createSaleProductForTrainer } from '@/server/saleProducts'
 import { createManualSalePaymentForTrainer } from '@/server/salePayments'
+import { createSaleProductForTrainer } from '@/server/saleProducts'
+import { createSaleForTrainer, requestPaymentForSale } from '@/server/sales'
 import { readSessionFromCookies } from '../../../../session.server'
 
 export type ClientSummary = Awaited<ReturnType<typeof loadClients>>[number]
@@ -23,13 +23,17 @@ export type CreditPack = {
 
 export const loadClients = cache(async () => {
   const session = await readSessionFromCookies()
-  if (!session) return []
+  if (!session) {
+    return []
+  }
   return (await listClientsForTrainer(session.trainerId)) ?? []
 })
 
 export const loadCreditPacks = cache(async (): Promise<CreditPack[]> => {
   const session = await readSessionFromCookies()
-  if (!session) return []
+  if (!session) {
+    return []
+  }
 
   const products = await listProducts(session.trainerId, { type: 'creditPack' })
 
@@ -69,9 +73,13 @@ const sellSchema = z.object({
 })
 
 const buildDurationFromDate = (rawDate?: string | null) => {
-  if (!rawDate) return null
+  if (!rawDate) {
+    return null
+  }
   const target = new Date(rawDate)
-  if (Number.isNaN(target.getTime())) return null
+  if (Number.isNaN(target.getTime())) {
+    return null
+  }
 
   const now = new Date()
   const msPerDay = 24 * 60 * 60 * 1000
@@ -99,7 +107,7 @@ export async function completeCreditPackSale(input: unknown): Promise<SellResult
 
   const trainerId = session.trainerId
   const dueAfter = parsed.paymentKind === 'request' ? buildDurationFromDate(parsed.dueDate) : null
-  const productName = parsed.packName?.trim() || pack.name
+  const productName = parsed.packName?.trim() ?? pack.name
   const productPrice = parsed.packPrice ?? pack.price
   const productCredits = parsed.packCredits ?? pack.totalCredits
 
@@ -126,7 +134,7 @@ export async function completeCreditPackSale(input: unknown): Promise<SellResult
     }
 
     const method = parsed.recordMethod === 'cash' ? 'cash' : 'electronic'
-    const specificMethodName = parsed.recordMethod === 'eft' ? parsed.eftType || 'EFT' : 'Cash'
+    const specificMethodName = parsed.recordMethod === 'eft' ? (parsed.eftType ?? 'EFT') : 'Cash'
 
     await createManualSalePaymentForTrainer(trainerId, {
       saleId: sale.id,

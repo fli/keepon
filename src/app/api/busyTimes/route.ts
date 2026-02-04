@@ -63,7 +63,7 @@ const ensureDate = (value: Date | string | null | undefined, label: string) => {
 
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
-      throw new Error(`Invalid ${label}`)
+      throw new TypeError(`Invalid ${label}`)
     }
     return value
   }
@@ -75,7 +75,7 @@ const ensureDate = (value: Date | string | null | undefined, label: string) => {
     }
     const parsed = new Date(trimmed)
     if (Number.isNaN(parsed.getTime())) {
-      throw new Error(`Invalid ${label}`)
+      throw new TypeError(`Invalid ${label}`)
     }
     return parsed
   }

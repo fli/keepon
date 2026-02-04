@@ -1,14 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z, ZodError } from 'zod'
+import { db, sql } from '@/lib/db'
+import type { RawClientSessionRow } from '../../../_lib/clientSessionsSchema'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
-import { adaptClientSessionRow, RawClientSessionRow } from '../../../_lib/clientSessionsSchema'
+import { adaptClientSessionRow } from '../../../_lib/clientSessionsSchema'
 
 const paramsSchema = z.object({
-  clientSessionId: z
-    .string()
-    .trim()
-    .min(1, 'Client session id must not be empty.'),
+  clientSessionId: z.string().trim().min(1, 'Client session id must not be empty.'),
 })
 
 const requestBodySchema = z

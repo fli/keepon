@@ -1,8 +1,8 @@
+import type { Insertable } from 'kysely'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, type Json } from '@/lib/db'
 import type { AnalyticsData } from '@/lib/db'
-import type { Insertable } from 'kysely'
+import { db, type Json } from '@/lib/db'
 import { buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
 
@@ -74,7 +74,9 @@ const createInternalErrorResponse = () =>
   )
 
 const parseDate = (value: unknown): Date | null => {
-  if (value === null || value === undefined) return null
+  if (value === null || value === undefined) {
+    return null
+  }
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return value
   }
@@ -82,12 +84,16 @@ const parseDate = (value: unknown): Date | null => {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-const toNullableString = (...values: Array<unknown>): string | null => {
+const toNullableString = (...values: unknown[]): string | null => {
   for (const value of values) {
-    if (value === undefined || value === null) continue
+    if (value === undefined || value === null) {
+      continue
+    }
     if (typeof value === 'string') {
       const trimmed = value.trim()
-      if (trimmed.length === 0) continue
+      if (trimmed.length === 0) {
+        continue
+      }
       return trimmed
     }
     if (typeof value === 'number' || typeof value === 'boolean') {
@@ -97,9 +103,11 @@ const toNullableString = (...values: Array<unknown>): string | null => {
   return null
 }
 
-const toNullableNumber = (...values: Array<unknown>): number | null => {
+const toNullableNumber = (...values: unknown[]): number | null => {
   for (const value of values) {
-    if (value === undefined || value === null) continue
+    if (value === undefined || value === null) {
+      continue
+    }
     const numeric =
       typeof value === 'number' ? value : typeof value === 'string' ? Number.parseFloat(value) : Number.NaN
 
@@ -110,25 +118,39 @@ const toNullableNumber = (...values: Array<unknown>): number | null => {
   return null
 }
 
-const toNullableBoolean = (...values: Array<unknown>): boolean | null => {
+const toNullableBoolean = (...values: unknown[]): boolean | null => {
   for (const value of values) {
-    if (value === undefined || value === null) continue
-    if (typeof value === 'boolean') return value
+    if (value === undefined || value === null) {
+      continue
+    }
+    if (typeof value === 'boolean') {
+      return value
+    }
     if (typeof value === 'string') {
       const normalized = value.trim().toLowerCase()
-      if (['true', 't', '1', 'yes', 'y'].includes(normalized)) return true
-      if (['false', 'f', '0', 'no', 'n'].includes(normalized)) return false
+      if (['true', 't', '1', 'yes', 'y'].includes(normalized)) {
+        return true
+      }
+      if (['false', 'f', '0', 'no', 'n'].includes(normalized)) {
+        return false
+      }
     }
     if (typeof value === 'number') {
-      if (value === 1) return true
-      if (value === 0) return false
+      if (value === 1) {
+        return true
+      }
+      if (value === 0) {
+        return false
+      }
     }
   }
   return null
 }
 
 const toJsonOrNull = (value: unknown): Json | null => {
-  if (value === undefined || value === null) return null
+  if (value === undefined || value === null) {
+    return null
+  }
   try {
     return JSON.parse(JSON.stringify(value)) as Json
   } catch {

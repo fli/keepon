@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { useMemo, useState, useTransition } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,7 +28,9 @@ export function SettingsGrid() {
   )
 
   const handleAction = (tile: Tile) => {
-    if (isPending || pendingId) return
+    if (isPending || pendingId) {
+      return
+    }
 
     const { action } = tile
     const done = () => setPendingId(null)

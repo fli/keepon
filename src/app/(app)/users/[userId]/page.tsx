@@ -1,8 +1,8 @@
-import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
-import { Card, CardContent } from '@/components/ui/card'
 import { PageContainer } from '@/components/page-container'
+import { Card, CardContent } from '@/components/ui/card'
 import { readSessionFromCookies } from '../../../session.server'
 
 export default function UserPage({ params }: { params: Promise<{ userId: string }> }) {

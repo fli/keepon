@@ -1,8 +1,8 @@
+import { NextResponse } from 'next/server'
 import fs from 'node:fs'
 import path from 'node:path'
-import { NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { buildErrorResponse } from '../../_lib/accessToken'
 
 const paramsSchema = z.object({
@@ -128,7 +128,7 @@ const wrapLines = (input: string) => {
   return result.join('\n')
 }
 
-const escapeNewlines = (value: string) => value.replace(/\n/g, '\\n')
+const escapeNewlines = (value: string) => value.replaceAll(/\n/g, '\\n')
 
 const buildEventBlock = (row: CalendarRow) => `BEGIN:VEVENT
 DTSTAMP:${escapeNewlines(row.dtstamp)}

@@ -1,16 +1,60 @@
 {
-  "$schema": "https://oxc.rs/schema/oxfmtrc.json",
-  "printWidth": 120,
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "semi": false,
-  "trailingComma": "es5",
   "singleQuote": true,
+  "tabWidth": 2,
+  "printWidth": 120,
+  "trailingComma": "es5",
+  "endOfLine": "lf",
+  "insertFinalNewline": true,
+  "experimentalSortPackageJson": {
+    "sortScripts": true
+  },
+  "experimentalSortImports": {
+    "internalPattern": ["@/", "@driah/"],
+    "groups": [
+      "side-effect-style",
+      "side-effect",
+      "type-import",
+      "style",
+      ["value-builtin", "value-external"],
+      "type-internal",
+      "value-internal",
+      ["type-parent", "type-sibling", "type-index"],
+      ["value-parent", "value-sibling", "value-index"],
+      "unknown"
+    ],
+    "newlinesBetween": false,
+    "partitionByComment": false,
+    "partitionByNewline": true,
+    "sortSideEffects": false
+  },
+  "experimentalTailwindcss": {
+    "stylesheet": "./src/app/globals.css",
+    "functions": ["clsx"],
+    "preserveDuplicates": false
+  },
   "ignorePatterns": [
-    "**/node_modules/**",
-    "**/.next/**",
-    "**/.turbo/**",
-    "**/dist/**",
-    "**/build/**",
-    "**/.output/**",
+    ".next",
+    "out",
+    "dist",
+    "build",
+    "coverage",
+    "reports",
+    "**/*.tsbuildinfo",
+    "src/generated",
+    "src/lib/db/generated",
+    "src/lib/db/kysely-types.ts",
+    "node_modules",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "package-lock.json",
+    ".pnp.*",
+    ".turbo",
+    ".env*",
+    ".DS_Store",
+    "**/kysely-types.ts",
+    "**/generated/schema-version.ts",
     "src/lib/db/generated.ts"
   ]
 }

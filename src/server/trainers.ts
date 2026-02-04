@@ -1,10 +1,10 @@
-import { randomUUID } from 'node:crypto'
-import { db, sql } from '@/lib/db'
-import { z } from 'zod'
-import { AppleSignInError, verifyAppleIdentityToken } from '../app/api/_lib/appleSignIn'
-import { brandColors } from '@/config/referenceData'
 import type { Transaction } from 'kysely'
+import { randomUUID } from 'node:crypto'
+import { z } from 'zod'
 import type { DB } from '@/lib/db'
+import { brandColors } from '@/config/referenceData'
+import { db, sql } from '@/lib/db'
+import { AppleSignInError, verifyAppleIdentityToken } from '../app/api/_lib/appleSignIn'
 
 type BrandColorName = (typeof brandColors)[number]
 
@@ -22,7 +22,9 @@ const intervalLiteral = z
 
 const defaultTrialDurationMs = (() => {
   const raw = process.env.DEFAULT_TRIAL_DURATION
-  if (!raw) return FALLBACK_TRIAL_DURATION
+  if (!raw) {
+    return FALLBACK_TRIAL_DURATION
+  }
   const parsed = intervalLiteral.safeParse(raw)
   if (!parsed.success) {
     return FALLBACK_TRIAL_DURATION
@@ -342,7 +344,7 @@ export async function createTrainerAccount(input: TrainerSignupInput) {
       appleUserId = identity.userId
     } catch (error) {
       if (error instanceof AppleSignInError) {
-        throw new Error('appleTokenInvalid')
+        throw new TypeError('appleTokenInvalid', { cause: error })
       }
       throw error
     }

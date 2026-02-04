@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { getStripeClient, STRIPE_API_VERSION } from '../../_lib/stripeClient'
@@ -237,7 +237,7 @@ const createExternalAccountBodySchema = z.object({
       })
       .passthrough(),
   ]),
-  default_for_currency: z.boolean().refine((value) => value === true, {
+  default_for_currency: z.boolean().refine((value) => value, {
     message: 'default_for_currency must be true',
   }),
 })
@@ -267,7 +267,7 @@ const stripeBankAccountSchema = z
 const normalizeApiVersion = (value: string | number | Date) => {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error('Invalid Stripe API version value')
+    throw new TypeError('Invalid Stripe API version value')
   }
   return date.toISOString().slice(0, 10)
 }
@@ -311,7 +311,7 @@ const toResponseBankAccount = (account: z.infer<typeof stripeBankAccountSchema>)
 }
 
 const fetchAllBankAccounts = async (stripeClient: Stripe, stripeAccountId: string) => {
-  const accounts: Array<z.infer<typeof stripeBankAccountSchema>> = []
+  const accounts: z.infer<typeof stripeBankAccountSchema>[] = []
   let startingAfter: string | undefined
 
   while (true) {
@@ -401,16 +401,16 @@ export async function GET(request: Request) {
     const storedBankAccounts = storedBankAccountsResult.rows
       .filter((row) => row.id !== null)
       .map((row) => ({
-        id: row.id as string,
+        id: row.id!,
         apiVersion: row.apiVersion ?? '',
         object: row.object,
       }))
 
-    const parsedStoredAccounts: Array<{
+    const parsedStoredAccounts: {
       apiVersion: string
       object: z.infer<typeof stripeBankAccountSchema>
       id: string
-    }> = []
+    }[] = []
 
     let requiresRefresh = storedBankAccounts.length === 0
 

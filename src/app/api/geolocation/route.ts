@@ -1,5 +1,5 @@
-import { NextResponse, connection } from 'next/server'
 import { headers } from 'next/headers'
+import { NextResponse, connection } from 'next/server'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
 

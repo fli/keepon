@@ -11,7 +11,7 @@ const stateSet = new Set(clientSessionStateSchema.options)
 export const isoDateTimeString = z.union([z.string(), z.date()]).transform((value) => {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error('Invalid date-time value')
+    throw new TypeError('Invalid date-time value')
   }
   return date.toISOString()
 })
@@ -22,7 +22,7 @@ export const isoDateTimeStringOrNull = z.union([z.string(), z.date(), z.null()])
   }
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error('Invalid date-time value')
+    throw new TypeError('Invalid date-time value')
   }
   return date.toISOString()
 })
@@ -33,7 +33,7 @@ export const nullableNumber = z.union([z.number(), z.string(), z.null()]).transf
   }
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error('Invalid numeric value')
+      throw new TypeError('Invalid numeric value')
     }
     return value
   }
@@ -43,7 +43,7 @@ export const nullableNumber = z.union([z.number(), z.string(), z.null()]).transf
   }
   const parsed = Number(trimmed)
   if (!Number.isFinite(parsed)) {
-    throw new Error('Invalid numeric value')
+    throw new TypeError('Invalid numeric value')
   }
   return parsed
 })
@@ -69,14 +69,14 @@ export const paymentSchema = z.object({
   paidAmount: z.union([z.number(), z.string()]).transform((value) => {
     if (typeof value === 'number') {
       if (!Number.isFinite(value)) {
-        throw new Error('Invalid paid amount value')
+        throw new TypeError('Invalid paid amount value')
       }
       return value
     }
     const trimmed = value.trim()
     const parsed = Number(trimmed)
     if (!Number.isFinite(parsed)) {
-      throw new Error('Invalid paid amount value')
+      throw new TypeError('Invalid paid amount value')
     }
     return parsed
   }),
@@ -117,7 +117,7 @@ export const clientSessionListSchema = z.array(clientSessionSchema)
 
 export const normalizeClientSessionState = (value: unknown): z.infer<typeof clientSessionStateSchema> => {
   if (typeof value !== 'string') {
-    throw new Error('Client session state is missing or invalid')
+    throw new TypeError('Client session state is missing or invalid')
   }
   const trimmed = value.trim()
   if (!stateSet.has(trimmed as z.infer<typeof clientSessionStateSchema>)) {
@@ -131,7 +131,7 @@ export const parseNullableBoolean = (value: unknown, label: string) => {
     return null
   }
   if (typeof value !== 'boolean') {
-    throw new Error(`Invalid ${label} value`)
+    throw new TypeError(`Invalid ${label} value`)
   }
   return value
 }
@@ -154,7 +154,7 @@ export const adaptPayment = (value: unknown) => {
     return null
   }
   if (typeof value !== 'object') {
-    throw new Error('Payment value was not an object')
+    throw new TypeError('Payment value was not an object')
   }
   return paymentSchema.parse(value)
 }
@@ -164,7 +164,7 @@ export const adaptNotes = (value: unknown) => {
     return [] as z.infer<typeof noteSchema>[]
   }
   if (!Array.isArray(value)) {
-    throw new Error('Notes value was not an array')
+    throw new TypeError('Notes value was not an array')
   }
   return z.array(noteSchema).parse(value)
 }

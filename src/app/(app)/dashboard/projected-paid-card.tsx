@@ -1,9 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { NativeSelect } from '@/components/ui/native-select'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import type { DashboardSummary } from '@/server/dashboard'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { NativeSelect } from '@/components/ui/native-select'
 
 type Timeframe = 'last7Days' | 'today'
 
@@ -31,7 +31,9 @@ export function ProjectedPaidCard({ payments }: ProjectedPaidCardProps) {
   const [timeframe, setTimeframe] = useState<Timeframe>('last7Days')
 
   const selected = useMemo(() => {
-    if (!payments) return null
+    if (!payments) {
+      return null
+    }
     return payments[timeframe]
   }, [payments, timeframe])
 

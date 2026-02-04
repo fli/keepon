@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
 import { z } from 'zod'
+import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 
 const isoDateTimeString = z.union([z.string(), z.date()]).transform((value) => {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error('Invalid date-time value')
+    throw new TypeError('Invalid date-time value')
   }
   return date.toISOString()
 })
@@ -14,7 +14,7 @@ const isoDateTimeString = z.union([z.string(), z.date()]).transform((value) => {
 const isoDateString = z.union([z.string(), z.date()]).transform((value) => {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error('Invalid date value')
+    throw new TypeError('Invalid date value')
   }
   return date.toISOString().slice(0, 10)
 })
@@ -63,7 +63,7 @@ const parseUnixTimestampSeconds = (value: string | number, label: string) => {
   const numeric = typeof value === 'number' ? value : Number.parseFloat(value.trim())
 
   if (!Number.isFinite(numeric)) {
-    throw new Error(`Invalid ${label} value encountered in payout record`)
+    throw new TypeError(`Invalid ${label} value encountered in payout record`)
   }
 
   return new Date(numeric * 1000)
@@ -72,14 +72,14 @@ const parseUnixTimestampSeconds = (value: string | number, label: string) => {
 const toIsoDateTime = (value: Date | string | number, label: string) => {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) {
-    throw new Error(`Invalid ${label} value encountered in payout record`)
+    throw new TypeError(`Invalid ${label} value encountered in payout record`)
   }
   return date.toISOString()
 }
 
 const toIsoDate = (date: Date, label: string) => {
   if (Number.isNaN(date.getTime())) {
-    throw new Error(`Invalid ${label} value encountered in payout record`)
+    throw new TypeError(`Invalid ${label} value encountered in payout record`)
   }
   return date.toISOString().slice(0, 10)
 }
@@ -88,7 +88,7 @@ const parseAmount = (value: string | number) => {
   const numeric = typeof value === 'number' ? value : Number.parseFloat(value.trim())
 
   if (!Number.isFinite(numeric)) {
-    throw new Error('Invalid amount value encountered in payout record')
+    throw new TypeError('Invalid amount value encountered in payout record')
   }
 
   const dollars = numeric / 100
@@ -136,7 +136,7 @@ export async function GET(request: Request) {
             statementDescriptor: stripeObject.statement_descriptor ?? null,
           }
         })
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))
     )
 
     return NextResponse.json(payouts)

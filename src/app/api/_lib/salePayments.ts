@@ -83,7 +83,7 @@ export type SalePaymentRow = {
 const ensureDate = (value: Date | string | null | undefined, label: string): Date => {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
-      throw new Error(`Invalid ${label} value in sale payment record`)
+      throw new TypeError(`Invalid ${label} value in sale payment record`)
     }
     return value
   }
@@ -91,7 +91,7 @@ const ensureDate = (value: Date | string | null | undefined, label: string): Dat
   if (typeof value === 'string') {
     const parsed = new Date(value)
     if (Number.isNaN(parsed.getTime())) {
-      throw new Error(`Invalid ${label} value in sale payment record`)
+      throw new TypeError(`Invalid ${label} value in sale payment record`)
     }
     return parsed
   }
@@ -112,7 +112,7 @@ const formatMoney = (value: string | number | null | undefined, label: string): 
 
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(`Invalid ${label} value in sale payment record`)
+      throw new TypeError(`Invalid ${label} value in sale payment record`)
     }
     return value.toFixed(2)
   }
@@ -124,7 +124,7 @@ const formatMoney = (value: string | number | null | undefined, label: string): 
 
   const numeric = Number.parseFloat(trimmed)
   if (!Number.isFinite(numeric)) {
-    throw new Error(`Invalid ${label} value in sale payment record`)
+    throw new TypeError(`Invalid ${label} value in sale payment record`)
   }
 
   return numeric.toFixed(2)
@@ -142,12 +142,12 @@ const parseInteger = (
   const numeric = typeof value === 'number' ? value : Number.parseFloat(String(value))
 
   if (!Number.isFinite(numeric)) {
-    throw new Error(`Invalid ${label} value in sale payment record`)
+    throw new TypeError(`Invalid ${label} value in sale payment record`)
   }
 
   const integer = Math.trunc(numeric)
   if (!Number.isInteger(integer)) {
-    throw new Error(`Invalid ${label} value in sale payment record`)
+    throw new TypeError(`Invalid ${label} value in sale payment record`)
   }
 
   if (options.minimum !== undefined && integer < options.minimum) {
@@ -170,7 +170,7 @@ const parseStripeCreatedTimestamp = (value: unknown, label: string): Date | null
 
   if (typeof created === 'number') {
     if (!Number.isFinite(created)) {
-      throw new Error(`Invalid ${label} created value in sale payment record`)
+      throw new TypeError(`Invalid ${label} created value in sale payment record`)
     }
     return new Date(created * 1000)
   }
@@ -183,7 +183,7 @@ const parseStripeCreatedTimestamp = (value: unknown, label: string): Date | null
 
     const numeric = Number.parseFloat(trimmed)
     if (!Number.isFinite(numeric)) {
-      throw new Error(`Invalid ${label} created value in sale payment record`)
+      throw new TypeError(`Invalid ${label} created value in sale payment record`)
     }
 
     return new Date(numeric * 1000)
@@ -193,7 +193,7 @@ const parseStripeCreatedTimestamp = (value: unknown, label: string): Date | null
 }
 
 const determineType = (row: SalePaymentRow): SalePaymentType => {
-  const flags: Array<{ type: SalePaymentType; value: boolean }> = [
+  const flags: { type: SalePaymentType; value: boolean }[] = [
     { type: 'manual', value: row.isManual === true },
     { type: 'stripe', value: row.isStripe === true },
     { type: 'creditPack', value: row.isCreditPack === true },
@@ -216,7 +216,7 @@ const determineType = (row: SalePaymentRow): SalePaymentType => {
 }
 
 const determineUpdatedAt = (row: SalePaymentRow): string => {
-  const candidates: Array<{ value: Date | string | null; label: string }> = [
+  const candidates: { value: Date | string | null; label: string }[] = [
     { value: row.paymentUpdatedAt, label: 'payment updatedAt' },
     { value: row.paymentManualUpdatedAt, label: 'manual updatedAt' },
     { value: row.paymentStripeUpdatedAt, label: 'stripe updatedAt' },

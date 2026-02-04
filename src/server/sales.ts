@@ -1,6 +1,6 @@
-import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { APP_NAME, NO_REPLY_EMAIL } from '@/app/api/_lib/constants'
+import { db, sql } from '@/lib/db'
 
 const tailwind600: Record<string, string> = {
   amber: '#d97706',
@@ -27,11 +27,11 @@ const resolveBrandColor = (value?: string | null) => (value && tailwind600[value
 
 const escapeHtml = (value: string) =>
   value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+    .replaceAll(/&/g, '&amp;')
+    .replaceAll(/</g, '&lt;')
+    .replaceAll(/>/g, '&gt;')
+    .replaceAll(/"/g, '&quot;')
+    .replaceAll(/'/g, '&#39;')
 
 const buildPaymentRequestEmail = (options: {
   serviceProviderName: string
@@ -141,12 +141,16 @@ const parseDueAfter = (value?: string | null) => {
   }
 
   const match = /^P(?:(\d+)W)?(?:(\d+)D)?$/i.exec(value.trim())
-  if (!match) return new Date()
+  if (!match) {
+    return new Date()
+  }
 
   const weeks = match[1] ? Number.parseInt(match[1], 10) : 0
   const days = match[2] ? Number.parseInt(match[2], 10) : 0
   const totalDays = weeks * 7 + days
-  if (!Number.isFinite(totalDays) || totalDays <= 0) return new Date()
+  if (!Number.isFinite(totalDays) || totalDays <= 0) {
+    return new Date()
+  }
 
   return new Date(Date.now() + totalDays * 24 * 60 * 60 * 1000)
 }

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
 import { z } from 'zod'
+import { db } from '@/lib/db'
+import type { RawClientSessionRow } from '../_lib/clientSessionsSchema'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
-import { adaptClientSessionRow, clientSessionListSchema, RawClientSessionRow } from '../_lib/clientSessionsSchema'
+import { adaptClientSessionRow, clientSessionListSchema } from '../_lib/clientSessionsSchema'
 
 const querySchema = z.object({
   sessionId: z.string().min(1).optional(),

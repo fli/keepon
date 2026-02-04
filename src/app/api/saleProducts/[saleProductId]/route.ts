@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
+import { uuidOrNil } from '@/lib/uuid'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
 import {
@@ -10,7 +12,6 @@ import {
   saleProductSchema,
   type FetchSaleProductFilters,
 } from '../shared'
-import { uuidOrNil } from '@/lib/uuid'
 
 type HandlerContext = RouteContext<'/api/saleProducts/[saleProductId]'>
 
@@ -40,9 +41,15 @@ const determineSaleProductType = (flags: {
   isCreditPack: boolean | null
   isItem: boolean | null
 }) => {
-  if (flags.isService) return 'service' as const
-  if (flags.isCreditPack) return 'creditPack' as const
-  if (flags.isItem) return 'item' as const
+  if (flags.isService) {
+    return 'service' as const
+  }
+  if (flags.isCreditPack) {
+    return 'creditPack' as const
+  }
+  if (flags.isItem) {
+    return 'item' as const
+  }
   throw new Error('Sale product row has unsupported type flags')
 }
 
@@ -78,7 +85,9 @@ const nullableTrimmedStringSchema = z
   .union([z.string(), z.null()])
   .optional()
   .transform((value) => {
-    if (value === undefined || value === null) return value === null ? null : undefined
+    if (value === undefined || value === null) {
+      return value === null ? null : undefined
+    }
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
   })
@@ -157,12 +166,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       )
     }
 
-    console.error(
-      'Failed to fetch sale product',
-      authorization.trainerId,
-      saleProductId,
-      error
-    )
+    console.error('Failed to fetch sale product', authorization.trainerId, saleProductId, error)
 
     return NextResponse.json(
       buildErrorResponse({

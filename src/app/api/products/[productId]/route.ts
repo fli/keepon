@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, sql } from '@/lib/db'
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { db, sql } from '@/lib/db'
+import { getProductById, moneyString } from '@/server/products'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
-import { getProductById, moneyString } from '@/server/products'
 
 const nonNegativeMoneyString = moneyString.refine(
   (value) => Number.parseFloat(value) >= 0,
@@ -15,10 +16,14 @@ const priceSchema = z
   .transform((value) => {
     const raw = typeof value === 'number' ? value.toString() : typeof value === 'string' ? value.trim() : value
 
-    if (typeof raw !== 'string') return raw
+    if (typeof raw !== 'string') {
+      return raw
+    }
 
     const numeric = Number.parseFloat(raw)
-    if (Number.isNaN(numeric)) return raw
+    if (Number.isNaN(numeric)) {
+      return raw
+    }
 
     return numeric.toFixed(2)
   })
@@ -28,8 +33,12 @@ const nullableTrimmedToNull = z
   .union([z.string(), z.null()])
   .optional()
   .transform((value) => {
-    if (value === undefined) return undefined
-    if (value === null) return null
+    if (value === undefined) {
+      return undefined
+    }
+    if (value === null) {
+      return null
+    }
     const trimmed = value.trim()
     return trimmed.length > 0 ? trimmed : null
   })
@@ -38,8 +47,12 @@ const descriptionSchema = z
   .union([z.string(), z.null()])
   .optional()
   .transform((value) => {
-    if (value === undefined) return undefined
-    if (value === null) return ''
+    if (value === undefined) {
+      return undefined
+    }
+    if (value === null) {
+      return ''
+    }
     return value.trim()
   })
 

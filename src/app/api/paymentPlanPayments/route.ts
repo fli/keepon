@@ -74,7 +74,7 @@ const toAmountString = (value: string | number | null, label: string): string =>
 
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new Error(`Invalid ${label} value in payment plan payment record`)
+      throw new TypeError(`Invalid ${label} value in payment plan payment record`)
     }
     return value.toFixed(2)
   }
@@ -94,7 +94,7 @@ const toRetryCount = (value: number | string | null): number => {
 
   if (typeof value === 'number') {
     if (!Number.isInteger(value)) {
-      throw new Error('Invalid retry count value in payment plan payment record')
+      throw new TypeError('Invalid retry count value in payment plan payment record')
     }
     return value
   }
@@ -106,7 +106,7 @@ const toRetryCount = (value: number | string | null): number => {
 
   const parsed = Number.parseInt(trimmed, 10)
   if (Number.isNaN(parsed) || !Number.isFinite(parsed)) {
-    throw new Error('Invalid retry count value in payment plan payment record')
+    throw new TypeError('Invalid retry count value in payment plan payment record')
   }
 
   return parsed

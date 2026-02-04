@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageContainer } from '@/components/page-container'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { readSessionFromCookies } from '../../../session.server'
 
 export default async function MakeSalePage() {
