@@ -5,10 +5,6 @@ import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { getStripeClient } from '../../../_lib/stripeClient'
 
-const paramsSchema = z.object({
-  trainerId: z.string().trim().min(1, 'Trainer id is required'),
-})
-
 const trainerStripeRowSchema = z.object({
   stripeAccountId: z.string().nullable(),
   account: z.unknown().nullable(),
@@ -144,23 +140,7 @@ const ensureArray = (value: unknown): unknown[] => (Array.isArray(value) ? value
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/stripeAccount'>
 
 export async function GET(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid path parameters',
-        detail: detail || 'Trainer id parameter is invalid.',
-        type: '/invalid-path-parameters',
-      }),
-      { status: 400 }
-    )
-  }
-
-  const { trainerId } = paramsResult.data
+  void context
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while fetching trainer Stripe account',
@@ -170,17 +150,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     return authorization.response
   }
 
-  if (authorization.trainerId !== trainerId) {
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 403,
-        title: 'Forbidden',
-        detail: 'You are not permitted to access this trainer resource.',
-        type: '/forbidden',
-      }),
-      { status: 403 }
-    )
-  }
+  const authTrainerId = authorization.trainerId
 
   try {
     const rowResult = await sql<{
@@ -213,7 +183,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         ON stripe_account.id = trainer.stripe_account_id
       LEFT JOIN stripe_balance
         ON stripe_balance.account_id = trainer.stripe_account_id
-     WHERE trainer.id = ${trainerId}
+     WHERE trainer.id = ${authTrainerId}
     `.execute(db)
 
     if (rowResult.rows.length === 0) {
@@ -453,7 +423,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       )
     }
 
-    console.error('Failed to fetch trainer Stripe account data', trainerId, error)
+    console.error('Failed to fetch trainer Stripe account data', authTrainerId, error)
 
     return NextResponse.json(
       buildErrorResponse({

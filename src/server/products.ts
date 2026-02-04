@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db, sql, type Point } from '@/lib/db'
+import { uuidOrNil } from '@/lib/uuid'
 import { z } from 'zod'
 import { buildErrorResponse } from '../app/api/_lib/accessToken'
 
@@ -72,13 +73,11 @@ export const querySchema = z.object({
   type: productTypeSchema.optional(),
   updatedAfter: z
     .string()
-    .transform((value) => {
+    .refine((value) => {
       const parsed = new Date(value)
-      if (Number.isNaN(parsed.getTime())) {
-        throw new Error('updatedAfter must be a valid ISO 8601 datetime string')
-      }
-      return parsed
-    })
+      return !Number.isNaN(parsed.getTime())
+    }, 'updatedAfter must be a valid ISO 8601 datetime string')
+    .transform((value) => new Date(value))
     .optional(),
 })
 
@@ -343,7 +342,7 @@ export const fetchProductsForTrainer = async (trainerId: string, filters: Produc
     .where('product.trainer_id', '=', trainerId)
 
   if (filters.productId) {
-    query = query.where('product.id', '=', filters.productId)
+    query = query.where('product.id', '=', uuidOrNil(filters.productId))
   }
 
   if (filters.type) {

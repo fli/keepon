@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db, type Json } from '@/lib/db'
 import { buildErrorResponse } from '../_lib/accessToken'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 
 const notificationSchema = z
   .object({
@@ -9,17 +10,6 @@ const notificationSchema = z
     environment: z.string().optional(),
   })
   .passthrough()
-
-const createInvalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
-    }),
-    { status: 400 }
-  )
 
 const createInvalidBodyResponse = (detail?: string) =>
   NextResponse.json(
@@ -63,21 +53,20 @@ const sanitizeNotification = (notification: Record<string, unknown>): Json =>
 export async function POST(request: Request) {
   let parsedBody: z.infer<typeof notificationSchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const validation = notificationSchema.safeParse(rawBody)
-
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
-
-      return createInvalidBodyResponse(detail || undefined)
-    }
-
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse App Store server notification payload', error)
-    return createInvalidJsonResponse()
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
   }
+
+  const validation = notificationSchema.safeParse(parsedJson.data)
+
+  if (!validation.success) {
+    const detail = validation.error.issues.map((issue) => issue.message).join('; ')
+
+    return createInvalidBodyResponse(detail || undefined)
+  }
+
+  parsedBody = validation.data
 
   const sharedSecret = process.env.APP_STORE_SHARED_SECRET
   if (parsedBody.password !== sharedSecret) {

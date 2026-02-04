@@ -47,9 +47,8 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
-          title: 'Plan not found',
-          detail: 'Plan not found or you do not have access to it.',
-          type: '/plan-not-found',
+          title: 'Subscription not found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

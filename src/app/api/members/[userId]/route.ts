@@ -5,10 +5,6 @@ import { buildErrorResponse, extractAccessToken } from '../../_lib/accessToken'
 
 const FIFTEEN_MINUTES_IN_MS = 15 * 60 * 1000
 
-const paramsSchema = z.object({
-  userId: z.string().trim().min(1, 'User id is required').uuid({ message: 'User id must be a valid UUID' }),
-})
-
 const responseSchema = z.object({
   id: z.string().uuid(),
 })
@@ -16,23 +12,7 @@ const responseSchema = z.object({
 type HandlerContext = RouteContext<'/api/members/[userId]'>
 
 export async function GET(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid user identifier',
-        detail: detail || 'Request parameters did not match the expected user identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
-
-  const { userId } = paramsResult.data
+  void context
 
   const accessToken = await extractAccessToken(request)
 
@@ -58,7 +38,6 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       })
       .where('id', '=', accessToken)
       .where('type', '=', 'password_reset')
-      .where('user_id', '=', userId)
       .where('expires_at', '>=', now)
       .returning(['user_id'])
       .executeTakeFirst()
@@ -92,11 +71,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       )
     }
 
-    console.error('Failed to verify password reset access token', {
-      userId,
-      accessToken,
-      error,
-    })
+    console.error('Failed to verify password reset access token', { accessToken, error })
 
     return NextResponse.json(
       buildErrorResponse({

@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 
 const requestSchema = z.object({
   email: z.string().trim().min(1, 'Email is required').email('Email must be a valid email address.'),
   code: z.string().trim().min(1, 'Code is required'),
-  clientId: z.string().trim().min(1, 'Client id is required').uuid('Client id must be a valid UUID'),
+  clientId: z.string().trim().min(1, 'Client id is required'),
 })
 
 const responseSchema = z.object({
@@ -26,36 +27,26 @@ const createTemporaryCodeInvalidResponse = () =>
 export async function POST(request: Request) {
   let parsedBody: z.infer<typeof requestSchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const validation = requestSchema.safeParse(rawBody)
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
+  }
 
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse client dashboard token request body', error)
+  const validation = requestSchema.safeParse(parsed.data)
+  if (!validation.success) {
+    const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+  parsedBody = validation.data
 
   const { email, code, clientId } = parsedBody
 

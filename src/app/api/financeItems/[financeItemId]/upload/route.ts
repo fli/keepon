@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { PublicBucketNotConfiguredError, uploadToPublicBucket } from '../../../_lib/storage'
 import { adaptFinanceItemRow, financeItemSchema, type FinanceItemRow } from '../../shared'
@@ -9,52 +8,35 @@ import { adaptFinanceItemRow, financeItemSchema, type FinanceItemRow } from '../
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 const allowedExtensions = new Set(['jpg', 'jpeg', 'png', 'gif'])
 
-const paramsSchema = z.object({
-  financeItemId: z.string().trim().min(1, 'Finance item id is required'),
-})
-
 type HandlerContext = { params: Promise<Record<string, string>> }
+
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
 
 const createNotFoundResponse = () =>
   NextResponse.json(
     buildErrorResponse({
       status: 404,
       title: 'Finance item not found',
-      detail: 'We could not find a finance item with the specified identifier for the authenticated trainer.',
-      type: '/finance-item-not-found',
+      type: '/resource-not-found',
     }),
     { status: 404 }
   )
 
-const createInvalidParamsResponse = (detail?: string) =>
+const createLegacyInvalidJsonResponse = () =>
   NextResponse.json(
     buildErrorResponse({
       status: 400,
-      title: 'Invalid path parameters',
-      detail: detail ?? 'Finance item identifier parameter did not match the expected schema.',
-      type: '/invalid-path-parameters',
+      title: LEGACY_INVALID_JSON_MESSAGE,
     }),
     { status: 400 }
   )
 
-const createInvalidBodyResponse = (detail?: string) =>
+const createLegacyErrorProcessingImageResponse = () =>
   NextResponse.json(
     buildErrorResponse({
       status: 400,
-      title: 'Invalid request body',
-      detail: detail ?? 'Request body must be multipart/form-data with an image file field named "image".',
-      type: '/invalid-body',
-    }),
-    { status: 400 }
-  )
-
-const createInvalidFileTypeResponse = (detail?: string) =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid file type',
-      detail: detail ?? 'Only JPG, PNG, or GIF images are supported.',
-      type: '/invalid-file-type',
+      title: 'Your image could not be processed. It may be corrupt or invalid.',
+      type: '/error-processing-image',
     }),
     { status: 400 }
   )
@@ -74,8 +56,7 @@ const createUnexpectedErrorResponse = () =>
   NextResponse.json(
     buildErrorResponse({
       status: 500,
-      title: 'Unexpected error uploading file',
-      type: '/upload-failed',
+      title: 'Something on our end went wrong.',
     }),
     { status: 500 }
   )
@@ -113,15 +94,7 @@ const fetchFinanceItem = async (trainerId: string, financeItemId: string): Promi
     .executeTakeFirst()) as FinanceItemRow | undefined
 
 export async function POST(request: Request, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return createInvalidParamsResponse(detail || undefined)
-  }
-
-  const { financeItemId } = paramsResult.data
+  const { financeItemId } = await context.params
 
   const auth = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while uploading finance item image',
@@ -131,7 +104,37 @@ export async function POST(request: Request, context: HandlerContext) {
     return auth.response
   }
 
-  const existingFinanceItem = await fetchFinanceItem(auth.trainerId, financeItemId)
+  const contentType = request.headers.get('content-type') ?? ''
+  if (!contentType.includes('multipart/form-data')) {
+    const rawBodyText = await request.text()
+    if (rawBodyText.trim().length > 0) {
+      try {
+        const parsed = JSON.parse(rawBodyText)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          return createLegacyInvalidJsonResponse()
+        }
+      } catch {
+        return createLegacyInvalidJsonResponse()
+      }
+    }
+    return createUnexpectedErrorResponse()
+  }
+
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      financeItemId
+    )
+  ) {
+    return createUnexpectedErrorResponse()
+  }
+
+  let existingFinanceItem: FinanceItemRow | undefined
+  try {
+    existingFinanceItem = await fetchFinanceItem(auth.trainerId, financeItemId)
+  } catch (error) {
+    console.error('Failed to fetch finance item before upload', auth.trainerId, financeItemId, error)
+    return createUnexpectedErrorResponse()
+  }
 
   if (!existingFinanceItem) {
     return createNotFoundResponse()
@@ -141,12 +144,12 @@ export async function POST(request: Request, context: HandlerContext) {
   try {
     formData = await request.formData()
   } catch {
-    return createInvalidBodyResponse()
+    return createLegacyErrorProcessingImageResponse()
   }
 
   const image = formData.get('image')
 
-  if (!image || !(image instanceof File) || image.size === 0) {
+  if (!image || !(image instanceof File)) {
     const parsed = parseFinanceItem(existingFinanceItem)
     if (!parsed.ok) {
       return NextResponse.json(
@@ -162,8 +165,12 @@ export async function POST(request: Request, context: HandlerContext) {
     return NextResponse.json(parsed.financeItem)
   }
 
+  if (image.size === 0) {
+    return createLegacyErrorProcessingImageResponse()
+  }
+
   if (image.size > MAX_FILE_BYTES) {
-    return createInvalidBodyResponse('Image file is larger than 5MB.')
+    return createLegacyErrorProcessingImageResponse()
   }
 
   let buffer: Buffer
@@ -171,7 +178,7 @@ export async function POST(request: Request, context: HandlerContext) {
     buffer = Buffer.from(await image.arrayBuffer())
   } catch (error) {
     console.error('Failed to read finance item upload buffer', auth.trainerId, financeItemId, error)
-    return createInvalidBodyResponse('Unable to read uploaded image.')
+    return createLegacyErrorProcessingImageResponse()
   }
 
   try {
@@ -179,7 +186,7 @@ export async function POST(request: Request, context: HandlerContext) {
     const detected = await fileTypeFromBuffer(buffer)
 
     if (!detected || !allowedExtensions.has(detected.ext.toLowerCase())) {
-      return createInvalidFileTypeResponse()
+      return createLegacyErrorProcessingImageResponse()
     }
 
     const filename = `${financeItemId}-${randomUUID()}.jpg`

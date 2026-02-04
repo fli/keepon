@@ -76,8 +76,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Subscription not found',
-          detail: 'We could not find a subscription matching that identifier.',
-          type: '/not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

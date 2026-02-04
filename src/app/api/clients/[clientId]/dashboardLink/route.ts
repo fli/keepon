@@ -3,10 +3,7 @@ import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../_lib/constants'
-
-const paramsSchema = z.object({
-  clientId: z.string().trim().min(1, 'Client id is required').uuid({ message: 'Client id must be a valid UUID' }),
-})
+import { createLegacyInvalidJsonResponse, parseStrictJsonBody } from '../../../_lib/strictJson'
 
 const clientDetailsSchema = z.object({
   clientId: z.string().uuid(),
@@ -131,23 +128,16 @@ class AccessTokenCreationError extends Error {
 type HandlerContext = RouteContext<'/api/clients/[clientId]/dashboardLink'>
 
 export async function PUT(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid client identifier',
-        detail: detail || 'Request parameters did not match the expected client identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
+  const { clientId } = await context.params
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
   }
+  const body = parsed.data
 
-  const { clientId } = paramsResult.data
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return createLegacyInvalidJsonResponse()
+  }
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while sending client dashboard link',
@@ -250,8 +240,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
-          type: '/client-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
@@ -261,8 +250,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       return NextResponse.json(
         buildErrorResponse({
           status: 409,
-          title: 'Client has no email',
-          detail: 'A client email address is required to send a dashboard link.',
+          title: 'Client has no email.',
           type: '/client-has-no-email',
         }),
         { status: 409 }

@@ -10,8 +10,7 @@ const paramsSchema = z.object({
   clientSessionId: z
     .string()
     .trim()
-    .min(1, 'Client session id must not be empty.')
-    .uuid({ message: 'Client session id must be a valid UUID.' }),
+    .min(1, 'Client session id must not be empty.'),
 })
 
 const bodySchema = z.object({
@@ -44,6 +43,16 @@ class ClientSessionNotFoundError extends Error {
     this.name = 'ClientSessionNotFoundError'
   }
 }
+
+const createLegacyNotFoundResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 404,
+      title: 'Client session not found',
+      type: '/resource-not-found',
+    }),
+    { status: 404 }
+  )
 
 class ClientHasNoEmailError extends Error {
   constructor() {
@@ -86,6 +95,17 @@ class BookingLinkUnavailableError extends Error {
     this.name = 'BookingLinkUnavailableError'
   }
 }
+
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
 
 const parseSmsCredits = (value: unknown): bigint => {
   if (value === null || value === undefined) {
@@ -215,19 +235,19 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
   const { clientSessionId } = paramsResult.data
 
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
-      }),
-      { status: 400 }
-    )
+  let body: unknown = {}
+  const rawBodyText = await request.text()
+  if (rawBodyText.trim().length > 0) {
+    try {
+      body = JSON.parse(rawBodyText)
+    } catch (error) {
+      console.error('Failed to parse client session share request body', clientSessionId, error)
+      return createLegacyInvalidJsonResponse()
+    }
+
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return createLegacyInvalidJsonResponse()
+    }
   }
 
   const bodyResult = bodySchema.safeParse(body)
@@ -373,15 +393,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     return new Response(null, { status: 204 })
   } catch (error) {
     if (error instanceof ClientSessionNotFoundError) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Client session not found',
-          detail: 'We could not find a client session with the specified identifier for the authenticated trainer.',
-          type: '/client-session-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     if (error instanceof ClientHasNoEmailError) {

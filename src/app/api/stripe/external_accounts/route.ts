@@ -3,9 +3,11 @@ import Stripe from 'stripe'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { getStripeClient, STRIPE_API_VERSION } from '../../_lib/stripeClient'
 
 const stripeApiVersionDate = STRIPE_API_VERSION.split('.')[0]
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
 
 class StripeConfigurationMissingError extends Error {
   constructor() {
@@ -14,42 +16,26 @@ class StripeConfigurationMissingError extends Error {
   }
 }
 
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
+
+const createTokenMustBeBankAccountResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: 'Provided bank account token is not for a bank account.',
+      type: '/token-must-be-bank-account',
+    }),
+    { status: 400 }
+  )
+
 export async function POST(request: Request) {
-  let parsedBody: z.infer<typeof createExternalAccountBodySchema>
-
-  try {
-    const rawBody = (await request.json()) as unknown
-    const result = createExternalAccountBodySchema.safeParse(rawBody)
-
-    if (!result.success) {
-      const detail = result.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-
-    parsedBody = result.data
-  } catch (error) {
-    console.error('Failed to parse Stripe external account request body', error)
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
-      }),
-      { status: 400 }
-    )
-  }
-
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while creating Stripe external account',
   })
@@ -57,6 +43,35 @@ export async function POST(request: Request) {
   if (!authorization.ok) {
     return authorization.response
   }
+
+  let parsedBody: z.infer<typeof createExternalAccountBodySchema>
+
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
+  }
+
+  const rawBody = parsed.data
+  if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
+    return createLegacyInvalidJsonResponse()
+  }
+  const result = createExternalAccountBodySchema.safeParse(rawBody)
+
+  if (!result.success) {
+    const detail = result.error.issues.map((issue) => issue.message).join('; ')
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
+      }),
+      { status: 400 }
+    )
+  }
+
+  parsedBody = result.data
 
   try {
     const trainerRow = await db
@@ -106,15 +121,7 @@ export async function POST(request: Request) {
       const externalAccountResponse = await stripeClient.accounts.createExternalAccount(stripeAccountId, stripeParams)
 
       if (externalAccountResponse.object !== 'bank_account') {
-        return NextResponse.json(
-          buildErrorResponse({
-            status: 400,
-            title: 'External account must be a bank account',
-            detail: 'Only bank accounts are supported for payouts.',
-            type: '/invalid-external-account',
-          }),
-          { status: 400 }
-        )
+        return createTokenMustBeBankAccountResponse()
       }
 
       const { lastResponse: _ignored, ...bankAccount } = externalAccountResponse as Stripe.BankAccount & {
@@ -124,17 +131,7 @@ export async function POST(request: Request) {
       const parsedAccount = stripeBankAccountSchema.safeParse(bankAccount)
 
       if (!parsedAccount.success) {
-        const detail = parsedAccount.error.issues.map((issue) => issue.message).join('; ')
-
-        return NextResponse.json(
-          buildErrorResponse({
-            status: 500,
-            title: 'Failed to validate Stripe external account response',
-            detail: detail || 'Stripe external account response did not match the expected schema.',
-            type: '/invalid-response',
-          }),
-          { status: 500 }
-        )
+        return createTokenMustBeBankAccountResponse()
       }
 
       await db
@@ -164,13 +161,15 @@ export async function POST(request: Request) {
         })
 
         return NextResponse.json(
-          buildErrorResponse({
-            status: error.statusCode ?? 502,
-            title: 'Stripe API error',
-            detail: error.message,
-            type: '/stripe-api-error',
-          }),
-          { status: error.statusCode ?? 502 }
+          {
+            ...buildErrorResponse({
+              status: 409,
+              title: error.message,
+              type: '/stripe-error',
+            }),
+            stripeError: error,
+          },
+          { status: 409 }
         )
       }
 
@@ -251,8 +250,8 @@ const stripeBankAccountSchema = z
     currency: z.string(),
     last4: z.string(),
     status: z.enum(['new', 'validated', 'verified', 'verification_failed', 'errored']),
-    fingerprint: z.union([z.string(), z.null()]).optional(),
-    routing_number: z.union([z.string(), z.null()]).optional(),
+    fingerprint: z.union([z.string(), z.null()]),
+    routing_number: z.union([z.string(), z.null()]),
     account_holder_name: z.union([z.string(), z.null()]).optional(),
     account_holder_type: z.union([z.literal('individual'), z.literal('company'), z.null()]).optional(),
     account_type: z.union([z.string(), z.null()]).optional(),
@@ -273,21 +272,43 @@ const normalizeApiVersion = (value: string | number | Date) => {
   return date.toISOString().slice(0, 10)
 }
 
-const toResponseBankAccount = (account: z.infer<typeof stripeBankAccountSchema>) => ({
-  id: account.id,
-  country: account.country,
-  currency: account.currency,
-  last4: account.last4,
-  status: account.status,
-  fingerprint: account.fingerprint ?? null,
-  routing_number: account.routing_number ?? null,
-  account_holder_name: account.account_holder_name ?? null,
-  account_holder_type: account.account_holder_type ?? null,
-  account_type: account.account_type ?? null,
-  bank_name: account.bank_name ?? null,
-  default_for_currency: account.default_for_currency ?? null,
-  available_payout_methods: account.available_payout_methods ?? null,
-})
+const toResponseBankAccount = (account: z.infer<typeof stripeBankAccountSchema>) => {
+  const response: Record<string, unknown> = {
+    id: account.id,
+    country: account.country,
+    currency: account.currency,
+    last4: account.last4,
+    status: account.status,
+    fingerprint: account.fingerprint ?? null,
+    routing_number: account.routing_number ?? null,
+  }
+
+  if (account.account_holder_name !== undefined) {
+    response.account_holder_name = account.account_holder_name ?? null
+  }
+
+  if (account.account_holder_type !== undefined) {
+    response.account_holder_type = account.account_holder_type ?? null
+  }
+
+  if (account.account_type !== undefined) {
+    response.account_type = account.account_type ?? null
+  }
+
+  if (account.bank_name !== undefined) {
+    response.bank_name = account.bank_name ?? null
+  }
+
+  if (account.default_for_currency !== undefined) {
+    response.default_for_currency = account.default_for_currency ?? null
+  }
+
+  if (account.available_payout_methods !== undefined) {
+    response.available_payout_methods = account.available_payout_methods ?? null
+  }
+
+  return response
+}
 
 const fetchAllBankAccounts = async (stripeClient: Stripe, stripeAccountId: string) => {
   const accounts: Array<z.infer<typeof stripeBankAccountSchema>> = []
@@ -494,12 +515,10 @@ export async function GET(request: Request) {
 
       return NextResponse.json(
         buildErrorResponse({
-          status: error.statusCode ?? 502,
-          title: 'Stripe API error',
-          detail: error.message,
-          type: '/stripe-api-error',
+          status: 500,
+          title: 'Something on our end went wrong.',
         }),
-        { status: error.statusCode ?? 502 }
+        { status: 500 }
       )
     }
 

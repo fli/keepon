@@ -10,8 +10,6 @@ const serviceProviderSchema = z.object({
   currency: z.string(),
   lastName: z.string().nullable().optional(),
   businessName: z.string().nullable().optional(),
-  contactEmail: z.string().nullable().optional(),
-  contactNumber: z.string().nullable().optional(),
   businessLogoUrl: z.string().nullable().optional(),
 })
 
@@ -38,8 +36,6 @@ export async function GET(request: Request) {
         eb.fn
           .coalesce(eb.ref('trainer.business_name'), eb.ref('trainer.online_bookings_business_name'))
           .as('businessName'),
-        eb.ref('trainer.online_bookings_contact_email').as('contactEmail'),
-        eb.ref('trainer.online_bookings_contact_number').as('contactNumber'),
         eb.ref('trainer.brand_color').as('brandColor'),
         eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
         eb.ref('country.alpha_2_code').as('country'),
@@ -67,12 +63,10 @@ export async function GET(request: Request) {
         firstName: row.firstName ?? undefined,
         lastName: row.lastName ?? null,
         businessName: row.businessName ?? null,
-        contactEmail: row.contactEmail ?? null,
-        contactNumber: row.contactNumber ?? null,
         brandColor: row.brandColor ?? undefined,
         businessLogoUrl: row.businessLogoUrl ?? null,
         country: row.country ?? undefined,
-        currency: row.currency ?? undefined,
+        currency: row.currency ? row.currency.toUpperCase() : undefined,
       })
     } catch (error) {
       if (error instanceof z.ZodError) {

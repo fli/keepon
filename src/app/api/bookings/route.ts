@@ -6,10 +6,13 @@ import type { Point } from '@/lib/db/generated'
 import type { IPostgresInterval } from 'postgres-interval'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 
 /**
  * Shared schemas
  */
+const moneyReg = /^(?:-\d)?\d*?(?:\.\d+)?$/
+
 const geoSchema = z.object({
   lat: z.number(),
   lng: z.number(),
@@ -29,7 +32,10 @@ const baseBookingSchema = z.object({
   bookingQuestionResponse: z.string().trim().optional().nullable(),
   payment: z
     .object({
-      amount: z.union([z.number(), z.string()]),
+      amount: z
+        .string()
+        .refine((value) => moneyReg.test(value), 'amount must be Money')
+        .refine((value) => Number.parseFloat(value) >= 0, 'amount must be greater than or equal to 0'),
       currency: z.string().optional(),
       stripePaymentMethodId: z.string().optional(),
       stripePaymentIntentId: z.string().optional(),
@@ -38,12 +44,12 @@ const baseBookingSchema = z.object({
 })
 
 const serviceBookingSchema = baseBookingSchema.extend({
-  serviceId: z.string().uuid({ message: 'serviceId must be a UUID' }),
+  serviceId: z.string().min(1, 'serviceId must not be empty'),
   bookingTime: z.string({ message: 'bookingTime is required' }).datetime({ offset: true }),
 })
 
 const sessionBookingSchema = baseBookingSchema.extend({
-  sessionId: z.string().uuid({ message: 'sessionId must be a UUID' }),
+  sessionId: z.string().min(1, 'sessionId must not be empty'),
 })
 
 const requestSchema = z.union([serviceBookingSchema, sessionBookingSchema])
@@ -61,9 +67,6 @@ const makeError = (status: number, title: string, type: string, detail?: string)
     }),
     { status }
   )
-
-const invalidJsonResponse = () =>
-  makeError(400, 'Invalid JSON payload', '/invalid-json', 'Request body must be valid JSON.')
 
 const invalidBodyResponse = (detail?: string) =>
   makeError(400, 'Invalid request body', '/invalid-body', detail ?? 'Request body did not match the expected schema.')
@@ -267,18 +270,17 @@ const maybeUpdateClient = async (
 export async function POST(request: Request) {
   let parsed: z.infer<typeof requestSchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const validation = requestSchema.safeParse(rawBody)
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
-      return invalidBodyResponse(detail || undefined)
-    }
-    parsed = validation.data
-  } catch (error) {
-    console.error('Failed to parse bookings payload as JSON', error)
-    return invalidJsonResponse()
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
   }
+
+  const validation = requestSchema.safeParse(parsedJson.data)
+  if (!validation.success) {
+    const detail = validation.error.issues.map((issue) => issue.message).join('; ')
+    return invalidBodyResponse(detail || undefined)
+  }
+  parsed = validation.data
 
   if ('serviceId' in parsed) {
     return handleServiceBooking(parsed)
@@ -341,12 +343,7 @@ const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) 
       if (!details) {
         return {
           ok: false,
-          response: makeError(
-            404,
-            'Service not found',
-            '/resource-not-found',
-            'No service matched the provided serviceId.'
-          ),
+          response: makeError(404, 'Service not found', '/resource-not-found'),
         } as const
       }
 

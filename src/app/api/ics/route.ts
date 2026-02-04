@@ -179,10 +179,10 @@ END:VCALENDAR`
 }
 
 const querySchema = z.object({
-  title: z.string().trim().min(1, 'title is required'),
-  timeZone: z.string().trim().min(1, 'timeZone is required'),
-  startTime: z.string().trim().min(1, 'startTime is required'),
-  endTime: z.string().trim().min(1, 'endTime is required'),
+  title: z.string(),
+  timeZone: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
   description: z.string().optional(),
   location: z.string().optional(),
 })
@@ -206,9 +206,9 @@ export async function GET(request: Request) {
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid query parameters',
+        title: 'Your parameters were invalid.',
         detail: detail || 'Request query parameters did not match the expected schema.',
-        type: '/invalid-query-parameters',
+        type: '/invalid-parameters',
       }),
       { status: 400 }
     )
@@ -216,18 +216,6 @@ export async function GET(request: Request) {
 
   const startTime = new Date(parsedQuery.data.startTime)
   const endTime = new Date(parsedQuery.data.endTime)
-
-  if (!Number.isFinite(startTime.getTime()) || !Number.isFinite(endTime.getTime())) {
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid date values',
-        detail: 'startTime and endTime must be valid date strings.',
-        type: '/invalid-query-parameters',
-      }),
-      { status: 400 }
-    )
-  }
 
   const ics = makeCalendarEvent({
     ...parsedQuery.data,
@@ -240,8 +228,6 @@ export async function GET(request: Request) {
       buildErrorResponse({
         status: 500,
         title: 'Invalid timezone',
-        detail: 'The provided timeZone value is not supported.',
-        type: '/invalid-timezone',
       }),
       { status: 500 }
     )

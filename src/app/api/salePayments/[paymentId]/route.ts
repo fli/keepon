@@ -6,16 +6,13 @@ import {
   authenticateTrainerRequest,
   buildErrorResponse,
 } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import {
   adaptSalePaymentRow,
   manualMethodSchema,
   salePaymentSchema,
   type SalePaymentRow,
 } from '../../_lib/salePayments'
-
-const paramsSchema = z.object({
-  paymentId: z.string().trim().min(1, 'Payment id is required').uuid({ message: 'Payment id must be a valid UUID' }),
-})
 
 type HandlerContext = RouteContext<'/api/salePayments/[paymentId]'>
 
@@ -32,6 +29,25 @@ class StripePaymentDeletionNotAllowedError extends Error {
     this.name = 'StripePaymentDeletionNotAllowedError'
   }
 }
+
+const createLegacyNotFoundResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 404,
+      title: 'Payment not found',
+      type: '/resource-not-found',
+    }),
+    { status: 404 }
+  )
+
+const createLegacyInternalErrorResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 500,
+      title: 'Something on our end went wrong.',
+    }),
+    { status: 500 }
+  )
 
 const normalizeDeletedCount = (value: unknown) => {
   if (typeof value === 'number') {
@@ -156,22 +172,6 @@ const fetchSalePayment = async (paymentId: string, trainerId: string) => {
 }
 
 export async function GET(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid payment identifier',
-        detail: detail || 'Request parameters did not match the expected payment identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
-
   const authorization = await authenticateTrainerOrClientRequest(request, {
     trainerExtensionFailureLogMessage: 'Failed to extend access token expiry while fetching sale payment for trainer',
     clientExtensionFailureLogMessage: 'Failed to extend access token expiry while fetching sale payment for client',
@@ -181,7 +181,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     return authorization.response
   }
 
-  const { paymentId } = paramsResult.data
+  const { paymentId } = await context.params
 
   try {
     let query = db
@@ -242,15 +242,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     const salePaymentRow = (await query.executeTakeFirst()) as SalePaymentRow | undefined
 
     if (!salePaymentRow) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Payment not found',
-          detail: 'We could not find a sale payment with the specified identifier for the authenticated account.',
-          type: '/sale-payment-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     const responseBody = salePaymentSchema.parse(adaptSalePaymentRow(salePaymentRow))
@@ -277,34 +269,11 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       error
     )
 
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 500,
-        title: 'Failed to fetch sale payment',
-        type: '/internal-server-error',
-      }),
-      { status: 500 }
-    )
+    return createLegacyInternalErrorResponse()
   }
 }
 
 export async function DELETE(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid payment identifier',
-        detail: detail || 'Request parameters did not match the expected payment identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
-
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while deleting sale payment',
   })
@@ -313,7 +282,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
     return authorization.response
   }
 
-  const { paymentId } = paramsResult.data
+  const { paymentId } = await context.params
 
   try {
     await db.transaction().execute(async (trx) => {
@@ -348,15 +317,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
     return new NextResponse(null, { status: 204 })
   } catch (error) {
     if (error instanceof SalePaymentNotFoundError) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Payment not found',
-          detail: 'We could not find a sale payment with the specified identifier for the authenticated account.',
-          type: '/sale-payment-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     if (error instanceof StripePaymentDeletionNotAllowedError) {
@@ -376,68 +337,33 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
       error,
     })
 
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 500,
-        title: 'Failed to delete sale payment',
-        type: '/internal-server-error',
-      }),
-      { status: 500 }
-    )
+    return createLegacyInternalErrorResponse()
   }
 }
 
 export async function PATCH(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
+  }
 
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
+  const bodyResult = patchRequestBodySchema.safeParse(parsedJson.data)
+
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid payment identifier',
-        detail: detail || 'Request parameters did not match the expected payment identifier schema.',
-        type: '/invalid-parameter',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
 
-  let parsedBody: z.infer<typeof patchRequestBodySchema>
-  try {
-    const rawText = await request.text()
-    const rawBody: unknown = rawText.trim().length === 0 ? {} : (JSON.parse(rawText) as unknown)
-
-    const bodyResult = patchRequestBodySchema.safeParse(rawBody)
-
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse sale payment update request body', error)
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
-      }),
-      { status: 400 }
-    )
-  }
+  const parsedBody = bodyResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating sale payment',
@@ -447,7 +373,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
     return authorization.response
   }
 
-  const { paymentId } = paramsResult.data
+  const { paymentId } = await context.params
   const hasUpdates = Object.values(parsedBody).some((value) => value !== undefined)
 
   try {
@@ -548,15 +474,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
     return NextResponse.json(salePayment)
   } catch (error) {
     if (error instanceof SalePaymentNotFoundError) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Payment not found',
-          detail: 'We could not find a sale payment with the specified identifier for the authenticated account.',
-          type: '/sale-payment-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     if (error instanceof z.ZodError) {
@@ -577,13 +495,6 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
       error,
     })
 
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 500,
-        title: 'Failed to update sale payment',
-        type: '/internal-server-error',
-      }),
-      { status: 500 }
-    )
+    return createLegacyInternalErrorResponse()
   }
 }

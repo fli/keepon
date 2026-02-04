@@ -8,8 +8,19 @@ import { adaptSalePaymentRow, salePaymentSchema, type SalePaymentRow } from '../
 import { getStripeClient, STRIPE_API_VERSION } from '../../../_lib/stripeClient'
 
 const paramsSchema = z.object({
-  paymentId: z.string().trim().min(1, 'Payment id is required').uuid({ message: 'Payment id must be a valid UUID' }),
+  paymentId: z.string().trim().min(1, 'Payment id is required'),
 })
+
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
 
 const stripeDetailsSchema = z.object({
   stripeChargeId: z.string().nullable(),
@@ -77,6 +88,18 @@ const sumStripeBalanceEntries = (entries: Array<{ amount: number; currency: stri
   entries.reduce((total, entry) => total.plus(new BigNumber(entry.amount).shiftedBy(-2)), new BigNumber(0))
 
 export async function POST(request: NextRequest, context: HandlerContext) {
+  const rawBodyText = await request.text()
+  if (rawBodyText.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(rawBodyText)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return createLegacyInvalidJsonResponse()
+      }
+    } catch {
+      return createLegacyInvalidJsonResponse()
+    }
+  }
+
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
@@ -140,7 +163,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
             eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
             eb.ref('paymentStripe.fee').as('fee'),
             eb.ref('payment.amount').as('amount'),
-            sql<string | null>`stripeAccount.object ->> 'type'`.as('stripeAccountType'),
+            sql<string | null>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('stripeAccountType'),
           ])
           .where('paymentStripe.id', '=', paymentId)
           .where('paymentStripe.trainer_id', '=', authorization.trainerId)
@@ -278,8 +301,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Payment not found',
-          detail: 'We could not find a sale payment with the specified identifier for the authenticated trainer.',
-          type: '/sale-payment-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

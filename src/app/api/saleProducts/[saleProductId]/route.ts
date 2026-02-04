@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
-import {
-  authenticateTrainerOrClientRequest,
-  authenticateTrainerRequest,
-  buildErrorResponse,
-} from '../../_lib/accessToken'
+import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import {
   adaptSaleProductRow,
   fetchSaleProducts,
@@ -13,14 +10,7 @@ import {
   saleProductSchema,
   type FetchSaleProductFilters,
 } from '../shared'
-
-const paramsSchema = z.object({
-  saleProductId: z
-    .string()
-    .trim()
-    .min(1, 'Sale product id is required')
-    .uuid({ message: 'Sale product id must be a valid UUID' }),
-})
+import { uuidOrNil } from '@/lib/uuid'
 
 type HandlerContext = RouteContext<'/api/saleProducts/[saleProductId]'>
 
@@ -73,28 +63,16 @@ const normalizeDeletedCount = (value: unknown) => {
   return 0
 }
 
+const moneyRegex = /^(?:-\d)?\d*?(?:\.\d+)?$/
+
 const moneyAmountSchema = z
-  .union([z.string(), z.number()])
-  .transform((value) => {
-    const numeric =
-      typeof value === 'number'
-        ? value
-        : (() => {
-            const trimmed = value.trim()
-            return Number.parseFloat(trimmed)
-          })()
-
-    if (!Number.isFinite(numeric)) {
-      throw new Error('price must be a valid number')
-    }
-
-    if (numeric < 0) {
-      throw new Error('price must be at least 0')
-    }
-
-    return numeric.toFixed(2)
+  .string({ invalid_type_error: 'price  should be string' })
+  .transform((value) => value.trim())
+  .refine((value) => moneyRegex.test(value), { message: 'price  should be Money' })
+  .refine((value) => Number.parseFloat(value) >= 0, {
+    message: 'price  should be greater than or equal to 0',
   })
-  .pipe(z.string().regex(/^\d+(?:\.\d{2})$/, 'price must be a non-negative amount with two decimals'))
+  .transform((value) => Number.parseFloat(value).toFixed(2))
 
 const nullableTrimmedStringSchema = z
   .union([z.string(), z.null()])
@@ -109,9 +87,21 @@ const patchRequestBodySchema = z
   .object({
     price: moneyAmountSchema.optional(),
     name: z.string().trim().min(1, 'name must not be empty').optional(),
-    quantity: z.number().int().min(1, 'quantity must be at least 1').optional(),
-    totalCredits: z.number().int().min(0, 'totalCredits must be at least 0').optional(),
-    durationMinutes: z.number().int().min(1, 'durationMinutes must be at least 1').optional(),
+    quantity: z
+      .number({ invalid_type_error: 'quantity  should be number' })
+      .int()
+      .min(1, 'quantity  should be greater than or equal to 1')
+      .optional(),
+    totalCredits: z
+      .number({ invalid_type_error: 'totalCredits  should be number' })
+      .int()
+      .min(0, 'totalCredits  should be greater than or equal to 0')
+      .optional(),
+    durationMinutes: z
+      .number({ invalid_type_error: 'durationMinutes  should be number' })
+      .int()
+      .min(1, 'durationMinutes  should be greater than or equal to 1')
+      .optional(),
     location: nullableTrimmedStringSchema,
     address: nullableTrimmedStringSchema,
     geo: geoSchema.nullable().optional(),
@@ -120,42 +110,21 @@ const patchRequestBodySchema = z
   .strict()
 
 export async function GET(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
+  const { saleProductId } = await context.params
 
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid sale product identifier',
-        detail: detail || 'Request parameters did not match the expected sale product identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
-
-  const authorization = await authenticateTrainerOrClientRequest(request, {
-    trainerExtensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching sale product for trainer request',
-    clientExtensionFailureLogMessage:
-      'Failed to extend access token expiry while fetching sale product for client request',
+  const authorization = await authenticateTrainerRequest(request, {
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching sale product',
   })
 
   if (!authorization.ok) {
     return authorization.response
   }
 
-  const { saleProductId } = paramsResult.data
+  const safeSaleProductId = uuidOrNil(saleProductId)
 
   try {
     const filters: FetchSaleProductFilters = {
-      saleProductId,
-    }
-
-    if (authorization.actor === 'client') {
-      filters.clientId = authorization.clientId
+      saleProductId: safeSaleProductId,
     }
 
     const rows = await fetchSaleProducts(authorization.trainerId, filters)
@@ -166,8 +135,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Sale product not found',
-          detail: 'We could not find a sale product with the specified identifier for the authenticated account.',
-          type: '/sale-product-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
@@ -192,7 +160,6 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     console.error(
       'Failed to fetch sale product',
       authorization.trainerId,
-      authorization.actor === 'client' ? authorization.clientId : undefined,
       saleProductId,
       error
     )
@@ -209,56 +176,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
 }
 
 export async function PATCH(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid sale product identifier',
-        detail: detail || 'Request parameters did not match the expected sale product identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
-
-  let parsedBody: z.infer<typeof patchRequestBodySchema>
-  try {
-    const rawText = await request.text()
-    const rawBody: unknown = rawText.trim().length === 0 ? {} : (JSON.parse(rawText) as unknown)
-
-    const bodyResult = patchRequestBodySchema.safeParse(rawBody)
-
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse sale product update request body', error)
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
-      }),
-      { status: 400 }
-    )
-  }
+  const { saleProductId } = await context.params
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating sale product',
@@ -268,7 +186,28 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
     return authorization.response
   }
 
-  const { saleProductId } = paramsResult.data
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
+  }
+
+  const bodyResult = patchRequestBodySchema.safeParse(parsedJson.data)
+
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('\n')
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Your parameters were invalid.',
+        detail: detail || 'Your parameters were invalid.',
+        type: '/invalid-parameters',
+      }),
+      { status: 400 }
+    )
+  }
+
+  const parsedBody = bodyResult.data
   const hasUpdates = Object.values(parsedBody).some((value) => value !== undefined)
 
   try {
@@ -417,8 +356,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Sale product not found',
-          detail: 'We could not find a sale product with the specified identifier for the authenticated trainer.',
-          type: '/sale-product-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
@@ -433,8 +371,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Sale product not found',
-          detail: 'We could not find a sale product with the specified identifier for the authenticated trainer.',
-          type: '/sale-product-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
@@ -481,21 +418,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
 }
 
 export async function DELETE(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid sale product identifier',
-        detail: detail || 'Request parameters did not match the expected sale product identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
+  const { saleProductId } = await context.params
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while deleting sale product',
@@ -504,8 +427,6 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   if (!authorization.ok) {
     return authorization.response
   }
-
-  const { saleProductId } = paramsResult.data
 
   try {
     await db.transaction().execute(async (trx) => {
@@ -549,8 +470,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Sale product not found',
-          detail: 'We could not find a sale product with the specified identifier for the authenticated trainer.',
-          type: '/sale-product-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

@@ -10,6 +10,7 @@ import { PublicBucketNotConfiguredError, uploadBufferToPublicBucket } from '../.
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 const allowedExtensions = new Set(['jpg', 'jpeg', 'png', 'gif'])
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
 
 type UploadField = {
   formKey: string
@@ -34,13 +35,30 @@ const createInvalidBodyResponse = (detail?: string) =>
     { status: 400 }
   )
 
-const createInvalidFileTypeResponse = (detail?: string) =>
+const createLegacyInvalidJsonResponse = () =>
   NextResponse.json(
     buildErrorResponse({
       status: 400,
-      title: 'Invalid file type',
-      detail: detail ?? 'Only JPG, PNG, or GIF images are supported.',
-      type: '/invalid-file-type',
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
+
+const createLegacyGenericErrorResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 500,
+      title: 'Something on our end went wrong.',
+    }),
+    { status: 500 }
+  )
+
+const createLegacyErrorProcessingImageResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: 'Your image could not be processed. It may be corrupt or invalid.',
+      type: '/error-processing-image',
     }),
     { status: 400 }
   )
@@ -141,6 +159,23 @@ export async function POST(request: Request) {
     return authorization.response
   }
 
+  const contentType = request.headers.get('content-type') ?? ''
+  if (contentType.includes('application/json')) {
+    const rawBody = await request.text()
+    if (!rawBody.trim()) {
+      return createLegacyGenericErrorResponse()
+    }
+    try {
+      const parsed = JSON.parse(rawBody) as unknown
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return createLegacyInvalidJsonResponse()
+      }
+      return createLegacyGenericErrorResponse()
+    } catch {
+      return createLegacyInvalidJsonResponse()
+    }
+  }
+
   let formData: FormData
   try {
     formData = await request.formData()
@@ -163,8 +198,12 @@ export async function POST(request: Request) {
     for (const field of uploadFields) {
       const file = formData.get(field.formKey)
 
-      if (!file || !(file instanceof File) || file.size === 0) {
+      if (!file || !(file instanceof File)) {
         continue
+      }
+
+      if (file.size === 0) {
+        return createLegacyErrorProcessingImageResponse()
       }
 
       if (file.size > MAX_FILE_BYTES) {
@@ -180,20 +219,30 @@ export async function POST(request: Request) {
           field: field.formKey,
           error,
         })
-        return createInvalidBodyResponse('Unable to read uploaded image.')
+        return createLegacyErrorProcessingImageResponse()
       }
 
       const detected = await fileTypeFromBuffer(buffer)
 
       const ext = detected?.ext?.toLowerCase()
       if (!detected || !ext || !allowedExtensions.has(ext)) {
-        return createInvalidFileTypeResponse()
+        return createLegacyErrorProcessingImageResponse()
       }
 
       const format: OutputFormat = ext === 'png' ? 'png' : 'jpg'
       const square = field.square === true
 
-      const transformed = await transformImage(buffer, { square, format })
+      let transformed: { buffer: Buffer; contentType: string; ext: OutputFormat }
+      try {
+        transformed = await transformImage(buffer, { square, format })
+      } catch (error) {
+        console.error('Failed to transform trainer upload image', {
+          trainerId: authorization.trainerId,
+          field: field.formKey,
+          error,
+        })
+        return createLegacyErrorProcessingImageResponse()
+      }
 
       const filename = `${field.formKey}-${authorization.trainerId}-${randomUUID()}.${transformed.ext}`
 

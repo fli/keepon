@@ -3,6 +3,7 @@ import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { buildErrorResponse } from '../../_lib/accessToken'
 import { APP_EMAIL, APP_NAME, KEEPON_LOGO_COLOR_URL } from '../../_lib/constants'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 
 const PASSWORD_RESET_TTL_MINUTES = 15
 
@@ -16,17 +17,6 @@ class MemberNotFoundError extends Error {
     this.name = 'MemberNotFoundError'
   }
 }
-
-const createInvalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
-    }),
-    { status: 400 }
-  )
 
 const createInvalidBodyResponse = (detail: string | undefined) =>
   NextResponse.json(
@@ -119,21 +109,20 @@ const buildEmailHtml = (firstName: string, resetUrl: URL) => `
 export async function POST(request: Request) {
   let parsedBody: z.infer<typeof requestSchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const validation = requestSchema.safeParse(rawBody)
-
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
-
-      return createInvalidBodyResponse(detail)
-    }
-
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse member reset request body', error)
-    return createInvalidJsonResponse()
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
   }
+
+  const validation = requestSchema.safeParse(parsed.data)
+
+  if (!validation.success) {
+    const detail = validation.error.issues.map((issue) => issue.message).join('; ')
+
+    return createInvalidBodyResponse(detail)
+  }
+
+  parsedBody = validation.data
 
   const { email } = parsedBody
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3001'

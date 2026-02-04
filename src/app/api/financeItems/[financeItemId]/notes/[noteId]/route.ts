@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../../../_lib/strictJson'
 import { financeItemNoteSchema } from '../../../shared'
 
 const paramsSchema = z.object({
@@ -27,6 +28,11 @@ class FinanceItemNotFoundError extends Error {
 }
 
 export async function PUT(request: NextRequest, context: HandlerContext) {
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
+  }
+
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
@@ -47,38 +53,23 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
   let parsedBody: z.infer<typeof requestBodySchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const bodyResult = requestBodySchema.safeParse(rawBody)
+  const bodyResult = requestBodySchema.safeParse(parsedJson.data)
 
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse finance item note update request body', financeItemId, error)
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+
+  parsedBody = bodyResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating finance item note',
@@ -120,8 +111,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Finance item not found',
-          detail: 'We could not find a finance item with the specified identifier for the authenticated trainer.',
-          type: '/finance-item-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

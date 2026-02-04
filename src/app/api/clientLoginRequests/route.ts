@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 import { APP_EMAIL, APP_NAME, KEEPON_LOGO_COLOR_URL } from '../_lib/constants'
 
 const requestSchema = z.object({
@@ -49,16 +50,6 @@ const buildEmailHtml = (code: string) => `
 
 class SilentRollbackError extends Error {}
 
-const createInvalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'JSON body could not be parsed.',
-      type: '/invalid-json-body',
-    }),
-    { status: 400 }
-  )
-
 const createInvalidBodyResponse = (detail: string | undefined) =>
   NextResponse.json(
     buildErrorResponse({
@@ -82,21 +73,20 @@ const createInternalErrorResponse = () =>
 export async function POST(request: Request) {
   let parsedBody: z.infer<typeof requestSchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const validation = requestSchema.safeParse(rawBody)
-
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
-
-      return createInvalidBodyResponse(detail)
-    }
-
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse client login request body', error)
-    return createInvalidJsonResponse()
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
   }
+
+  const validation = requestSchema.safeParse(parsed.data)
+
+  if (!validation.success) {
+    const detail = validation.error.issues.map((issue) => issue.message).join('; ')
+
+    return createInvalidBodyResponse(detail)
+  }
+
+  parsedBody = validation.data
 
   const { email } = parsedBody
 

@@ -3,6 +3,7 @@ import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import Stripe from 'stripe'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 import { getStripeClient } from '../_lib/stripeClient'
 
 const requestBodySchema = z.object({
@@ -27,17 +28,6 @@ const accountLinkResponseSchema = z.object({
 const baseUrl = process.env.BASE_URL ?? 'http://localhost:3001'
 const successUrl = new URL('/ios-links/stripe-onboarding-success', baseUrl).toString()
 const failureUrl = new URL('/ios-links/stripe-onboarding-failure', baseUrl).toString()
-
-const createInvalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
-    }),
-    { status: 400 }
-  )
 
 const createInvalidBodyResponse = (detail?: string) =>
   NextResponse.json(
@@ -96,20 +86,19 @@ const createInternalErrorResponse = () =>
 export async function POST(request: Request) {
   let body: z.infer<typeof requestBodySchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const parsed = requestBodySchema.safeParse(rawBody)
-
-    if (!parsed.success) {
-      const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
-      return createInvalidBodyResponse(detail || undefined)
-    }
-
-    body = parsed.data
-  } catch (error) {
-    console.error('Failed to parse Stripe onboarding link request body', error)
-    return createInvalidJsonResponse()
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
   }
+
+  const validated = requestBodySchema.safeParse(parsed.data)
+
+  if (!validated.success) {
+    const detail = validated.error.issues.map((issue) => issue.message).join('; ')
+    return createInvalidBodyResponse(detail || undefined)
+  }
+
+  body = validated.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while creating Stripe onboarding link',
@@ -133,9 +122,9 @@ export async function POST(request: Request) {
       .leftJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
       .select((eb) => [
         eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
-        sql<boolean>`(stripeAccount.object #>> '{capabilities,card_payments}') IS NOT NULL`.as('cardPayments'),
-        sql<boolean>`(stripeAccount.object #>> '{capabilities,transfers}') IS NOT NULL`.as('transfers'),
-        sql<string | null>`stripeAccount.object ->> 'type'`.as('stripeAccountType'),
+        sql<boolean>`(${sql.ref('stripeAccount.object')} #>> '{capabilities,card_payments}') IS NOT NULL`.as('cardPayments'),
+        sql<boolean>`(${sql.ref('stripeAccount.object')} #>> '{capabilities,transfers}') IS NOT NULL`.as('transfers'),
+        sql<string | null>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('stripeAccountType'),
       ])
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()
@@ -241,14 +230,10 @@ export async function POST(request: Request) {
     const parsedLink = accountLinkResponseSchema.safeParse(accountLinkData)
 
     if (!parsedLink.success) {
-      const detail = parsedLink.error.issues.map((issue) => issue.message).join('; ')
-
       return NextResponse.json(
         buildErrorResponse({
           status: 500,
-          title: 'Failed to validate Stripe account link response',
-          detail: detail || 'Stripe account link response did not match the expected schema.',
-          type: '/invalid-response',
+          title: 'Something on our end went wrong.',
         }),
         { status: 500 }
       )

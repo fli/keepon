@@ -4,15 +4,48 @@ import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { normalizeSessionSeriesRow, type RawSessionSeriesRow } from '../shared'
 
-const paramsSchema = z.object({
-  sessionSeriesId: z
-    .string()
-    .trim()
-    .min(1, 'Session series id is required')
-    .uuid({ message: 'Session series id must be a valid UUID' }),
-})
-
 type HandlerContext = RouteContext<'/api/sessionSeries/[sessionSeriesId]'>
+
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
+
+const createLegacyGenericErrorResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 500,
+      title: 'Something on our end went wrong.',
+    }),
+    { status: 500 }
+  )
+
+const createLegacyNotFoundResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 404,
+      title: 'Appointment Series not found',
+      type: '/resource-not-found',
+    }),
+    { status: 404 }
+  )
+
+const createLegacyInvalidParametersResponse = (detail: string) =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: 'Your parameters were invalid.',
+      detail,
+      type: '/invalid-parameters',
+    }),
+    { status: 400 }
+  )
 
 const nullableUrl = z.preprocess(
   (value) => {
@@ -73,22 +106,6 @@ class SessionSeriesNotFoundError extends Error {
 }
 
 export async function GET(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid session series identifier',
-        detail: detail || 'Request parameters did not match the expected session series identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
-
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while fetching session series',
   })
@@ -97,7 +114,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     return authorization.response
   }
 
-  const { sessionSeriesId } = paramsResult.data
+  const { sessionSeriesId } = await context.params
 
   try {
     const row = await db
@@ -108,88 +125,40 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       .executeTakeFirst()
 
     if (!row) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Session series not found',
-          detail: 'We could not find a session series with the specified identifier for the authenticated trainer.',
-          type: '/session-series-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     const sessionSeries = normalizeSessionSeriesRow(row as RawSessionSeriesRow, 0)
 
     return NextResponse.json(sessionSeries)
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 500,
-          title: 'Failed to parse session series data from database',
-          detail: 'Session series data did not match the expected response schema.',
-          type: '/invalid-response',
-        }),
-        { status: 500 }
-      )
-    }
-
     console.error('Failed to fetch session series', {
       trainerId: authorization.trainerId,
       sessionSeriesId,
       error,
     })
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 500,
-        title: 'Failed to fetch session series',
-        type: '/internal-server-error',
-      }),
-      { status: 500 }
-    )
+    return createLegacyGenericErrorResponse()
   }
 }
 
 export async function PUT(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid session series identifier',
-        detail: detail || 'Request parameters did not match the expected session series identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
-
-  const { sessionSeriesId } = paramsResult.data
+  const { sessionSeriesId } = await context.params
 
   let parsedBody: z.infer<typeof requestBodySchema>
 
   try {
     const rawText = await request.text()
-    const rawBody: unknown = rawText.trim().length === 0 ? {} : (JSON.parse(rawText) as unknown)
+    const rawBody: unknown =
+      rawText.trim().length === 0 ? {} : (JSON.parse(rawText) as unknown)
+
+    if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
+      return createLegacyInvalidJsonResponse()
+    }
     const validation = requestBodySchema.safeParse(rawBody)
 
     if (!validation.success) {
       const detail = validation.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
+      return createLegacyInvalidParametersResponse(detail || 'Your parameters were invalid.')
     }
 
     parsedBody = validation.data
@@ -198,16 +167,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       sessionSeriesId,
       error,
     })
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
-      }),
-      { status: 400 }
-    )
+    return createLegacyInvalidJsonResponse()
   }
 
   const authorization = await authenticateTrainerRequest(request, {
@@ -300,27 +260,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     return NextResponse.json(sessionSeries)
   } catch (error) {
     if (error instanceof SessionSeriesNotFoundError) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Session series not found',
-          detail: 'We could not find a session series with the specified identifier for the authenticated trainer.',
-          type: '/session-series-not-found',
-        }),
-        { status: 404 }
-      )
-    }
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 500,
-          title: 'Failed to parse session series data from database',
-          detail: 'Session series data did not match the expected response schema.',
-          type: '/invalid-response',
-        }),
-        { status: 500 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     console.error('Failed to update session series', {
@@ -328,14 +268,6 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       sessionSeriesId,
       error,
     })
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 500,
-        title: 'Failed to update session series',
-        type: '/internal-server-error',
-      }),
-      { status: 500 }
-    )
+    return createLegacyGenericErrorResponse()
   }
 }

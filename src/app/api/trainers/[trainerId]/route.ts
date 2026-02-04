@@ -10,14 +10,11 @@ import {
 import { db, sql } from '@/lib/db'
 import { isIsoDuration } from '@/lib/reminders'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { getStripeClient, STRIPE_API_VERSION } from '../../_lib/stripeClient'
 import { getTrainerProfile } from '@/server/trainerProfile'
 
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]'>
-
-const paramsSchema = z.object({
-  trainerId: z.string().uuid({ message: 'trainerId must be a valid UUID' }),
-})
 
 const shouldIncludeSessionSeries = (url: URL) => {
   const include = (value: string | null) => value?.trim().toLowerCase() ?? ''
@@ -25,6 +22,28 @@ const shouldIncludeSessionSeries = (url: URL) => {
     include(url.searchParams.get('filter[include]')) === 'sessionseries' ||
     include(url.searchParams.get('filter[include][relation]')) === 'sessionseries'
   )
+}
+
+const LEGACY_INVALID_PARAMETERS_TITLE = 'Your parameters were invalid.'
+
+const invalidParametersResponse = (detail: string) =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_PARAMETERS_TITLE,
+      detail,
+      type: '/invalid-parameters',
+    }),
+    { status: 400 }
+  )
+
+const parseLegacyQueryValue = (value: string | null) => {
+  if (value === null) return undefined
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
 }
 
 const stripeApiVersionDate = STRIPE_API_VERSION.split('.')[0]
@@ -85,17 +104,6 @@ const updateTrainerBodySchema = z
     defaultCancellationAdvanceNoticeDuration: isoDurationSchema.optional(),
   })
   .strict()
-
-const invalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
-    }),
-    { status: 400 }
-  )
 
 const invalidBodyResponse = (detail?: string) =>
   NextResponse.json(
@@ -292,23 +300,34 @@ const ensureStripeBankAccount = async (
 }
 
 export async function GET(request: NextRequest, context: HandlerContext) {
-  const params = await context.params
-  const parsedParams = paramsSchema.safeParse(params ?? {})
+  void context
 
-  if (!parsedParams.success) {
-    const detail = parsedParams.error.issues.map((issue) => issue.message).join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid trainer identifier',
-        detail: detail || undefined,
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
+  const url = new URL(request.url)
+  const filterValue = parseLegacyQueryValue(url.searchParams.get('filter'))
+
+  let includeSessionSeries = false
+  if (filterValue !== undefined) {
+    if (!filterValue || typeof filterValue !== 'object' || Array.isArray(filterValue)) {
+      return invalidParametersResponse('filter  should be Record<string, unknown>')
+    }
+    const includeValue = (filterValue as { include?: unknown }).include
+    if (includeValue !== undefined) {
+      if (typeof includeValue === 'string') {
+        includeSessionSeries = includeValue.trim().toLowerCase() === 'sessionseries'
+      } else if (includeValue && typeof includeValue === 'object' && !Array.isArray(includeValue)) {
+        const relationValue = (includeValue as { relation?: unknown }).relation
+        if (relationValue !== undefined && typeof relationValue !== 'string') {
+          return invalidParametersResponse('filter.include.relation  should be string')
+        }
+        includeSessionSeries =
+          typeof relationValue === 'string' && relationValue.trim().toLowerCase() === 'sessionseries'
+      } else {
+        return invalidParametersResponse('filter.include  should be string or  should be Record<string, unknown>')
+      }
+    }
+  } else {
+    includeSessionSeries = shouldIncludeSessionSeries(url)
   }
-
-  const includeSessionSeries = shouldIncludeSessionSeries(new URL(request.url))
 
   const auth = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while fetching trainer profile',
@@ -316,18 +335,6 @@ export async function GET(request: NextRequest, context: HandlerContext) {
 
   if (!auth.ok) {
     return auth.response
-  }
-
-  if (auth.trainerId !== parsedParams.data.trainerId) {
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 403,
-        title: 'Forbidden',
-        detail: 'Token does not match requested trainer.',
-        type: '/forbidden',
-      }),
-      { status: 403 }
-    )
   }
 
   try {
@@ -377,21 +384,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
 }
 
 export async function PUT(request: NextRequest, context: HandlerContext) {
-  const params = await context.params
-  const parsedParams = paramsSchema.safeParse(params ?? {})
-
-  if (!parsedParams.success) {
-    const detail = parsedParams.error.issues.map((issue) => issue.message).join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid trainer identifier',
-        detail: detail || undefined,
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
+  void context
 
   const includeSessionSeries = shouldIncludeSessionSeries(new URL(request.url))
 
@@ -403,26 +396,20 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     return auth.response
   }
 
-  if (auth.trainerId !== parsedParams.data.trainerId) {
-    return forbiddenTrainerResponse()
-  }
-
   let body: z.infer<typeof updateTrainerBodySchema>
-
-  try {
-    const json: unknown = await request.json()
-    const parsedBody = updateTrainerBodySchema.safeParse(json)
-
-    if (!parsedBody.success) {
-      const detail = parsedBody.error.issues.map((issue) => issue.message).join('; ')
-      return invalidBodyResponse(detail)
-    }
-
-    body = parsedBody.data
-  } catch (error) {
-    console.error('Failed to parse trainer update request body', error)
-    return invalidJsonResponse()
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
   }
+
+  const parsedBody = updateTrainerBodySchema.safeParse(parsed.data)
+
+  if (!parsedBody.success) {
+    const detail = parsedBody.error.issues.map((issue) => issue.message).join('; ')
+    return invalidBodyResponse(detail)
+  }
+
+  body = parsedBody.data
 
   if (Object.keys(body).length === 0) {
     try {

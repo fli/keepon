@@ -144,7 +144,10 @@ export const adaptFinanceItemRow = (row: FinanceItemRow): z.input<typeof finance
     status,
     paymentType,
     stripeApplicationFeeId,
-    notes,
+  }
+
+  if (notes.length > 0) {
+    adapted.notes = notes
   }
 
   const name = parseNullableString(row.name)

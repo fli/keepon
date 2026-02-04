@@ -9,38 +9,39 @@ const positionSchema = z
     lng: z.number(),
   })
   .nullable()
+  .optional()
 
 const geolocationSchema = z.object({
-  country: z.string().nullable(),
-  subdivision: z.string().nullable(),
-  city: z.string().nullable(),
+  country: z.string().nullable().optional(),
+  subdivision: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
   position: positionSchema,
 })
 
 const sanitizeHeaderValue = (value: string | null) => {
   if (!value) {
-    return null
+    return undefined
   }
   const trimmed = value.trim()
-  return trimmed.length > 0 ? trimmed : null
+  return trimmed.length > 0 ? trimmed : undefined
 }
 
 const parsePositionHeader = (rawValue: string | null) => {
   const sanitized = sanitizeHeaderValue(rawValue)
   if (!sanitized) {
-    return null
+    return undefined
   }
 
   const [rawLat, rawLng] = sanitized.split(',', 2)
   if (!rawLat || !rawLng) {
-    return null
+    return undefined
   }
 
   const lat = Number.parseFloat(rawLat)
   const lng = Number.parseFloat(rawLng)
 
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return null
+    return undefined
   }
 
   return { lat, lng }

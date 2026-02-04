@@ -4,10 +4,6 @@ import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/ac
 import { createClientForTrainer, createClientSchema, listClientsForTrainer } from '@/server/clients'
 import { clientListSchema } from '../../../clients/shared'
 
-const paramsSchema = z.object({
-  trainerId: z.string().uuid({ message: 'trainerId must be a valid UUID' }),
-})
-
 type TrainerRouteContext = RouteContext<'/api/trainers/[trainerId]/clients'>
 
 const querySchema = z.object({
@@ -16,43 +12,90 @@ const querySchema = z.object({
 
 const createClientsSchema = z.union([createClientSchema, z.array(createClientSchema)])
 
-const invalidJsonResponse = () =>
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
   NextResponse.json(
     buildErrorResponse({
       status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
+      title: LEGACY_INVALID_JSON_MESSAGE,
     }),
     { status: 400 }
   )
 
-const invalidBodyResponse = (detail?: string) =>
+const invalidParametersResponse = (detail: string) =>
   NextResponse.json(
     buildErrorResponse({
       status: 400,
-      title: 'Invalid request body',
-      detail: detail || 'Body did not match expected schema.',
-      type: '/invalid-body',
+      title: 'Your parameters were invalid.',
+      detail,
+      type: '/invalid-parameters',
     }),
     { status: 400 }
   )
+
+const isValidStatus = (value: unknown): value is 'current' | 'past' | 'lead' =>
+  value === 'current' || value === 'past' || value === 'lead'
+
+const buildLegacyCreateClientDetail = (payload: unknown) => {
+  const suffix = '\nor  should be Array<unknown>'
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return ` should be Record<string, unknown>${suffix}`
+  }
+
+  const body = payload as Record<string, unknown>
+  const hasFirstName = Object.prototype.hasOwnProperty.call(body, 'firstName')
+  const hasStatus = Object.prototype.hasOwnProperty.call(body, 'status')
+
+  if (!hasFirstName && !hasStatus) {
+    return `firstName  not provided status  not provided${suffix}`
+  }
+  if (!hasFirstName) {
+    return ` firstName  not provided${suffix}`
+  }
+  if (!hasStatus) {
+    return ` status  not provided${suffix}`
+  }
+
+  if (typeof body.firstName !== 'string') {
+    return ` firstName  should be string${suffix}`
+  }
+
+  if (!isValidStatus(body.status)) {
+    return ` status  should be "current" | "past" | "lead"${suffix}`
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'birthday')) {
+    const birthday = body.birthday
+    if (birthday !== null) {
+      if (typeof birthday !== 'string') {
+        return ` birthday  should be string${suffix}`
+      }
+      const trimmed = birthday.trim()
+      if (trimmed.length > 0) {
+        return ` birthday should not be provided or  should be is a valid date string or  should be is a valid datetime string${suffix}`
+      }
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'email')) {
+    const email = body.email
+    if (email !== null) {
+      if (typeof email !== 'string') {
+        return ` email should not be provided or  should be email${suffix}`
+      }
+      const trimmed = email.trim()
+      if (trimmed.length > 0 && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(trimmed)) {
+        return ` email should not be provided or  should be email${suffix}`
+      }
+    }
+  }
+
+  return ` should be Record<string, unknown>${suffix}`
+}
 
 export async function GET(request: NextRequest, context: TrainerRouteContext) {
-  const params = await context.params
-  const paramsResult = paramsSchema.safeParse(params ?? {})
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid trainer identifier',
-        detail: detail || undefined,
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
+  void context
 
   const url = new URL(request.url)
   const queryResult = querySchema.safeParse({
@@ -78,18 +121,6 @@ export async function GET(request: NextRequest, context: TrainerRouteContext) {
 
   if (!auth.ok) {
     return auth.response
-  }
-
-  if (auth.trainerId !== paramsResult.data.trainerId) {
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 403,
-        title: 'Forbidden',
-        detail: 'Token does not match requested trainer.',
-        type: '/forbidden',
-      }),
-      { status: 403 }
-    )
   }
 
   const { sessionId } = queryResult.data
@@ -123,19 +154,30 @@ export async function GET(request: NextRequest, context: TrainerRouteContext) {
 }
 
 export async function POST(request: NextRequest, context: TrainerRouteContext) {
-  const params = await context.params
-  const paramsResult = paramsSchema.safeParse(params ?? {})
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid trainer identifier',
-        detail: detail || undefined,
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
+  void context
+
+  let rawBody: unknown = {}
+  const rawBodyText = await request.text()
+  if (rawBodyText.trim().length > 0) {
+    try {
+      rawBody = JSON.parse(rawBodyText)
+    } catch (error) {
+      console.error('Failed to parse client create request body', error)
+      return createLegacyInvalidJsonResponse()
+    }
+  }
+
+  if (rawBody === null || (typeof rawBody !== 'object' && !Array.isArray(rawBody))) {
+    return createLegacyInvalidJsonResponse()
+  }
+
+  if (rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)) {
+    if (Object.prototype.hasOwnProperty.call(rawBody, 'birthday')) {
+      const birthday = (rawBody as Record<string, unknown>).birthday
+      if (birthday !== null && typeof birthday !== 'string') {
+        return invalidParametersResponse(buildLegacyCreateClientDetail(rawBody))
+      }
+    }
   }
 
   const auth = await authenticateTrainerRequest(request, {
@@ -146,32 +188,14 @@ export async function POST(request: NextRequest, context: TrainerRouteContext) {
     return auth.response
   }
 
-  if (auth.trainerId !== paramsResult.data.trainerId) {
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 403,
-        title: 'Forbidden',
-        detail: 'Token does not match requested trainer.',
-        type: '/forbidden',
-      }),
-      { status: 403 }
-    )
-  }
-
   let parsedBody: z.infer<typeof createClientsSchema>
 
-  try {
-    const json: unknown = await request.json()
-    const validation = createClientsSchema.safeParse(json)
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
-      return invalidBodyResponse(detail)
-    }
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse client create request body', error)
-    return invalidJsonResponse()
+  const validation = createClientsSchema.safeParse(rawBody)
+  if (!validation.success) {
+    const detail = buildLegacyCreateClientDetail(rawBody)
+    return invalidParametersResponse(detail)
   }
+  parsedBody = validation.data
 
   const payloads = Array.isArray(parsedBody) ? parsedBody : [parsedBody]
 
@@ -183,8 +207,8 @@ export async function POST(request: NextRequest, context: TrainerRouteContext) {
     return NextResponse.json(Array.isArray(parsedBody) ? parsed : parsed[0])
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const detail = error.issues.map((issue) => issue.message).join('; ')
-      return invalidBodyResponse(detail)
+      const detail = buildLegacyCreateClientDetail(parsedBody)
+      return invalidParametersResponse(detail)
     }
 
     console.error('Failed to create clients', error)

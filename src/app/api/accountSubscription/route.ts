@@ -5,12 +5,13 @@ import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import Stripe from 'stripe'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 import { getAccountSubscriptionPricingForCountry } from '../_lib/accountSubscriptionPricing'
 import { currencyChargeLimits } from '../_lib/transactionFees'
 import { getStripeClient, STRIPE_API_VERSION } from '../_lib/stripeClient'
 
 const patchRequestBodySchema = z.object({
-  cancelAtPeriodEnd: z.boolean(),
+  cancelAtPeriodEnd: z.boolean().optional(),
 })
 
 const addressSchema = z.object({
@@ -90,38 +91,28 @@ const buildAlreadySubscribedResponse = () =>
 export async function PATCH(request: Request) {
   let body: z.infer<typeof patchRequestBodySchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const parsed = patchRequestBodySchema.safeParse(rawBody)
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
+  }
 
-    if (!parsed.success) {
-      const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
+  const parsed = patchRequestBodySchema.safeParse(parsedJson.data)
 
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-
-    body = parsed.data
-  } catch (error) {
-    console.error('Failed to parse account subscription request body', error)
+  if (!parsed.success) {
+    const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+
+  body = parsed.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating account subscription',
@@ -302,41 +293,6 @@ export async function PATCH(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  let parsedBody: z.infer<typeof putRequestBodySchema>
-
-  try {
-    const rawBody = (await request.json()) as unknown
-    const bodyResult = putRequestBodySchema.safeParse(rawBody)
-
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse account subscription create request body', error)
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
-      }),
-      { status: 400 }
-    )
-  }
-
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while creating account subscription',
   })
@@ -344,6 +300,31 @@ export async function PUT(request: Request) {
   if (!authorization.ok) {
     return authorization.response
   }
+
+  let parsedBody: z.infer<typeof putRequestBodySchema>
+
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
+  }
+
+  const bodyResult = putRequestBodySchema.safeParse(parsedJson.data)
+
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
+      }),
+      { status: 400 }
+    )
+  }
+
+  parsedBody = bodyResult.data
 
   let trainerRow: z.infer<typeof trainerSubscriptionRowSchema> | undefined
 

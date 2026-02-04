@@ -3,9 +3,7 @@ import { db } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 
-const paramsSchema = z.object({
-  trainerId: z.string().min(1, 'Trainer id is required'),
-})
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
 
 const responseSchema = z.object({
   count: z.number().int().nonnegative(),
@@ -14,22 +12,34 @@ const responseSchema = z.object({
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/notifications/view'>
 
 export async function PUT(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
+  void context
 
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid path parameters',
-        detail: detail || 'Trainer id parameter is invalid.',
-        type: '/invalid-path-parameters',
-      }),
-      { status: 400 }
-    )
+  const contentType = request.headers.get('content-type') ?? ''
+  if (contentType.includes('application/json')) {
+    const rawBody = await request.text()
+    if (rawBody.trim().length > 0) {
+      try {
+        const parsed = JSON.parse(rawBody)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          return NextResponse.json(
+            buildErrorResponse({
+              status: 400,
+              title: LEGACY_INVALID_JSON_MESSAGE,
+            }),
+            { status: 400 }
+          )
+        }
+      } catch {
+        return NextResponse.json(
+          buildErrorResponse({
+            status: 400,
+            title: LEGACY_INVALID_JSON_MESSAGE,
+          }),
+          { status: 400 }
+        )
+      }
+    }
   }
-
-  const { trainerId } = paramsResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while marking notifications as viewed',
@@ -37,18 +47,6 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
   if (!authorization.ok) {
     return authorization.response
-  }
-
-  if (authorization.trainerId !== trainerId) {
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 403,
-        title: 'Forbidden',
-        detail: 'You are not permitted to modify notifications for this trainer.',
-        type: '/forbidden',
-      }),
-      { status: 403 }
-    )
   }
 
   try {
@@ -79,7 +77,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       )
     }
 
-    console.error('Failed to mark trainer notifications as viewed for trainer', trainerId, error)
+    console.error('Failed to mark trainer notifications as viewed for trainer', authorization.trainerId, error)
 
     return NextResponse.json(
       buildErrorResponse({

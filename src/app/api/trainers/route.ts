@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 import { buildErrorResponse } from '../_lib/accessToken'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 import { createTrainerAccount, trainerSignupSchema } from '@/server/trainers'
 
 const responseSchema = z.object({
@@ -9,17 +10,6 @@ const responseSchema = z.object({
   userId: z.string(),
   trainerId: z.string(),
 })
-
-const invalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
-    }),
-    { status: 400 }
-  )
 
 const invalidBodyResponse = (detail?: string) =>
   NextResponse.json(
@@ -33,13 +23,11 @@ const invalidBodyResponse = (detail?: string) =>
   )
 
 export async function POST(request: Request) {
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch (error) {
-    console.error('Failed to parse trainer signup request body as JSON', error)
-    return invalidJsonResponse()
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
   }
+  const body = parsedJson.data
 
   const parsed = trainerSignupSchema.safeParse(body)
   if (!parsed.success) {

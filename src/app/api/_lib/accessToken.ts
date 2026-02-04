@@ -73,10 +73,13 @@ const ensureRuntimeContext = async () => {
 export const extractAccessToken = async (request: Request) => {
   await ensureRuntimeContext()
   let headerValue: string | null = null
-  try {
-    headerValue = (await headers()).get('authorization')
-  } catch {
-    // Ignore header store errors during prerender.
+  headerValue = request.headers.get('authorization')
+  if (!headerValue) {
+    try {
+      headerValue = (await headers()).get('authorization')
+    } catch {
+      // Ignore header store errors during prerender.
+    }
   }
 
   if (headerValue) {

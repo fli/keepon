@@ -3,7 +3,9 @@ import Stripe from 'stripe'
 import BigNumber from 'bignumber.js'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { isValid, parseISO } from 'date-fns'
 import { authenticateTrainerOrClientRequest, buildErrorResponse } from '../_lib/accessToken'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 import { adaptSalePaymentRow, salePaymentSchema, type SalePaymentRow } from '../_lib/salePayments'
 import { getStripeClient, STRIPE_API_VERSION } from '../_lib/stripeClient'
 import {
@@ -13,45 +15,34 @@ import {
   CountryNotSupportedError,
 } from '../_lib/transactionFees'
 import { APP_NAME } from '../_lib/constants'
+import { uuidOrNil } from '@/lib/uuid'
 
-const querySchema = z.object({
-  saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }).optional(),
-  updatedAfter: z
-    .string()
-    .transform((value) => {
-      const parsed = new Date(value)
-      if (Number.isNaN(parsed.getTime())) {
-        throw new Error('updatedAfter must be a valid ISO 8601 datetime string')
-      }
-      return parsed
-    })
-    .optional(),
-  paymentPlanId: z.string().uuid({ message: 'paymentPlanId must be a valid UUID' }).optional(),
-  clientId: z.string().uuid({ message: 'clientId must be a valid UUID' }).optional(),
-})
+const createLegacyInvalidParametersResponse = (detail: string) =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: 'Your parameters were invalid.',
+      detail,
+      type: '/invalid-parameters',
+    }),
+    { status: 400 }
+  )
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const normalize = (value: string | null) => (value && value.trim().length > 0 ? value.trim() : undefined)
 
-  const queryResult = querySchema.safeParse({
-    saleId: normalize(url.searchParams.get('saleId')),
-    updatedAfter: normalize(url.searchParams.get('updatedAfter')),
-    paymentPlanId: normalize(url.searchParams.get('paymentPlanId')),
-    clientId: normalize(url.searchParams.get('clientId')),
-  })
-
-  if (!queryResult.success) {
-    const detail = queryResult.error.issues.map((issue) => issue.message).join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid query parameters',
-        detail: detail || 'Request query parameters did not match the expected schema.',
-        type: '/invalid-query',
-      }),
-      { status: 400 }
-    )
+  const saleId = normalize(url.searchParams.get('saleId'))
+  const paymentPlanId = normalize(url.searchParams.get('paymentPlanId'))
+  const clientId = normalize(url.searchParams.get('clientId'))
+  const updatedAfterRaw = normalize(url.searchParams.get('updatedAfter'))
+  let updatedAfter: Date | undefined
+  if (updatedAfterRaw) {
+    const parsed = parseISO(updatedAfterRaw)
+    if (!isValid(parsed)) {
+      return createLegacyInvalidParametersResponse('updatedAfter  should be is a valid datetime string')
+    }
+    updatedAfter = parsed
   }
 
   const authorization = await authenticateTrainerOrClientRequest(request, {
@@ -65,7 +56,7 @@ export async function GET(request: Request) {
     return authorization.response
   }
 
-  const filters = { ...queryResult.data }
+  const filters = { saleId, paymentPlanId, clientId, updatedAfter }
 
   if (authorization.actor === 'client') {
     if (filters.clientId && filters.clientId !== authorization.clientId) {
@@ -79,6 +70,18 @@ export async function GET(request: Request) {
       )
     }
     filters.clientId = authorization.clientId
+  }
+
+  if (filters.saleId) {
+    filters.saleId = uuidOrNil(filters.saleId)
+  }
+
+  if (filters.paymentPlanId) {
+    filters.paymentPlanId = uuidOrNil(filters.paymentPlanId)
+  }
+
+  if (filters.clientId) {
+    filters.clientId = uuidOrNil(filters.clientId)
   }
 
   try {
@@ -305,18 +308,15 @@ const saleDetailsSchema = z.object({
   saleCreditPackId: z.string().nullable(),
 })
 
-const amountSchema = z
-  .union([z.string(), z.number()])
-  .transform((value) => value.toString())
-  .refine((value) => {
-    const amount = new BigNumber(value)
-    return amount.isFinite() && amount.gte(0)
-  }, 'amount must be a non-negative number')
+const amountSchema = z.string().refine((value) => {
+  const amount = new BigNumber(value)
+  return amount.isFinite() && amount.gte(0)
+}, 'amount must be a non-negative number')
 
 const isoDateTimeSchema = z.string().datetime({ offset: true }).nullable().optional()
 
 const baseRequestSchema = z.object({
-  saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }),
+  saleId: z.string().trim().min(1, 'saleId must not be empty'),
   amount: amountSchema,
   currency: z.string().trim().min(1),
 })
@@ -434,22 +434,11 @@ const fetchSalePayment = async (paymentId: string, trainerId: string) => {
 }
 
 export async function POST(request: Request) {
-  let body: unknown
-
-  try {
-    body = await request.json()
-  } catch (error) {
-    console.error('Failed to parse sale payment body as JSON', error)
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
-      }),
-      { status: 400 }
-    )
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
   }
+  const body = parsedJson.data
 
   const parsed = requestSchema.safeParse(body)
 
@@ -473,6 +462,17 @@ export async function POST(request: Request) {
 
   if (!authorization.ok) {
     return authorization.response
+  }
+
+  if (authorization.actor === 'client' && parsed.data.type !== 'stripe') {
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'You can only pay by stripe.',
+        type: '/can-only-pay-by-stripe',
+      }),
+      { status: 400 }
+    )
   }
 
   const payload = parsed.data
@@ -507,7 +507,7 @@ export async function POST(request: Request) {
           eb.ref('country.alpha_2_code').as('country'),
           eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
           eb.ref('trainer.stripe_payments_blocked').as('stripePaymentsBlocked'),
-          sql<string | null>`stripeAccount.object ->> 'type'`.as('stripeAccountType'),
+          sql<string | null>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('stripeAccountType'),
           eb.ref('client.email').as('clientEmail'),
           eb.ref('client.first_name').as('clientFirstName'),
           eb.ref('client.last_name').as('clientLastName'),
@@ -542,10 +542,6 @@ export async function POST(request: Request) {
       const salePrice = new BigNumber(saleDetails.saleProductPrice)
       if (!salePrice.isFinite() || !salePrice.eq(amountValue)) {
         throw new PaymentAmountMismatchError()
-      }
-
-      if (authorization.actor === 'client' && payload.type !== 'stripe') {
-        throw new ClientStripeOnlyError()
       }
 
       if (payload.type === 'creditPack') {
@@ -912,8 +908,7 @@ export async function POST(request: Request) {
         buildErrorResponse({
           status: 404,
           title: 'Sale not found',
-          detail: 'No sale was found for the provided identifier and authenticated user.',
-          type: '/sale-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
@@ -946,12 +941,11 @@ export async function POST(request: Request) {
     if (error instanceof ClientStripeOnlyError) {
       return NextResponse.json(
         buildErrorResponse({
-          status: 403,
-          title: 'Clients must pay with Stripe',
-          detail: 'Clients can only pay using Stripe card payments.',
-          type: '/forbidden',
+          status: 400,
+          title: 'You can only pay by stripe.',
+          type: '/can-only-pay-by-stripe',
         }),
-        { status: 403 }
+        { status: 400 }
       )
     }
 

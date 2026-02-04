@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
+import { validate as validateUuid, NIL as NIL_UUID } from 'uuid'
 import {
   authenticateTrainerOrClientRequest,
   authenticateTrainerRequest,
   buildErrorResponse,
 } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { adaptSaleRow, fetchSales, saleSchema } from '../shared'
-
-const paramsSchema = z.object({
-  saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }),
-})
 
 type HandlerContext = RouteContext<'/api/sales/[saleId]'>
 
@@ -36,6 +34,18 @@ class SalePaidByCardDeletionNotAllowedError extends Error {
   }
 }
 
+const coerceUuidOrNil = (value: string) => (validateUuid(value) ? value : NIL_UUID)
+
+const createLegacyNotFoundResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 404,
+      title: 'Sale not found',
+      type: '/resource-not-found',
+    }),
+    { status: 404 }
+  )
+
 const normalizeDeletedCount = (value: unknown) => {
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : 0
@@ -54,22 +64,6 @@ const normalizeDeletedCount = (value: unknown) => {
 }
 
 export async function GET(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid sale identifier',
-        detail: detail || undefined,
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
-
   const auth = await authenticateTrainerOrClientRequest(request, {
     trainerExtensionFailureLogMessage: 'Failed to extend access token expiry while fetching sale for trainer request',
     clientExtensionFailureLogMessage: 'Failed to extend access token expiry while fetching sale for client request',
@@ -79,13 +73,14 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     return auth.response
   }
 
-  const { saleId } = paramsResult.data
+  const { saleId } = await context.params
+  const safeSaleId = coerceUuidOrNil(saleId)
 
   try {
     const rows = await fetchSales({
       trainerId: auth.trainerId,
       clientId: auth.actor === 'client' ? auth.clientId : undefined,
-      saleId,
+      saleId: safeSaleId,
     })
 
     const saleRow = rows[0]
@@ -99,15 +94,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     return NextResponse.json(sale)
   } catch (error) {
     if (error instanceof SaleNotFoundError) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Sale not found',
-          detail: 'No sale exists for this trainer with that id.',
-          type: '/sale-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     if (error instanceof z.ZodError) {
@@ -136,22 +123,6 @@ export async function GET(request: NextRequest, context: HandlerContext) {
 }
 
 export async function DELETE(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid sale identifier',
-        detail: detail || undefined,
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
-
   const auth = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while deleting sale',
   })
@@ -160,7 +131,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
     return auth.response
   }
 
-  const { saleId } = paramsResult.data
+  const { saleId } = await context.params
 
   try {
     await db.transaction().execute(async (trx) => {
@@ -202,15 +173,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
     return new NextResponse(null, { status: 204 })
   } catch (error) {
     if (error instanceof SaleNotFoundError) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Sale not found',
-          detail: 'No sale exists for this trainer with that id.',
-          type: '/sale-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     if (error instanceof SalePaidByCardDeletionNotAllowedError) {
@@ -238,55 +201,30 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
 }
 
 export async function PATCH(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid sale identifier',
-        detail: detail || undefined,
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
-
   let parsedBody: z.infer<typeof patchRequestBodySchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const bodyResult = patchRequestBodySchema.safeParse(rawBody)
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
+  }
 
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
+  const bodyResult = patchRequestBodySchema.safeParse(parsed.data)
 
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse sale update request body', error)
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+
+  parsedBody = bodyResult.data
 
   const auth = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating sale',
@@ -296,7 +234,8 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
     return auth.response
   }
 
-  const { saleId } = paramsResult.data
+  const { saleId } = await context.params
+  const safeSaleId = coerceUuidOrNil(saleId)
 
   const hasDueAt = Object.prototype.hasOwnProperty.call(parsedBody, 'dueAt')
   const hasNote = Object.prototype.hasOwnProperty.call(parsedBody, 'note')
@@ -336,8 +275,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
           buildErrorResponse({
             status: 404,
             title: 'Sale not found',
-            detail: 'No sale exists for this trainer with that id.',
-            type: '/sale-not-found',
+            type: '/resource-not-found',
           }),
           { status: 404 }
         )
@@ -348,15 +286,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
     const saleRow = rows[0]
 
     if (!saleRow) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Sale not found',
-          detail: 'No sale exists for this trainer with that id.',
-          type: '/sale-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     const sale = saleSchema.parse(adaptSaleRow(saleRow))

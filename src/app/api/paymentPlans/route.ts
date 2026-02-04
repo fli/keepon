@@ -4,7 +4,6 @@ import { z } from 'zod'
 import { authenticateClientRequest, buildErrorResponse } from '../_lib/accessToken'
 import {
   paymentPlanListSchema,
-  paymentPlanStatusSchema,
   parseAmount,
   parseNumberValue,
   parseRequiredAmount,
@@ -12,7 +11,6 @@ import {
   toIsoString,
   toOptionalIsoString,
   type PaymentPlanRow,
-  type PaymentPlanStatus,
 } from './shared'
 
 export async function GET(request: Request) {
@@ -20,24 +18,7 @@ export async function GET(request: Request) {
   const rawStatus = url.searchParams.get('status')
   const trimmedStatus = rawStatus?.trim() ?? ''
 
-  let statusFilter: PaymentPlanStatus | undefined
-
-  if (trimmedStatus.length > 0) {
-    const statusParse = paymentPlanStatusSchema.safeParse(trimmedStatus.toLowerCase())
-    if (!statusParse.success) {
-      const allowedStatuses = paymentPlanStatusSchema.options.join(', ')
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid status parameter',
-          detail: `Status must be one of: ${allowedStatuses}.`,
-          type: '/invalid-query',
-        }),
-        { status: 400 }
-      )
-    }
-    statusFilter = statusParse.data
-  }
+  const statusFilter = trimmedStatus.length > 0 ? trimmedStatus : undefined
 
   const authorization = await authenticateClientRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while fetching payment plans',

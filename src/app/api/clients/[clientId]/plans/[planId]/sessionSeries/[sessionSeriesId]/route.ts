@@ -6,14 +6,24 @@ import { normalizePlanRow, type RawPlanRow } from '../../../../../../plans/share
 import { paymentSchema } from '../../../../../../_lib/clientSessionsSchema'
 
 const paramsSchema = z.object({
-  clientId: z.string().trim().min(1, 'Client id is required.').uuid({ message: 'Client id must be a valid UUID.' }),
-  planId: z.string().trim().min(1, 'Plan id is required.').uuid({ message: 'Plan id must be a valid UUID.' }),
+  clientId: z.string().trim().min(1, 'Client id is required.'),
+  planId: z.string().trim().min(1, 'Plan id is required.'),
   sessionSeriesId: z
     .string()
     .trim()
-    .min(1, 'Session series id is required.')
-    .uuid({ message: 'Session series id must be a valid UUID.' }),
+    .min(1, 'Session series id is required.'),
 })
+
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
 
 type HandlerContext = { params: Promise<Record<string, string>> }
 
@@ -252,6 +262,18 @@ const normalizeSessionDetail = (row: SessionDetailRow, index: number): Normalize
 }
 
 export async function PUT(request: NextRequest, context: HandlerContext) {
+  const rawBodyText = await request.text()
+  if (rawBodyText.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(rawBodyText)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return createLegacyInvalidJsonResponse()
+      }
+    } catch {
+      return createLegacyInvalidJsonResponse()
+    }
+  }
+
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
@@ -486,7 +508,6 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Appointment series not found',
-          detail: 'We could not find the requested session series for this client and trainer.',
           type: '/resource-not-found',
         }),
         { status: 404 }
@@ -510,7 +531,6 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Subscription not found',
-          detail: 'We could not find a subscription with the specified identifier for the authenticated trainer.',
           type: '/resource-not-found',
         }),
         { status: 404 }
@@ -593,21 +613,6 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 }
 
 export async function DELETE(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid path parameters',
-        detail: detail || 'Request parameters did not match the expected schema.',
-        type: '/invalid-path-parameters',
-      }),
-      { status: 400 }
-    )
-  }
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while removing subscription session series',
@@ -617,22 +622,10 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
     return authorization.response
   }
 
-  const { clientId, planId, sessionSeriesId } = paramsResult.data
+  const { clientId, planId, sessionSeriesId } = await context.params
 
   try {
     const result = await db.transaction().execute(async (trx) => {
-      const planExists = await trx
-        .selectFrom('payment_plan as plan')
-        .select('plan.id')
-        .where('plan.id', '=', planId)
-        .where('plan.client_id', '=', clientId)
-        .where('plan.trainer_id', '=', authorization.trainerId)
-        .executeTakeFirst()
-
-      if (!planExists) {
-        throw new SubscriptionNotFoundError()
-      }
-
       const clientSessionsResult = await sql<ClientSessionPaymentRow>`
         SELECT
           client_session.id AS client_session_id,
@@ -675,13 +668,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         .selectFrom('vw_legacy_plan as v')
         .selectAll('v')
         .where('v.id', '=', planId)
-        .where('v.trainerId', '=', authorization.trainerId)
-        .where('v.clientId', '=', clientId)
         .executeTakeFirst()) as RawPlanRow | undefined
-
-      if (!rawPlanRow) {
-        throw new SubscriptionNotFoundError()
-      }
 
       const plan = normalizePlanRow(rawPlanRow)
 
@@ -717,18 +704,6 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
 
     return NextResponse.json(result)
   } catch (error) {
-    if (error instanceof SubscriptionNotFoundError) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Subscription not found',
-          detail: 'We could not find a subscription with the specified identifier for the authenticated trainer.',
-          type: '/resource-not-found',
-        }),
-        { status: 404 }
-      )
-    }
-
     if (error instanceof PaymentDeletionMismatchError) {
       console.error('Payment deletion mismatch while removing subscription session series', {
         trainerId: authorization.trainerId,

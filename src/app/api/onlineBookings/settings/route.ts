@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { parsePhoneNumberFromString } from 'libphonenumber-js/min'
 import type { CountryCode } from 'libphonenumber-js'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 
 const weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
 
@@ -278,12 +279,42 @@ const parseTimerange = (value: string): [string, string] | null => {
   return [start, end]
 }
 
-const parseTimerangeList = (values: readonly string[] | null | undefined): Array<[string, string]> => {
-  if (!values || values.length === 0) {
+const parsePgArray = (value: string): string[] => {
+  const trimmed = value.trim()
+  if (!trimmed || trimmed === '{}') {
+    return []
+  }
+  const matches = Array.from(trimmed.matchAll(/\"((?:\\\\.|[^\"\\\\])*)\"/g)).map((match) =>
+    match[1].replace(/\\\\\"/g, '"').replace(/\\\\\\\\/g, '\\')
+  )
+  if (matches.length > 0) {
+    return matches
+  }
+  const fallback = trimmed.replace(/^\{/, '').replace(/\}$/, '')
+  return fallback
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+}
+
+const normalizeTimerangeInput = (values: unknown): string[] => {
+  if (!values) return []
+  if (Array.isArray(values)) {
+    return values.map((entry) => String(entry))
+  }
+  if (typeof values === 'string') {
+    return parsePgArray(values)
+  }
+  return []
+}
+
+const parseTimerangeList = (values: unknown): Array<[string, string]> => {
+  const list = normalizeTimerangeInput(values)
+  if (!list || list.length === 0) {
     return []
   }
 
-  const intervals = values.map(parseTimerange).filter((interval): interval is [string, string] => interval !== null)
+  const intervals = list.map(parseTimerange).filter((interval): interval is [string, string] => interval !== null)
 
   return intervals
     .slice()
@@ -563,22 +594,20 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  let body: unknown
+  const auth = await authenticateTrainerRequest(request, {
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating online bookings settings',
+  })
 
-  try {
-    body = await request.json()
-  } catch (error) {
-    console.error('Failed to parse online bookings settings body as JSON', error)
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
-      }),
-      { status: 400 }
-    )
+  if (!auth.ok) {
+    return auth.response
   }
+
+  let body: unknown
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
+  }
+  body = parsed.data
 
   const parsedBody = patchRequestSchema.safeParse(body)
   if (!parsedBody.success) {
@@ -593,14 +622,6 @@ export async function PATCH(request: Request) {
       }),
       { status: 400 }
     )
-  }
-
-  const auth = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage: 'Failed to extend access token expiry while updating online bookings settings',
-  })
-
-  if (!auth.ok) {
-    return auth.response
   }
 
   const data = parsedBody.data

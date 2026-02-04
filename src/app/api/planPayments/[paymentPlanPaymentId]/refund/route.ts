@@ -11,9 +11,19 @@ const paramsSchema = z.object({
   paymentPlanPaymentId: z
     .string()
     .trim()
-    .min(1, 'Payment plan payment id is required')
-    .uuid({ message: 'Payment plan payment id must be a valid UUID' }),
+    .min(1, 'Payment plan payment id is required'),
 })
+
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
 
 type HandlerContext = { params: Promise<Record<string, string>> }
 
@@ -179,6 +189,18 @@ const adaptPlanPaymentRow = (row: RawPlanPayment) => {
 }
 
 export async function PUT(request: NextRequest, context: HandlerContext) {
+  const rawBodyText = await request.text()
+  if (rawBodyText.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(rawBodyText)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return createLegacyInvalidJsonResponse()
+      }
+    } catch {
+      return createLegacyInvalidJsonResponse()
+    }
+  }
+
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
@@ -225,7 +247,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           eb.ref('paymentPlanCharge.stripe_payment_intent_id').as('stripePaymentIntentId'),
           eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
           eb.ref('trainer.minimum_balance').as('minimumBalance'),
-          sql<string | null>`stripeAccount.object ->> 'type'`.as('stripeAccountType'),
+          sql<string | null>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('stripeAccountType'),
         ])
         .where('paymentPlanPayment.id', '=', paymentPlanPaymentId)
         .where('paymentPlanPayment.trainer_id', '=', authorization.trainerId)
@@ -342,9 +364,8 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
-          title: 'Plan payment not found',
-          detail: 'We could not find a plan payment with the specified identifier for the authenticated trainer.',
-          type: '/plan-payment-not-found',
+          title: 'Payment not found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

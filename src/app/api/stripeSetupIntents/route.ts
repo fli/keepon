@@ -6,6 +6,7 @@ import { authenticateClientRequest, buildErrorResponse } from '../_lib/accessTok
 import { getStripeClient, STRIPE_API_VERSION } from '../_lib/stripeClient'
 
 const stripeApiVersionDate = STRIPE_API_VERSION.split('.')[0]
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
 
 const clientStripeRowSchema = z.object({
   stripeCustomerId: z.string().nullable(),
@@ -72,6 +73,33 @@ const createInternalErrorResponse = () =>
 const threeDsExceptions = new Set(['cus_LKaEWrm9vaFNsm'])
 
 export async function POST(request: Request) {
+  const contentType = request.headers.get('content-type') ?? ''
+  if (contentType.includes('application/json')) {
+    const rawBody = await request.text()
+    if (rawBody.trim().length > 0) {
+      try {
+        const parsed = JSON.parse(rawBody)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          return NextResponse.json(
+            buildErrorResponse({
+              status: 400,
+              title: LEGACY_INVALID_JSON_MESSAGE,
+            }),
+            { status: 400 }
+          )
+        }
+      } catch {
+        return NextResponse.json(
+          buildErrorResponse({
+            status: 400,
+            title: LEGACY_INVALID_JSON_MESSAGE,
+          }),
+          { status: 400 }
+        )
+      }
+    }
+  }
+
   const authorization = await authenticateClientRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while creating Stripe setup intent',
   })
@@ -98,7 +126,7 @@ export async function POST(request: Request) {
         eb.ref('client.email').as('clientEmail'),
         eb.ref('trainer.email').as('serviceProviderEmail'),
         eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
-        sql<string | null>`stripeAccount.object ->> 'type'`.as('stripeAccountType'),
+        sql<string | null>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('stripeAccountType'),
       ])
       .where('client.id', '=', authorization.clientId)
       .where('trainer.id', '=', authorization.trainerId)

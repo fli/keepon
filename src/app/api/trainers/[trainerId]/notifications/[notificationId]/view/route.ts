@@ -3,10 +3,7 @@ import { db } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../../_lib/accessToken'
 
-const paramsSchema = z.object({
-  trainerId: z.string().min(1, 'Trainer id is required'),
-  notificationId: z.string().min(1, 'Notification id is required'),
-})
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
 
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/notifications/[notificationId]/view'>
 
@@ -25,22 +22,8 @@ const toNumber = (value: unknown) => {
 }
 
 export async function PUT(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid path parameters',
-        detail: detail || 'Trainer id or notification id parameter is invalid.',
-        type: '/invalid-path-parameters',
-      }),
-      { status: 400 }
-    )
-  }
-
-  const { trainerId, notificationId } = paramsResult.data
+  const params = await context.params
+  const notificationId = params.notificationId
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while marking notification as viewed',
@@ -49,17 +32,31 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   if (!authorization.ok) {
     return authorization.response
   }
-
-  if (authorization.trainerId !== trainerId) {
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 403,
-        title: 'Forbidden',
-        detail: 'You are not permitted to modify notifications for this trainer.',
-        type: '/forbidden',
-      }),
-      { status: 403 }
-    )
+  const contentType = request.headers.get('content-type') ?? ''
+  if (contentType.includes('application/json')) {
+    const rawBody = await request.text()
+    if (rawBody.trim().length > 0) {
+      try {
+        const parsed = JSON.parse(rawBody)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          return NextResponse.json(
+            buildErrorResponse({
+              status: 400,
+              title: LEGACY_INVALID_JSON_MESSAGE,
+            }),
+            { status: 400 }
+          )
+        }
+      } catch {
+        return NextResponse.json(
+          buildErrorResponse({
+            status: 400,
+            title: LEGACY_INVALID_JSON_MESSAGE,
+          }),
+          { status: 400 }
+        )
+      }
+    }
   }
 
   try {
@@ -77,8 +74,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Notification not found',
-          detail: 'No notification exists with the specified identifier for the authenticated trainer.',
-          type: '/notification-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
@@ -86,12 +82,11 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
     return new Response(null, { status: 204 })
   } catch (error) {
-    console.error('Failed to mark notification as viewed for trainer', trainerId, notificationId, error)
+    console.error('Failed to mark notification as viewed for trainer', notificationId, error)
     return NextResponse.json(
       buildErrorResponse({
         status: 500,
-        title: 'Failed to update notification',
-        type: '/internal-server-error',
+        title: 'Something on our end went wrong.',
       }),
       { status: 500 }
     )

@@ -100,6 +100,18 @@ const requestBodySchema = z
   })
   .strict()
 
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
+
+const createLegacyNotFoundResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 404,
+      title: 'Client not found',
+      type: '/resource-not-found',
+    }),
+    { status: 404 }
+  )
+
 const clientDetailsSchema = z.object({
   email: z.string().nullable(),
   stripeCustomerId: z.string().nullable(),
@@ -114,16 +126,13 @@ export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
     return NextResponse.json(
       buildErrorResponse({
-        status: 400,
-        title: 'Invalid client identifier',
-        detail: detail || 'Request parameters did not match the expected client identifier schema.',
-        type: '/invalid-parameter',
+        status: 404,
+        title: 'Client not found',
+        type: '/resource-not-found',
       }),
-      { status: 400 }
+      { status: 404 }
     )
   }
 
@@ -150,8 +159,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
-          type: '/client-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
@@ -165,9 +173,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       return NextResponse.json(
         buildErrorResponse({
           status: 500,
-          title: 'Failed to parse client data from database',
-          detail: 'Client data did not match the expected response schema.',
-          type: '/invalid-response',
+          title: 'Something on our end went wrong.',
         }),
         { status: 500 }
       )
@@ -205,46 +211,6 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
   const { clientId } = paramsResult.data
 
-  let parsedBody: z.infer<typeof requestBodySchema>
-
-  try {
-    const rawBody = (await request.json()) as unknown
-    const validation = requestBodySchema.safeParse(rawBody)
-
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse client update request body', {
-      clientId,
-      error,
-    })
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
-      }),
-      { status: 400 }
-    )
-  }
-
-  const hasUpdates = Object.values(parsedBody).some((value) => value !== undefined)
-
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating client',
   })
@@ -252,6 +218,56 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   if (!authorization.ok) {
     return authorization.response
   }
+
+  let parsedBody: z.infer<typeof requestBodySchema>
+
+  const invalidJsonResponse = () =>
+    NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: LEGACY_INVALID_JSON_MESSAGE,
+      }),
+      { status: 400 }
+    )
+
+  try {
+    const rawText = await request.text()
+    if (rawText.trim().length === 0) {
+      parsedBody = {}
+    } else {
+      const parsed = JSON.parse(rawText) as unknown
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return invalidJsonResponse()
+      }
+
+      const validation = requestBodySchema.safeParse(parsed)
+
+      if (!validation.success) {
+        const detail = validation.error.issues.map((issue) => issue.message).join('; ')
+
+        return NextResponse.json(
+          buildErrorResponse({
+            status: 400,
+            title: 'Invalid request body',
+            detail: detail || 'Request body did not match the expected schema.',
+            type: '/invalid-body',
+          }),
+          { status: 400 }
+        )
+      }
+
+      parsedBody = validation.data
+    }
+  } catch (error) {
+    console.error('Failed to parse client update request body', {
+      clientId,
+      error,
+    })
+
+    return invalidJsonResponse()
+  }
+
+  const hasUpdates = Object.values(parsedBody).some((value) => value !== undefined)
 
   const fetchClient = async () => {
     const clientRow = await db
@@ -273,15 +289,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       const client = await fetchClient()
 
       if (!client) {
-        return NextResponse.json(
-          buildErrorResponse({
-            status: 404,
-            title: 'Client not found',
-            detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
-            type: '/client-not-found',
-          }),
-          { status: 404 }
-        )
+        return createLegacyNotFoundResponse()
       }
 
       return NextResponse.json(client)
@@ -326,7 +334,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           eb.ref('client.user_id').as('userId'),
           eb.ref('client.stripe_customer_id').as('stripeCustomerId'),
           eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
-          sql<string | null>`stripeAccount.object ->> 'type'`.as('stripeAccountType'),
+          sql<string | null>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('stripeAccountType'),
         ])
         .where('client.id', '=', clientId)
         .where('client.trainer_id', '=', authorization.trainerId)
@@ -436,17 +444,9 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
     const client = await fetchClient()
 
-    if (!client) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Client not found',
-          detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
-          type: '/client-not-found',
-        }),
-        { status: 404 }
-      )
-    }
+      if (!client) {
+        return createLegacyNotFoundResponse()
+      }
 
     return NextResponse.json(client)
   } catch (error) {
@@ -455,8 +455,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
-          type: '/client-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
@@ -520,16 +519,12 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
     return NextResponse.json(
       buildErrorResponse({
-        status: 400,
-        title: 'Invalid client identifier',
-        detail: detail || 'Request parameters did not match the expected client identifier schema.',
-        type: '/invalid-parameter',
+        status: 500,
+        title: 'Something on our end went wrong.',
       }),
-      { status: 400 }
+      { status: 500 }
     )
   }
 
@@ -593,8 +588,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
-          type: '/client-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

@@ -2,15 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { getProductById, moneyString } from '@/server/products'
-
-const paramsSchema = z.object({
-  productId: z.string().trim().min(1, 'Product id is required').uuid({ message: 'Product id must be a valid UUID' }),
-})
-
-const deleteResponseSchema = z.object({
-  count: z.number().int().nonnegative(),
-})
 
 const nonNegativeMoneyString = moneyString.refine(
   (value) => Number.parseFloat(value) >= 0,
@@ -96,21 +89,7 @@ class MustUpdateImageUsingUploadError extends Error {}
 type HandlerContext = { params: Promise<{ productId: string }> }
 
 export async function GET(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid product identifier',
-        detail: detail || 'Request parameters did not match the expected product identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
+  const { productId } = await context.params
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while fetching product',
@@ -120,8 +99,6 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     return authorization.response
   }
 
-  const { productId } = paramsResult.data
-
   try {
     const product = await getProductById(authorization.trainerId, productId)
 
@@ -130,8 +107,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Product not found',
-          detail: 'We could not find a product with the specified identifier for the authenticated trainer.',
-          type: '/product-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
@@ -169,21 +145,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
 }
 
 export async function DELETE(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid path parameters',
-        detail: detail || 'Product identifier parameter did not match the expected schema.',
-        type: '/invalid-path-parameters',
-      }),
-      { status: 400 }
-    )
-  }
+  const { productId } = await context.params
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while deleting product',
@@ -192,8 +154,6 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   if (!authorization.ok) {
     return authorization.response
   }
-
-  const { productId } = paramsResult.data
 
   try {
     const deleted = await db.transaction().execute(async (trx) => {
@@ -219,16 +179,13 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Product not found',
-          detail: 'We could not find a product with the specified identifier for the authenticated trainer.',
-          type: '/product-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
     }
 
-    const responseBody = deleteResponseSchema.parse({ count: 1 })
-
-    return NextResponse.json(responseBody)
+    return new NextResponse(null, { status: 204 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -260,56 +217,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
 }
 
 export async function PATCH(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid product identifier',
-        detail: detail || 'Request parameters did not match the expected product identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
-
-  let parsedBody: z.infer<typeof patchRequestBodySchema>
-  try {
-    const rawText = await request.text()
-    const rawBody: unknown = rawText.trim().length === 0 ? {} : (JSON.parse(rawText) as unknown)
-
-    const bodyResult = patchRequestBodySchema.safeParse(rawBody)
-
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse product update request body', error)
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
-      }),
-      { status: 400 }
-    )
-  }
+  const { productId } = await context.params
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating product',
@@ -319,7 +227,28 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
     return authorization.response
   }
 
-  const { productId } = paramsResult.data
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
+  }
+
+  const bodyResult = patchRequestBodySchema.safeParse(parsedJson.data)
+
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
+      }),
+      { status: 400 }
+    )
+  }
+
+  const parsedBody = bodyResult.data
   const hasUpdates = Object.values(parsedBody).some((value) => value !== undefined)
 
   try {
@@ -331,8 +260,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
           buildErrorResponse({
             status: 404,
             title: 'Product not found',
-            detail: 'We could not find a product with the specified identifier for the authenticated trainer.',
-            type: '/product-not-found',
+            type: '/resource-not-found',
           }),
           { status: 404 }
         )
@@ -579,8 +507,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Product not found',
-          detail: 'We could not find a product with the specified identifier for the authenticated trainer.',
-          type: '/product-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
@@ -593,8 +520,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Product not found',
-          detail: 'We could not find a product with the specified identifier for the authenticated trainer.',
-          type: '/product-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

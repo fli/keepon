@@ -1,28 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
-import { paramsSchema } from '../_shared'
 import { listTrainerNotifications } from '@/server/notifications'
 
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/notifications/all'>
 
 export async function GET(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid path parameters',
-        detail: detail || 'Trainer id parameter is invalid.',
-        type: '/invalid-path-parameters',
-      }),
-      { status: 400 }
-    )
-  }
-
-  const { trainerId } = paramsResult.data
+  void context
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while fetching notifications',
@@ -30,18 +14,6 @@ export async function GET(request: NextRequest, context: HandlerContext) {
 
   if (!authorization.ok) {
     return authorization.response
-  }
-
-  if (authorization.trainerId !== trainerId) {
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 403,
-        title: 'Forbidden',
-        detail: 'You are not permitted to access notifications for this trainer.',
-        type: '/forbidden',
-      }),
-      { status: 403 }
-    )
   }
 
   try {
@@ -61,7 +33,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       )
     }
 
-    console.error('Failed to fetch all notifications for trainer', trainerId, error)
+    console.error('Failed to fetch all notifications for trainer', authorization.trainerId, error)
 
     return NextResponse.json(
       buildErrorResponse({

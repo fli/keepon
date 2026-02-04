@@ -32,7 +32,7 @@ const birthdaySchema = z.preprocess((value) => {
     return trimmed.length === 0 ? null : trimmed
   }
   return value
-}, z.union([z.coerce.date(), z.null()]).optional())
+}, z.union([z.coerce.date().refine((date) => !Number.isNaN(date.getTime()), 'Invalid date'), z.null()]).optional())
 
 const geoSchema = z
   .union([z.object({ lat: z.number(), lng: z.number() }), z.object({ lat: z.null(), lng: z.null() })])

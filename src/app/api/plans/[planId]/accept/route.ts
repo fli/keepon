@@ -3,10 +3,11 @@ import { headers } from 'next/headers'
 import { z } from 'zod'
 import { db, sql } from '@/lib/db'
 import { authenticateClientRequest, buildErrorResponse } from '../../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../../_lib/strictJson'
 import { normalizePlanRow, type RawPlanRow } from '../../shared'
 
 const paramsSchema = z.object({
-  planId: z.string().trim().min(1, 'planId must not be empty').uuid({ message: 'planId must be a valid UUID' }),
+  planId: z.string().trim().min(1, 'planId must not be empty'),
 })
 
 type HandlerContext = { params: Promise<Record<string, string>> }
@@ -82,6 +83,11 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       }),
       { status: 400 }
     )
+  }
+
+  const parsedBody = await parseStrictJsonBody(request)
+  if (!parsedBody.ok) {
+    return parsedBody.response
   }
 
   const authorization = await authenticateClientRequest(request, {
@@ -274,7 +280,6 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Subscription not found',
-          detail: 'We could not find a subscription matching that identifier.',
           type: '/resource-not-found',
         }),
         { status: 404 }

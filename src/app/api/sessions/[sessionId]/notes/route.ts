@@ -8,8 +8,7 @@ const paramsSchema = z.object({
   sessionId: z
     .string({ message: 'Session id is required.' })
     .trim()
-    .min(1, 'Session id must not be empty.')
-    .uuid({ message: 'Session id must be a valid UUID.' }),
+    .min(1, 'Session id must not be empty.'),
 })
 
 const requestBodySchema = z.object({
@@ -39,6 +38,17 @@ class SessionNotFoundError extends Error {
   }
 }
 
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
+
 export async function POST(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
 
@@ -59,39 +69,38 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   const { sessionId } = paramsResult.data
 
   let parsedBody: z.infer<typeof requestBodySchema>
+  let rawBody: unknown = {}
+  const rawBodyText = await request.text()
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const bodyResult = requestBodySchema.safeParse(rawBody)
-
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
+  if (rawBodyText.trim().length > 0) {
+    try {
+      rawBody = JSON.parse(rawBodyText)
+    } catch (error) {
+      console.error('Failed to parse session note request body', sessionId, error)
+      return createLegacyInvalidJsonResponse()
     }
 
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse session note request body', sessionId, error)
+    if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
+      return createLegacyInvalidJsonResponse()
+    }
+  }
+
+  const bodyResult = requestBodySchema.safeParse(rawBody)
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+
+  parsedBody = bodyResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating session notes',
@@ -137,9 +146,8 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
-          title: 'Session not found',
-          detail: 'We could not find a session with the specified identifier for the authenticated trainer.',
-          type: '/session-not-found',
+          title: 'Appointment not found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

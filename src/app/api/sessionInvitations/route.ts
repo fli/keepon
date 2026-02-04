@@ -3,18 +3,17 @@ import { db, sql } from '@/lib/db'
 import { z, ZodError } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../_lib/constants'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 
 const requestSchema = z.object({
   clientId: z
     .string({ message: 'clientId is required' })
     .trim()
-    .min(1, 'clientId must not be empty')
-    .uuid({ message: 'clientId must be a valid UUID' }),
+    .min(1, 'clientId must not be empty'),
   sessionId: z
     .string({ message: 'sessionId is required' })
     .trim()
-    .min(1, 'sessionId must not be empty')
-    .uuid({ message: 'sessionId must be a valid UUID' }),
+    .min(1, 'sessionId must not be empty'),
 })
 
 const nullableCount = z.union([z.number(), z.string(), z.null()]).transform((value) => {
@@ -205,36 +204,26 @@ const formatEventPrice = (price: number | null, locale: string, currency?: strin
 export async function POST(request: NextRequest) {
   let parsedBody: z.infer<typeof requestSchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const bodyResult = requestSchema.safeParse(rawBody)
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
+  }
 
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse session invitation request body', error)
+  const bodyResult = requestSchema.safeParse(parsed.data)
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+  parsedBody = bodyResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while creating session invitation',
@@ -384,9 +373,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
-          title: 'Client or session not found',
-          detail: 'We could not find the specified client or session for the authenticated trainer.',
-          type: '/client-or-session-not-found',
+          title: 'Appointment not found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

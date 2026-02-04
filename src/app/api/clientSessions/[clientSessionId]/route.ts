@@ -4,6 +4,7 @@ import type { DB } from '@/lib/db'
 import type { Insertable } from 'kysely'
 import { z, ZodError } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { adaptClientSessionRow, RawClientSessionRow } from '../../_lib/clientSessionsSchema'
 
 const paramsSchema = z.object({
@@ -52,6 +53,16 @@ const normalizeUpdatedCount = (value: unknown) => {
 
   return 0
 }
+
+const createLegacyNotFoundResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 404,
+      title: 'Client session not found',
+      type: '/resource-not-found',
+    }),
+    { status: 404 }
+  )
 
 export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
@@ -108,15 +119,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       .executeTakeFirst()) as RawClientSessionRow | undefined
 
     if (!row) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Client session not found',
-          detail: 'We could not find a client session with the specified identifier for the authenticated trainer.',
-          type: '/client-session-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     const clientSession = adaptClientSessionRow(row)
@@ -166,45 +169,27 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
   const { clientSessionId } = paramsResult.data
 
-  let parsedBody: z.infer<typeof requestBodySchema> = {}
-  const rawBodyText = await request.text()
-
-  if (rawBodyText.trim().length > 0) {
-    let jsonBody: unknown
-
-    try {
-      jsonBody = JSON.parse(rawBodyText)
-    } catch (error) {
-      console.error('Failed to parse client session update request JSON', clientSessionId, error)
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid JSON payload',
-          detail: 'Request body must be valid JSON.',
-          type: '/invalid-json',
-        }),
-        { status: 400 }
-      )
-    }
-
-    const bodyResult = requestBodySchema.safeParse(jsonBody)
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-
-    parsedBody = bodyResult.data
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
   }
+
+  const bodyResult = requestBodySchema.safeParse(parsedJson.data)
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
+
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
+      }),
+      { status: 400 }
+    )
+  }
+
+  const parsedBody = bodyResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating client session',
@@ -309,15 +294,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     return NextResponse.json(clientSession)
   } catch (error) {
     if (error instanceof ClientSessionNotFoundError) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Client session not found',
-          detail: 'We could not find a client session with the specified identifier for the authenticated trainer.',
-          type: '/client-session-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     if (error instanceof ZodError) {

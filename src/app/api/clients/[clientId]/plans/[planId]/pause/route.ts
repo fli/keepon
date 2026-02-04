@@ -5,9 +5,20 @@ import { authenticateTrainerRequest, buildErrorResponse } from '../../../../../_
 import { normalizePlanRow, type RawPlanRow } from '../../../../../plans/shared'
 
 const paramsSchema = z.object({
-  clientId: z.string().trim().min(1, 'Client id is required').uuid({ message: 'Client id must be a valid UUID.' }),
-  planId: z.string().trim().min(1, 'Plan id is required').uuid({ message: 'Plan id must be a valid UUID.' }),
+  clientId: z.string().trim().min(1, 'Client id is required'),
+  planId: z.string().trim().min(1, 'Plan id is required'),
 })
+
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
 
 type HandlerContext = RouteContext<'/api/clients/[clientId]/plans/[planId]/pause'>
 
@@ -52,6 +63,18 @@ type PlanStatusRow = {
 }
 
 export async function PUT(request: NextRequest, context: HandlerContext) {
+  const rawBodyText = await request.text()
+  if (rawBodyText.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(rawBodyText)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return createLegacyInvalidJsonResponse()
+      }
+    } catch {
+      return createLegacyInvalidJsonResponse()
+    }
+  }
+
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
@@ -156,7 +179,6 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Subscription not found',
-          detail: 'We could not find a subscription with the specified identifier for the authenticated trainer.',
           type: '/resource-not-found',
         }),
         { status: 404 }

@@ -41,7 +41,6 @@ export const salesQuerySchema = z.object({
     .string()
     .trim()
     .min(1, 'clientId must not be empty')
-    .uuid({ message: 'clientId must be a valid UUID' })
     .optional(),
 })
 
@@ -198,7 +197,7 @@ const buildClientSessionSummary = () =>
     .selectFrom('client_session as clientSession')
     .select((eb) => [
       eb.ref('clientSession.sale_id').as('saleId'),
-      sql<string | null>`MAX(${sql.ref('clientSession.id')})`.as('clientSessionId'),
+      sql<string | null>`MAX(${sql.ref('clientSession.id')}::text)`.as('clientSessionId'),
     ])
     .groupBy('clientSession.sale_id')
     .as('clientSessionSummary')

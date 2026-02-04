@@ -4,15 +4,11 @@ import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 
 const paramsSchema = z.object({
-  sessionSeriesId: z
-    .string()
-    .trim()
-    .min(1, 'Session series id is required')
-    .uuid({ message: 'Session series id must be a valid UUID' }),
+  sessionSeriesId: z.string().trim().min(1, 'Session series id is required'),
 })
 
 const querySchema = z.object({
-  sessionId: z.string().trim().min(1, 'Session id is required').uuid({ message: 'Session id must be a valid UUID' }),
+  sessionId: z.string().trim().min(1, 'Session id is required'),
 })
 
 const deleteResponseSchema = z.object({
@@ -231,9 +227,8 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
-          title: 'Session series not found',
-          detail: 'We could not find a session series with the specified identifier for the authenticated trainer.',
-          type: '/session-series-not-found',
+          title: 'Appointment series not found.',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

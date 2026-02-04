@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { z } from 'zod'
 import { authenticateClientRequest, buildErrorResponse } from '../../../_lib/accessToken'
-
-const paramsSchema = z.object({
-  clientId: z.string().trim().min(1, 'Client id is required').uuid({ message: 'Client id must be a valid UUID' }),
-})
+import { createLegacyInvalidJsonResponse, parseStrictJsonBody } from '../../../_lib/strictJson'
 
 type HandlerContext = RouteContext<'/api/clients/[clientId]/termsAccepted'>
 
@@ -24,23 +20,16 @@ const toNumber = (value: unknown) => {
 }
 
 export async function PUT(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid client identifier',
-        detail: detail || 'Request parameters did not match the expected client identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
+  void context
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
   }
+  const body = parsed.data
 
-  const { clientId } = paramsResult.data
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return createLegacyInvalidJsonResponse()
+  }
 
   const authorization = await authenticateClientRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while accepting client terms',
@@ -48,18 +37,6 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
   if (!authorization.ok) {
     return authorization.response
-  }
-
-  if (authorization.clientId !== clientId) {
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 403,
-        title: 'Forbidden',
-        detail: 'You are not permitted to update terms for another client.',
-        type: '/forbidden',
-      }),
-      { status: 403 }
-    )
   }
 
   try {
@@ -79,8 +56,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail: 'No client exists with the specified identifier for the authenticated access token.',
-          type: '/client-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

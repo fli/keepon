@@ -10,6 +10,7 @@ import {
   saleProductSchema,
   saleProductTypeSchema,
 } from './shared'
+import { uuidOrNil } from '@/lib/uuid'
 
 type PgError = { code?: string; constraint?: string }
 
@@ -19,18 +20,39 @@ const isPgError = (error: unknown): error is PgError =>
 class SaleNotFoundError extends Error {}
 class SaleAlreadyHasProductError extends Error {}
 
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
+const moneyReg = /^(?:-\d)?\d*?(?:\.\d+)?$/
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
+
+const createLegacyInvalidParametersResponse = (detail: string) =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: 'Your parameters were invalid.',
+      detail,
+      type: '/invalid-parameters',
+    }),
+    { status: 400 }
+  )
+
 const querySchema = z.object({
   type: saleProductTypeSchema.optional(),
   saleId: z.string().min(1).optional(),
   updatedAfter: z
     .string()
-    .transform((value) => {
+    .refine((value) => {
       const parsed = new Date(value)
-      if (Number.isNaN(parsed.getTime())) {
-        throw new Error('updatedAfter must be a valid ISO 8601 datetime string')
-      }
-      return parsed
-    })
+      return !Number.isNaN(parsed.getTime())
+    }, 'updatedAfter must be a valid ISO 8601 datetime string')
+    .transform((value) => new Date(value))
     .optional(),
   clientId: z.string().min(1).optional(),
 })
@@ -92,6 +114,14 @@ export async function GET(request: Request) {
       filters.clientId = authorization.clientId
     }
 
+    if (filters.saleId) {
+      filters.saleId = uuidOrNil(filters.saleId)
+    }
+
+    if (filters.clientId) {
+      filters.clientId = uuidOrNil(filters.clientId)
+    }
+
     const rows = await fetchSaleProducts(authorization.trainerId, {
       type: filters.type,
       saleId: filters.saleId,
@@ -129,56 +159,6 @@ export async function GET(request: Request) {
   }
 }
 
-const moneyAmountSchema = z
-  .union([z.string(), z.number()])
-  .transform((value) => {
-    const numeric =
-      typeof value === 'number'
-        ? value
-        : (() => {
-            const trimmed = value.trim()
-            return Number.parseFloat(trimmed)
-          })()
-
-    if (!Number.isFinite(numeric)) {
-      throw new Error('price must be a valid number')
-    }
-
-    if (numeric < 0) {
-      throw new Error('price must be at least 0')
-    }
-
-    return numeric.toFixed(2)
-  })
-  .pipe(z.string().regex(/^\d+(?:\.\d{2})$/, 'price must be a non-negative amount with two decimals'))
-
-const baseSaleProductSchema = z.object({
-  saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }),
-  price: moneyAmountSchema,
-  currency: z.string().trim().min(1, 'currency must not be empty'),
-  name: z.string().trim().min(1, 'name must not be empty'),
-  productId: z.string().trim().min(1, 'productId must not be empty').nullable().optional(),
-})
-
-const createSaleProductSchema = z.discriminatedUnion('type', [
-  baseSaleProductSchema.extend({
-    type: z.literal('creditPack'),
-    totalCredits: z.number().int().min(0, 'totalCredits must be at least 0'),
-  }),
-  baseSaleProductSchema.extend({
-    type: z.literal('item'),
-    quantity: z.number().int().min(1, 'quantity must be at least 1').optional(),
-  }),
-  baseSaleProductSchema.extend({
-    type: z.literal('service'),
-    durationMinutes: z.number().int().min(1, 'durationMinutes must be at least 1'),
-    location: z.string().nullable().optional(),
-    address: z.string().nullable().optional(),
-    geo: geoSchema.nullable().optional(),
-    googlePlaceId: z.string().nullable().optional(),
-  }),
-])
-
 const toNullableTrimmedString = (value?: string | null) => {
   if (value === null || value === undefined) {
     return null
@@ -188,38 +168,195 @@ const toNullableTrimmedString = (value?: string | null) => {
   return trimmed.length > 0 ? trimmed : null
 }
 
+type ValidSaleProductBody =
+  | {
+      type: 'creditPack'
+      saleId: string
+      price: string
+      currency: string
+      name: string
+      productId: string | null
+      totalCredits: number
+    }
+  | {
+      type: 'item'
+      saleId: string
+      price: string
+      currency: string
+      name: string
+      productId: string | null
+      quantity: number
+    }
+  | {
+      type: 'service'
+      saleId: string
+      price: string
+      currency: string
+      name: string
+      productId: string | null
+      durationMinutes: number
+      location: string | null
+      address: string | null
+      geo: { lat: number; lng: number } | null
+      googlePlaceId: string | null
+    }
+
+const validateSaleProductBody = (body: Record<string, unknown>) => {
+  const errors: string[] = []
+
+  const typeRaw = body.type
+  if (typeRaw === undefined) {
+    return { ok: false as const, detail: 'type  not provided' }
+  }
+  if (typeof typeRaw !== 'string') {
+    return { ok: false as const, detail: 'type  should be string' }
+  }
+
+  const saleIdRaw = body.saleId
+  if (saleIdRaw === undefined) {
+    errors.push('saleId  not provided')
+  } else if (typeof saleIdRaw !== 'string') {
+    errors.push('saleId  should be string')
+  }
+
+  const priceRaw = body.price
+  if (priceRaw === undefined) {
+    errors.push('price  not provided')
+  } else if (typeof priceRaw !== 'string') {
+    errors.push('price  should be string')
+  } else if (!moneyReg.test(priceRaw)) {
+    errors.push('price  should be Money')
+  } else if (Number.parseFloat(priceRaw) < 0) {
+    errors.push('price  should be greater than or equal to 0')
+  }
+
+  const currencyRaw = body.currency
+  if (currencyRaw === undefined) {
+    errors.push('currency  not provided')
+  } else if (typeof currencyRaw !== 'string') {
+    errors.push('currency  should be string')
+  }
+
+  const nameRaw = body.name
+  if (nameRaw === undefined) {
+    errors.push('name  not provided')
+  } else if (typeof nameRaw !== 'string') {
+    errors.push('name  should be string')
+  } else if (nameRaw.trim().length === 0) {
+    errors.push('name  should be string')
+  }
+
+  const productIdRaw = body.productId
+  if (productIdRaw !== undefined && productIdRaw !== null && typeof productIdRaw !== 'string') {
+    errors.push('productId  should be string')
+  }
+
+  if (typeRaw === 'creditPack') {
+    const totalCreditsRaw = body.totalCredits
+    if (totalCreditsRaw === undefined) {
+      errors.push('totalCredits  not provided')
+    } else if (typeof totalCreditsRaw !== 'number' || Number.isNaN(totalCreditsRaw)) {
+      errors.push('totalCredits  should be number')
+    } else if (totalCreditsRaw < 0) {
+      errors.push('totalCredits  should be greater than or equal to 0')
+    }
+  } else if (typeRaw === 'item') {
+    const quantityRaw = body.quantity
+    if (quantityRaw !== undefined) {
+      if (typeof quantityRaw !== 'number' || Number.isNaN(quantityRaw)) {
+        errors.push('quantity  should be number')
+      } else if (quantityRaw < 1) {
+        errors.push('quantity  should be greater than or equal to 1')
+      }
+    }
+  } else if (typeRaw === 'service') {
+    const durationRaw = body.durationMinutes
+    if (durationRaw === undefined) {
+      errors.push('durationMinutes  not provided')
+    } else if (typeof durationRaw !== 'number' || Number.isNaN(durationRaw)) {
+      errors.push('durationMinutes  should be number')
+    } else if (durationRaw < 1) {
+      errors.push('durationMinutes  should be greater than or equal to 1')
+    }
+  }
+
+  if (errors.length > 0) {
+    return { ok: false as const, detail: errors.join('\n') }
+  }
+
+  const saleId = saleIdRaw as string
+  const price = priceRaw as string
+  const currency = currencyRaw as string
+  const name = nameRaw as string
+  const productId = toNullableTrimmedString(
+    typeof productIdRaw === 'string' ? productIdRaw : null
+  )
+
+  if (typeRaw === 'creditPack') {
+    return {
+      ok: true as const,
+      data: {
+        type: 'creditPack' as const,
+        saleId,
+        price,
+        currency,
+        name,
+        productId,
+        totalCredits: body.totalCredits as number,
+      },
+    }
+  }
+
+  if (typeRaw === 'item') {
+    return {
+      ok: true as const,
+      data: {
+        type: 'item' as const,
+        saleId,
+        price,
+        currency,
+        name,
+        productId,
+        quantity:
+          typeof body.quantity === 'number' && !Number.isNaN(body.quantity)
+            ? (body.quantity as number)
+            : 1,
+      },
+    }
+  }
+
+  const locationRaw = body.location
+  const addressRaw = body.address
+  const googlePlaceIdRaw = body.googlePlaceId
+  const geoRaw = body.geo
+
+  return {
+    ok: true as const,
+    data: {
+      type: 'service' as const,
+      saleId,
+      price,
+      currency,
+      name,
+      productId,
+      durationMinutes: body.durationMinutes as number,
+      location: toNullableTrimmedString(typeof locationRaw === 'string' ? locationRaw : null),
+      address: toNullableTrimmedString(typeof addressRaw === 'string' ? addressRaw : null),
+      googlePlaceId: toNullableTrimmedString(
+        typeof googlePlaceIdRaw === 'string' ? googlePlaceIdRaw : null
+      ),
+      geo:
+        geoRaw && typeof geoRaw === 'object' && !Array.isArray(geoRaw)
+          ? (geoSchema.safeParse(geoRaw).success ? (geoRaw as { lat: number; lng: number }) : null)
+          : null,
+    },
+  }
+}
+
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+
 export async function POST(request: Request) {
-  let body: unknown
-
-  try {
-    body = await request.json()
-  } catch (error) {
-    console.error('Failed to parse sale product body as JSON', error)
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
-      }),
-      { status: 400 }
-    )
-  }
-
-  const parsed = createSaleProductSchema.safeParse(body)
-  if (!parsed.success) {
-    const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid request body',
-        detail: detail || undefined,
-        type: '/invalid-body',
-      }),
-      { status: 400 }
-    )
-  }
-
   const auth = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while creating sale product',
   })
@@ -228,7 +365,29 @@ export async function POST(request: Request) {
     return auth.response
   }
 
-  const data = parsed.data
+  let body: unknown
+  try {
+    const rawText = await request.text()
+    body = rawText.trim().length === 0 ? {} : (JSON.parse(rawText) as unknown)
+  } catch (error) {
+    console.error('Failed to parse sale product body as JSON', error)
+    return createLegacyInvalidJsonResponse()
+  }
+
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return createLegacyInvalidJsonResponse()
+  }
+
+  const validation = validateSaleProductBody(body as Record<string, unknown>)
+  if (!validation.ok) {
+    return createLegacyInvalidParametersResponse(validation.detail)
+  }
+
+  const data = validation.data
+
+  if (data.productId && !isUuid(data.productId)) {
+    throw new Error('Invalid product id')
+  }
 
   try {
     const saleProductId = await db.transaction().execute(async (trx) => {
@@ -381,8 +540,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       buildErrorResponse({
         status: 500,
-        title: 'Failed to create sale product',
-        type: '/internal-server-error',
+        title: 'Something on our end went wrong.',
       }),
       { status: 500 }
     )

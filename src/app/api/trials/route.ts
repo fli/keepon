@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 
 const FALLBACK_TRIAL_DURATION = '14 days'
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
 
 const intervalLiteralSchema = z
   .string()
@@ -43,6 +44,33 @@ type TrialRow = z.infer<typeof trialResponseSchema>
 const TRIAL_NOT_FOUND_ERROR = 'TRIAL_NOT_FOUND'
 
 export async function POST(request: Request) {
+  const contentType = request.headers.get('content-type') ?? ''
+  if (contentType.includes('application/json')) {
+    const rawBody = await request.text()
+    if (rawBody.trim().length > 0) {
+      try {
+        const parsed = JSON.parse(rawBody)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          return NextResponse.json(
+            buildErrorResponse({
+              status: 400,
+              title: LEGACY_INVALID_JSON_MESSAGE,
+            }),
+            { status: 400 }
+          )
+        }
+      } catch {
+        return NextResponse.json(
+          buildErrorResponse({
+            status: 400,
+            title: LEGACY_INVALID_JSON_MESSAGE,
+          }),
+          { status: 400 }
+        )
+      }
+    }
+  }
+
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while creating trial',
   })

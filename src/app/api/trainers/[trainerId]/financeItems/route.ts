@@ -4,9 +4,7 @@ import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { adaptFinanceItemRow, financeItemListSchema, type FinanceItemRow } from '../../../financeItems/shared'
 
-const paramsSchema = z.object({
-  trainerId: z.string().min(1, 'Trainer id is required'),
-})
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
 
 const requestBodySchema = z.array(
   z
@@ -26,29 +24,13 @@ const requestBodySchema = z.array(
     .strict()
 )
 
-const querySchema = z.object({
-  updatedAtGt: z
-    .string()
-    .trim()
-    .transform((value) => {
-      const parsed = new Date(value)
-      if (Number.isNaN(parsed.getTime())) {
-        throw new Error('Invalid updatedAt.gt value')
-      }
-      return parsed
-    })
-    .optional(),
-})
-
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/financeItems'>
 
 const invalidJsonResponse = () =>
   NextResponse.json(
     buildErrorResponse({
       status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
+      title: LEGACY_INVALID_JSON_MESSAGE,
     }),
     { status: 400 }
   )
@@ -57,51 +39,14 @@ const invalidBodyResponse = (detail?: string) =>
   NextResponse.json(
     buildErrorResponse({
       status: 400,
-      title: 'Invalid request body',
-      detail: detail || 'Request body did not match the expected schema.',
-      type: '/invalid-body',
+      title: 'Your parameters were invalid.',
+      detail: detail || 'Your parameters were invalid.',
+      type: '/invalid-parameters',
     }),
     { status: 400 }
   )
 
 export async function GET(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid path parameters',
-        detail: detail || 'Trainer id parameter is invalid.',
-        type: '/invalid-path-parameters',
-      }),
-      { status: 400 }
-    )
-  }
-
-  const { trainerId } = paramsResult.data
-
-  const url = new URL(request.url)
-  const updatedAtGtParam = url.searchParams.get('filter[where][updatedAt][gt]')
-
-  const queryResult = querySchema.safeParse({
-    updatedAtGt: updatedAtGtParam && updatedAtGtParam.trim().length > 0 ? updatedAtGtParam : undefined,
-  })
-
-  if (!queryResult.success) {
-    const detail = queryResult.error.issues.map((issue) => issue.message).join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid query parameters',
-        detail: detail || 'Request query parameters did not match the expected schema.',
-        type: '/invalid-query',
-      }),
-      { status: 400 }
-    )
-  }
-
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while fetching finance items',
   })
@@ -110,16 +55,30 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     return authorization.response
   }
 
-  if (authorization.trainerId !== trainerId) {
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 403,
-        title: 'Forbidden',
-        detail: 'You are not permitted to access finance items for this trainer.',
-        type: '/forbidden',
-      }),
-      { status: 403 }
-    )
+  const url = new URL(request.url)
+  let updatedAtGt: Date | null = null
+  const filterParam = url.searchParams.get('filter')
+  if (filterParam !== null) {
+    let parsedFilter: unknown
+    try {
+      parsedFilter = JSON.parse(filterParam)
+    } catch {
+      return invalidBodyResponse('filter  should be Record<string, unknown>')
+    }
+    if (!parsedFilter || typeof parsedFilter !== 'object' || Array.isArray(parsedFilter)) {
+      return invalidBodyResponse('filter  should be Record<string, unknown>')
+    }
+    const gtValue = (parsedFilter as any)?.where?.updatedAt?.gt
+    if (gtValue !== undefined && gtValue !== null) {
+      if (typeof gtValue !== 'string') {
+        return invalidBodyResponse('filter.where.updatedAt.gt  should be DateTimeString')
+      }
+      const parsedDate = new Date(gtValue)
+      if (Number.isNaN(parsedDate.getTime())) {
+        return invalidBodyResponse('filter.where.updatedAt.gt  should be DateTimeString')
+      }
+      updatedAtGt = parsedDate
+    }
   }
 
   try {
@@ -140,15 +99,11 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       ])
       .where('v.trainerId', '=', authorization.trainerId)
 
-    const updatedAtGt = queryResult.data.updatedAtGt
     if (updatedAtGt) {
       query = query.where('v.updatedAt', '>=', updatedAtGt)
     }
 
-    const rows = (await query
-      .orderBy('v.updatedAt', 'desc')
-      .orderBy('v.createdAt', 'desc')
-      .execute()) as FinanceItemRow[]
+    const rows = (await query.execute()) as FinanceItemRow[]
 
     const financeItems = financeItemListSchema.parse(rows.map((row) => adaptFinanceItemRow(row)))
 
@@ -179,23 +134,6 @@ export async function GET(request: NextRequest, context: HandlerContext) {
 }
 
 export async function POST(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid path parameters',
-        detail: detail || 'Trainer id parameter is invalid.',
-        type: '/invalid-path-parameters',
-      }),
-      { status: 400 }
-    )
-  }
-
-  const { trainerId } = paramsResult.data
-
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while creating finance items',
   })
@@ -204,22 +142,15 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     return authorization.response
   }
 
-  if (authorization.trainerId !== trainerId) {
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 403,
-        title: 'Forbidden',
-        detail: 'You are not permitted to create finance items for this trainer.',
-        type: '/forbidden',
-      }),
-      { status: 403 }
-    )
-  }
-
   let parsedBody: z.infer<typeof requestBodySchema>
 
   try {
-    const rawBody = (await request.json()) as unknown
+    const rawText = await request.text()
+    const rawBody: unknown = rawText.trim().length === 0 ? {} : (JSON.parse(rawText) as unknown)
+
+    if (rawBody === null || typeof rawBody !== 'object') {
+      return invalidJsonResponse()
+    }
     const bodyResult = requestBodySchema.safeParse(rawBody)
 
     if (!bodyResult.success) {

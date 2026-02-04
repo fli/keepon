@@ -4,6 +4,7 @@ import { db, type Json } from '@/lib/db'
 import type { AnalyticsData } from '@/lib/db'
 import type { Insertable } from 'kysely'
 import { buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 
 const dateLikeSchema = z.union([z.string(), z.number(), z.date()])
 const looseRecord = z.record(z.string(), z.unknown())
@@ -43,26 +44,13 @@ const screenEventSchema = z.object({
 })
 
 const requestSchema = z.object({
-  batch: z
-    .array(z.discriminatedUnion('type', [identifyEventSchema, trackEventSchema, screenEventSchema]))
-    .min(1, 'batch must contain at least one event'),
+  batch: z.array(z.discriminatedUnion('type', [identifyEventSchema, trackEventSchema, screenEventSchema])).optional(),
   sentAt: dateLikeSchema.optional(),
   context: looseRecord.optional(),
 })
 
 type RequestBody = z.infer<typeof requestSchema>
 type AnalyticsRow = Insertable<AnalyticsData>
-
-const createInvalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
-    }),
-    { status: 400 }
-  )
 
 const createInvalidBodyResponse = (detail?: string) =>
   NextResponse.json(
@@ -162,17 +150,20 @@ const computeTimestamp = (
 export async function POST(request: Request) {
   let body: RequestBody
 
-  try {
-    const raw = (await request.json()) as unknown
-    const parsed = requestSchema.safeParse(raw)
-    if (!parsed.success) {
-      const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
-      return createInvalidBodyResponse(detail || undefined)
-    }
-    body = parsed.data
-  } catch (error) {
-    console.error('Failed to parse /lytics/batch payload as JSON', error)
-    return createInvalidJsonResponse()
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
+  }
+
+  const parsed = requestSchema.safeParse(parsedJson.data)
+  if (!parsed.success) {
+    const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
+    return createInvalidBodyResponse(detail || undefined)
+  }
+  body = parsed.data
+
+  if (!body.batch || body.batch.length === 0) {
+    return new NextResponse(null, { status: 204 })
   }
 
   const now = new Date()

@@ -5,11 +5,6 @@ import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
 
-const authorizationSchema = z.object({
-  email: z.string().trim().min(1, 'Email is required').email('Email must be a valid email address.'),
-  code: z.string().trim().min(1, 'Code is required'),
-})
-
 const clientSchema = z.object({
   id: z.string(),
   firstName: z.string(),
@@ -42,47 +37,33 @@ const createTemporaryCodeInvalidResponse = () =>
     { status: 401 }
   )
 
-type ParsedAuthorization = { ok: true; email: string; code: string } | { ok: false }
-
-const parseBasicAuthorization = (headerValue: string | null): ParsedAuthorization => {
-  if (!headerValue) {
-    return { ok: false }
-  }
-
-  const [scheme, encodedCredentials] = headerValue.split(' ')
-  if (!scheme || !encodedCredentials || scheme.toLowerCase() !== 'basic') {
-    return { ok: false }
-  }
-
-  let decoded: string
-
-  try {
-    decoded = Buffer.from(encodedCredentials, 'base64').toString('utf8')
-  } catch {
-    return { ok: false }
-  }
-
-  const separatorIndex = decoded.indexOf(':')
-  if (separatorIndex < 0) {
-    return { ok: false }
-  }
-
-  const email = decoded.slice(0, separatorIndex)
-  const code = decoded.slice(separatorIndex + 1)
-
-  const parsed = authorizationSchema.safeParse({ email, code })
-
-  if (!parsed.success) {
-    return { ok: false }
-  }
-
-  return { ok: true, ...parsed.data }
-}
+const createLegacyInternalErrorResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 500,
+      title: 'Something on our end went wrong.',
+    }),
+    { status: 500 }
+  )
 
 export async function GET(_request: Request) {
-  const authorization = parseBasicAuthorization((await headers()).get('authorization'))
+  const headerValue = (await headers()).get('authorization')
+  const [authType, encodedCredentials] = headerValue?.split(' ') || []
+  let email = ''
+  let code = ''
 
-  if (!authorization.ok) {
+  try {
+    const decoded = Buffer.from(encodedCredentials, 'base64').toString('utf8')
+    const separatorIndex = decoded.indexOf(':')
+    if (separatorIndex >= 0) {
+      email = decoded.slice(0, separatorIndex)
+      code = decoded.slice(separatorIndex + 1)
+    }
+  } catch {
+    return createLegacyInternalErrorResponse()
+  }
+
+  if (authType !== 'Basic' || !email || !code) {
     return createMissingTokenResponse()
   }
 
@@ -91,8 +72,8 @@ export async function GET(_request: Request) {
       const loginRequest = await sql<{ exists: true }>`
           SELECT TRUE AS exists
             FROM client_login_request
-           WHERE email = ${authorization.email}
-             AND code = ${authorization.code}
+           WHERE email = ${email}
+             AND code = ${code}
              AND expires_at > NOW()
              AND NOT authenticated
              AND failed_authentication_count < 3
@@ -103,7 +84,7 @@ export async function GET(_request: Request) {
         await sql`
             UPDATE client_login_request
                SET failed_authentication_count = failed_authentication_count + 1
-             WHERE email = ${authorization.email}
+             WHERE email = ${email}
                AND expires_at > NOW()
                AND NOT authenticated
           `.execute(trx)
@@ -126,7 +107,7 @@ export async function GET(_request: Request) {
             trainer.last_name AS service_provider_last_name
           FROM client
           JOIN trainer ON trainer.id = client.trainer_id
-         WHERE client.email = ${authorization.email}
+         WHERE client.email = ${email}
         `.execute(trx)
 
       if (clientsResult.rows.length === 0) {
@@ -166,7 +147,7 @@ export async function GET(_request: Request) {
 
     console.error('Failed to list client logins', {
       error,
-      email: authorization.ok ? authorization.email : undefined,
+      email,
     })
 
     return NextResponse.json(

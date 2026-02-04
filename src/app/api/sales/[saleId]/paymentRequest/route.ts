@@ -11,12 +11,35 @@ import {
 } from '@/server/sales'
 
 const paramsSchema = z.object({
-  saleId: z.string().uuid({ message: 'saleId must be a valid UUID' }),
+  saleId: z.string(),
 })
+
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
 
 type HandlerContext = RouteContext<'/api/sales/[saleId]/paymentRequest'>
 
 export async function POST(request: NextRequest, context: HandlerContext) {
+  const rawBodyText = await request.text()
+  if (rawBodyText.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(rawBodyText)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return createLegacyInvalidJsonResponse()
+      }
+    } catch {
+      return createLegacyInvalidJsonResponse()
+    }
+  }
+
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {
@@ -61,8 +84,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Sale not found',
-          detail: 'No sale exists for this trainer with that id.',
-          type: '/sale-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
@@ -170,8 +192,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Sale not found',
-          detail: 'No sale exists for this trainer with that id.',
-          type: '/sale-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

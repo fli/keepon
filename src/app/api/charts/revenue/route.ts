@@ -42,22 +42,16 @@ const querySchema = z
       })
     }
 
-    if (value.endTime) {
-      const end = Date.parse(value.endTime)
-      if (!Number.isFinite(end)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['endTime'],
-          message: 'endTime must be a valid ISO 8601 timestamp.',
-        })
-      } else if (Number.isFinite(start) && end <= start) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['endTime'],
-          message: 'endTime must be after startTime.',
-        })
-      }
+  if (value.endTime) {
+    const end = Date.parse(value.endTime)
+    if (!Number.isFinite(end)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['endTime'],
+        message: 'endTime must be a valid ISO 8601 timestamp.',
+      })
     }
+  }
   })
 
 const revenuePointSchema = z.object({
@@ -118,6 +112,14 @@ type RawRevenueRow = {
 }
 
 export async function GET(request: Request) {
+  const authorization = await authenticateTrainerRequest(request, {
+    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching revenue chart data',
+  })
+
+  if (!authorization.ok) {
+    return authorization.response
+  }
+
   const url = new URL(request.url)
 
   const queryResult = querySchema.safeParse({
@@ -141,13 +143,16 @@ export async function GET(request: Request) {
   }
 
   const { unit, startTime, timezone, endTime } = queryResult.data
-
-  const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage: 'Failed to extend access token expiry while fetching revenue chart data',
-  })
-
-  if (!authorization.ok) {
-    return authorization.response
+  const parsedStart = Date.parse(startTime)
+  const parsedEnd = endTime ? Date.parse(endTime) : null
+  if (Number.isFinite(parsedStart) && parsedEnd !== null && Number.isFinite(parsedEnd) && parsedEnd < parsedStart) {
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 500,
+        title: 'Something on our end went wrong.',
+      }),
+      { status: 500 }
+    )
   }
 
   try {
@@ -246,7 +251,6 @@ export async function GET(request: Request) {
         JOIN periods ON payments.date <@ periods.r
         GROUP BY periods.r
       ) results ON results.r = periods.r
-      ORDER BY "startTime"
     `.execute(db)
 
     const data = revenueResult.rows.map((row) => ({

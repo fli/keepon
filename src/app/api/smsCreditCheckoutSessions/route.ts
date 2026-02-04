@@ -4,6 +4,7 @@ import { z } from 'zod'
 import Stripe from 'stripe'
 import BigNumber from 'bignumber.js'
 import { buildErrorResponse } from '../_lib/accessToken'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 import { getSmsCreditPricingForCountry } from '../_lib/smsCreditPricing'
 import { getStripeClient, STRIPE_API_VERSION } from '../_lib/stripeClient'
 
@@ -11,7 +12,7 @@ const stripeApiVersionDate = STRIPE_API_VERSION.split('.')[0]
 
 const requestBodySchema = z.object({
   smsCreditCheckoutId: z.string().trim().min(1, 'smsCreditCheckoutId is required'),
-  creditCount: z.number().int().positive('creditCount must be a positive integer'),
+  creditCount: z.number().int('creditCount must be an integer'),
 })
 
 const checkoutDetailsSchema = z.object({
@@ -25,17 +26,6 @@ const checkoutDetailsSchema = z.object({
   firstName: z.string(),
   lastName: z.string().nullable(),
 })
-
-const createInvalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
-    }),
-    { status: 400 }
-  )
 
 const createInvalidBodyResponse = (detail?: string) =>
   NextResponse.json(
@@ -53,7 +43,6 @@ const createCheckoutNotFoundResponse = () =>
     buildErrorResponse({
       status: 404,
       title: 'SMS credit checkout not found',
-      detail: 'No trainer is associated with the provided SMS credit checkout identifier.',
       type: '/resource-not-found',
     }),
     { status: 404 }
@@ -113,20 +102,19 @@ const buildServiceProviderName = (details: z.infer<typeof checkoutDetailsSchema>
 export async function POST(request: Request) {
   let body: z.infer<typeof requestBodySchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const parsed = requestBodySchema.safeParse(rawBody)
-
-    if (!parsed.success) {
-      const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
-      return createInvalidBodyResponse(detail || undefined)
-    }
-
-    body = parsed.data
-  } catch (error) {
-    console.error('Failed to parse SMS credit checkout session request body', error)
-    return createInvalidJsonResponse()
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
   }
+
+  const validated = requestBodySchema.safeParse(parsed.data)
+
+  if (!validated.success) {
+    const detail = validated.error.issues.map((issue) => issue.message).join('; ')
+    return createInvalidBodyResponse(detail || undefined)
+  }
+
+  body = validated.data
 
   const stripeClient = getStripeClient()
 

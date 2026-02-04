@@ -3,14 +3,6 @@ import { db } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 
-const paramsSchema = z.object({
-  invitationId: z
-    .string()
-    .trim()
-    .min(1, 'Session invitation id is required')
-    .uuid({ message: 'Session invitation id must be a valid UUID' }),
-})
-
 type HandlerContext = RouteContext<'/api/sessionInvitations/[invitationId]'>
 
 const normalizeDeletedCount = (value: unknown) => {
@@ -31,21 +23,7 @@ const normalizeDeletedCount = (value: unknown) => {
 }
 
 export async function DELETE(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid session invitation identifier',
-        detail: detail || 'Request parameters did not match the expected session invitation identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
+  const { invitationId } = await context.params
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while deleting session invitation',
@@ -54,8 +32,6 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
   if (!authorization.ok) {
     return authorization.response
   }
-
-  const { invitationId } = paramsResult.data
 
   try {
     const deleteResult = await db
@@ -71,9 +47,8 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
-          title: 'Session invitation not found',
-          detail: 'We could not find an invitation with the specified identifier for the authenticated trainer.',
-          type: '/session-invitation-not-found',
+          title: 'Invitation not found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

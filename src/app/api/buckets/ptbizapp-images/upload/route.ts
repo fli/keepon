@@ -4,13 +4,22 @@ import { NextResponse } from 'next/server'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { PublicBucketNotConfiguredError, uploadToPublicBucket } from '../../../_lib/storage'
 
-const createInvalidBodyResponse = (detail?: string) =>
+const createInvalidBodyResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 500,
+      title: 'Something on our end went wrong.',
+    }),
+    { status: 500 }
+  )
+
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
   NextResponse.json(
     buildErrorResponse({
       status: 400,
-      title: 'Invalid request body',
-      detail: detail ?? 'Request body must be multipart/form-data with a file field named "file".',
-      type: '/invalid-body',
+      title: LEGACY_INVALID_JSON_MESSAGE,
     }),
     { status: 400 }
   )
@@ -55,6 +64,23 @@ export async function POST(request: Request, _context: HandlerContext) {
     return auth.response
   }
 
+  const contentType = request.headers.get('content-type') ?? ''
+  if (!contentType.includes('multipart/form-data')) {
+    const rawBodyText = await request.text()
+    if (rawBodyText.trim().length === 0) {
+      return createInvalidBodyResponse()
+    }
+    try {
+      const parsed = JSON.parse(rawBodyText)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return createLegacyInvalidJsonResponse()
+      }
+    } catch {
+      return createLegacyInvalidJsonResponse()
+    }
+    return createInvalidBodyResponse()
+  }
+
   let formData: FormData
   try {
     formData = await request.formData()
@@ -64,7 +90,7 @@ export async function POST(request: Request, _context: HandlerContext) {
 
   const file = formData.get('file')
   if (!file || !(file instanceof File)) {
-    return createInvalidBodyResponse('A file field named "file" is required.')
+    return createInvalidBodyResponse()
   }
 
   const buffer = Buffer.from(await file.arrayBuffer())

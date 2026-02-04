@@ -11,27 +11,27 @@ import {
   type TransactionFeeType,
 } from '../_lib/transactionFees'
 
-const amountSchema = z
-  .string()
-  .trim()
-  .min(1, 'Amount is required.')
-  .transform((value) => new BigNumber(value))
-  .refine((amount) => amount.isFinite(), 'Amount must be a finite number.')
-  .refine((amount) => amount.gte(0), 'Amount must be greater than or equal to 0.')
+const LEGACY_INVALID_PARAMETERS_TITLE = 'Your parameters were invalid.'
 
-const querySchema = z.object({
-  amount: amountSchema,
-  currency: z
-    .string()
-    .trim()
-    .min(1, 'Currency is required.')
-    .transform((value) => value.toUpperCase()),
-  cardCountry: z
-    .string()
-    .trim()
-    .min(2, 'Card country code must contain at least 2 characters.')
-    .transform((value) => value.toUpperCase()),
-})
+const invalidParametersResponse = (detail: string) =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_PARAMETERS_TITLE,
+      detail,
+      type: '/invalid-parameters',
+    }),
+    { status: 400 }
+  )
+
+const parseLegacyQueryValue = (value: string | null) => {
+  if (value === null) return undefined
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
+}
 
 const trainerCountrySchema = z.object({
   country: z
@@ -59,8 +59,6 @@ const responseSchema = z.object({
   feeType: feeTypeSchema,
 })
 
-type Query = z.infer<typeof querySchema>
-
 export async function GET(request: Request) {
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while calculating transaction fee',
@@ -71,37 +69,34 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url)
-  const rawQuery: Record<keyof Query, string | undefined> = {
-    amount: url.searchParams.get('amount') ?? undefined,
-    currency: url.searchParams.get('currency') ?? undefined,
-    cardCountry: url.searchParams.get('cardCountry') ?? undefined,
+  const amountValue = parseLegacyQueryValue(url.searchParams.get('amount'))
+  const currencyValue = parseLegacyQueryValue(url.searchParams.get('currency'))
+  const cardCountryValue = parseLegacyQueryValue(url.searchParams.get('cardCountry'))
+
+  if (amountValue === undefined) {
+    return invalidParametersResponse('amount  not provided')
+  }
+  if (typeof amountValue !== 'number' || Number.isNaN(amountValue)) {
+    return invalidParametersResponse('amount  should be number')
+  }
+  if (currencyValue === undefined) {
+    return invalidParametersResponse('currency  not provided')
+  }
+  if (typeof currencyValue !== 'string') {
+    return invalidParametersResponse('currency  should be string')
+  }
+  if (cardCountryValue === undefined) {
+    return invalidParametersResponse('cardCountry  not provided')
+  }
+  if (typeof cardCountryValue !== 'string') {
+    return invalidParametersResponse('cardCountry  should be string')
   }
 
-  const parsedQuery = querySchema.safeParse(rawQuery)
-  if (!parsedQuery.success) {
-    const detail = parsedQuery.error.issues
-      .map((issue) => {
-        if (issue.message === 'Required') {
-          const path = issue.path.join('.') || 'query'
-          return `Query parameter "${path}" is required.`
-        }
-        return issue.message
-      })
-      .join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid query parameters',
-        detail: detail.length > 0 ? detail : 'The provided query parameters are invalid.',
-        type: '/invalid-query',
-      }),
-      { status: 400 }
-    )
-  }
+  const amount = new BigNumber(amountValue)
+  const currency = currencyValue
+  const cardCountry = cardCountryValue
 
-  const { amount, currency, cardCountry } = parsedQuery.data
-
-  const limits = currencyChargeLimits[currency as keyof typeof currencyChargeLimits]
+  const limits = currencyChargeLimits[currency.toUpperCase() as keyof typeof currencyChargeLimits]
 
   if (!limits) {
     return NextResponse.json(

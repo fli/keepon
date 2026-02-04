@@ -59,7 +59,7 @@ const buildValidationUrl = (requestUrl: string) => {
   if (baseUrl) {
     const parsedBase = new URL(baseUrl)
     url.host = parsedBase.host
-    url.protocol = parsedBase.protocol
+    url.protocol = 'https:'
   }
 
   return url.toString()

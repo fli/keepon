@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { adaptFinanceItemRow, financeItemSchema, type FinanceItemRow } from '../shared'
 
 const paramsSchema = z.object({
@@ -41,6 +42,16 @@ class FinanceItemNotFoundError extends Error {
     this.name = 'FinanceItemNotFoundError'
   }
 }
+
+const createLegacyNotFoundResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 404,
+      title: 'Finance item not found',
+      type: '/resource-not-found',
+    }),
+    { status: 404 }
+  )
 
 export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
@@ -90,15 +101,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       .executeTakeFirst()) as FinanceItemRow | undefined
 
     if (!row) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Finance item not found',
-          detail: 'We could not find a finance item with the specified identifier for the authenticated trainer.',
-          type: '/finance-item-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     const financeItem = financeItemSchema.parse(adaptFinanceItemRow(row))
@@ -162,42 +165,28 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   }
 
   let parsedBody: z.infer<typeof requestBodySchema>
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
+  }
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const bodyResult = requestBodySchema.safeParse(rawBody)
+  const bodyResult = requestBodySchema.safeParse(parsed.data)
 
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse finance item update request body', {
-      financeItemId,
-      error,
-    })
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+
+  parsedBody = bodyResult.data
 
   const hasUpdates = Object.values(parsedBody).some((value) => value !== undefined)
 
@@ -242,15 +231,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       return NextResponse.json(financeItem)
     } catch (error) {
       if (error instanceof FinanceItemNotFoundError) {
-        return NextResponse.json(
-          buildErrorResponse({
-            status: 404,
-            title: 'Finance item not found',
-            detail: 'We could not find a finance item with the specified identifier for the authenticated trainer.',
-            type: '/finance-item-not-found',
-          }),
-          { status: 404 }
-        )
+        return createLegacyNotFoundResponse()
       }
 
       if (error instanceof z.ZodError) {
@@ -318,15 +299,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     return NextResponse.json(financeItem)
   } catch (error) {
     if (error instanceof FinanceItemNotFoundError) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Finance item not found',
-          detail: 'We could not find a finance item with the specified identifier for the authenticated trainer.',
-          type: '/finance-item-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     if (error instanceof z.ZodError) {
@@ -406,15 +379,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
       .executeTakeFirst()
 
     if (!deleted) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Finance item not found',
-          detail: 'We could not find a finance item with the specified identifier for the authenticated trainer.',
-          type: '/finance-item-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     const responseBody = deleteResponseSchema.parse({ count: 1 })

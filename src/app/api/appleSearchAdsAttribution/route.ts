@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { buildErrorResponse } from '../_lib/accessToken'
+import { createLegacyInvalidJsonResponse, parseStrictJsonBody } from '../_lib/strictJson'
 
 const isoDateTimeString = z
   .string()
@@ -44,17 +45,6 @@ const requestSchema = z.object({
   creativesetName: optionalNullableString,
 })
 
-const createInvalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
-    }),
-    { status: 400 }
-  )
-
 const createInvalidBodyResponse = (detail?: string) =>
   NextResponse.json(
     buildErrorResponse({
@@ -85,21 +75,20 @@ type RequestBody = z.infer<typeof requestSchema>
 export async function POST(request: Request) {
   let parsedBody: RequestBody
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const validation = requestSchema.safeParse(rawBody)
-
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
-
-      return createInvalidBodyResponse(detail || undefined)
-    }
-
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse Apple Search Ads attribution payload as JSON', error)
-    return createInvalidJsonResponse()
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
   }
+
+  const validation = requestSchema.safeParse(parsed.data)
+
+  if (!validation.success) {
+    const detail = validation.error.issues.map((issue) => issue.message).join('; ')
+
+    return createInvalidBodyResponse(detail || undefined)
+  }
+
+  parsedBody = validation.data
 
   try {
     await db

@@ -2,32 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 
-const paramsSchema = z.object({
-  trainerId: z.string().min(1, 'Trainer id is required'),
-})
-
 const responseSchema = z.array(z.unknown())
 
 type HandlerContext = RouteContext<'/api/trainers/[trainerId]/taxItems'>
 
 export async function GET(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid path parameters',
-        detail: detail || 'Trainer id parameter is invalid.',
-        type: '/invalid-path-parameters',
-      }),
-      { status: 400 }
-    )
-  }
-
-  const { trainerId } = paramsResult.data
+  void context
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while fetching tax items',
@@ -35,18 +15,6 @@ export async function GET(request: NextRequest, context: HandlerContext) {
 
   if (!authorization.ok) {
     return authorization.response
-  }
-
-  if (authorization.trainerId !== trainerId) {
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 403,
-        title: 'Forbidden',
-        detail: 'You are not permitted to access tax items for this trainer.',
-        type: '/forbidden',
-      }),
-      { status: 403 }
-    )
   }
 
   const emptyResponse = responseSchema.parse([])

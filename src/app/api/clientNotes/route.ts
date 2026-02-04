@@ -4,29 +4,35 @@ import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
 import { adaptClientNoteRow, clientNoteListSchema, clientNoteSchema, type ClientNoteRow } from './shared'
 
-const requestBodySchema = z
-  .object({
-    clientId: z
-      .string()
-      .min(1, 'clientId must not be empty')
-      .transform((value) => value.trim()),
-    title: z.union([z.string(), z.null(), z.undefined()]).transform((value) => {
-      if (value === null || value === undefined) {
-        return null
-      }
-      return value
+const requestBodySchema = z.object({
+  clientId: z
+    .string()
+    .transform((value) => value.trim())
+    .optional(),
+  title: z.union([z.string(), z.null(), z.undefined()]).transform((value) => {
+    if (value === null || value === undefined) {
+      return null
+    }
+    return value
+  }),
+  body: z.union([z.string(), z.null(), z.undefined()]).transform((value) => {
+    if (value === null || value === undefined) {
+      return null
+    }
+    return value
+  }),
+})
+
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
     }),
-    body: z.union([z.string(), z.null(), z.undefined()]).transform((value) => {
-      if (value === null || value === undefined) {
-        return null
-      }
-      return value
-    }),
-  })
-  .refine((data) => data.clientId.length > 0, {
-    message: 'clientId must not be empty',
-    path: ['clientId'],
-  })
+    { status: 400 }
+  )
 
 const querySchema = z.object({
   clientId: z.string().min(1, 'clientId must not be empty').optional(),
@@ -108,34 +114,35 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   let parsedBody: z.infer<typeof requestBodySchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const result = requestBodySchema.safeParse(rawBody)
-    if (!result.success) {
-      const detail = result.error.issues.map((issue) => issue.message).join('; ')
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
+  let rawBody: unknown = {}
+  const rawBodyText = await request.text()
+  if (rawBodyText.trim().length > 0) {
+    try {
+      rawBody = JSON.parse(rawBodyText)
+    } catch (error) {
+      console.error('Failed to parse client note request body', error)
+      return createLegacyInvalidJsonResponse()
     }
-    parsedBody = result.data
-  } catch (error) {
-    console.error('Failed to parse client note request body', error)
+
+    if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
+      return createLegacyInvalidJsonResponse()
+    }
+  }
+
+  const result = requestBodySchema.safeParse(rawBody)
+  if (!result.success) {
+    const detail = result.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+  parsedBody = result.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while creating client notes',
@@ -171,7 +178,7 @@ export async function POST(request: Request) {
 
     const responseBody = clientNoteSchema.parse(adaptClientNoteRow(inserted as ClientNoteRow))
 
-    return NextResponse.json(responseBody, { status: 201 })
+    return NextResponse.json(responseBody, { status: 200 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

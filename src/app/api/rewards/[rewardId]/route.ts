@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { adaptRewardRow, rewardRowSchema, rewardSchema, rewardTypeSchema } from '../shared'
 
 const paramsSchema = z.object({
-  rewardId: z.string().trim().min(1, 'Reward id is required').uuid({ message: 'Reward id must be a valid UUID' }),
+  rewardId: z.string().trim().min(1, 'Reward id is required'),
 })
 
 const patchRequestBodySchema = z
@@ -44,37 +45,28 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
   }
 
   let parsedBody: z.infer<typeof patchRequestBodySchema>
-  try {
-    const rawBody = (await request.json()) as unknown
-    const bodyResult = patchRequestBodySchema.safeParse(rawBody)
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
+  }
 
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
+  const bodyResult = patchRequestBodySchema.safeParse(parsed.data)
 
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse reward update request body', error)
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+
+  parsedBody = bodyResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating reward',
@@ -213,8 +205,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Reward not found',
-          detail: 'We could not find a reward with the specified identifier for the authenticated trainer.',
-          type: '/reward-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

@@ -68,8 +68,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'SMS credit checkout not found',
-          detail: 'No trainer is associated with the provided SMS credit checkout identifier.',
-          type: '/sms-credit-checkout-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

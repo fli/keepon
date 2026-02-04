@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { z } from 'zod'
 import Stripe from 'stripe'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { getStripeClient } from '../../_lib/stripeClient'
 
 const requestBodySchema = z.object({
@@ -35,38 +36,28 @@ const isGetKeeponHostname = (url: URL) => {
 export async function POST(request: Request) {
   let parsedBody: z.infer<typeof requestBodySchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const result = requestBodySchema.safeParse(rawBody)
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
+  }
 
-    if (!result.success) {
-      const detail = result.error.issues.map((issue) => issue.message).join('; ')
+  const result = requestBodySchema.safeParse(parsedJson.data)
 
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-
-    parsedBody = result.data
-  } catch (error) {
-    console.error('Failed to parse billing portal session request body', error)
+  if (!result.success) {
+    const detail = result.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+
+  parsedBody = result.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while creating Stripe billing portal session',

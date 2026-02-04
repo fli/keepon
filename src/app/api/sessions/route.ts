@@ -9,7 +9,6 @@ const querySchema = z.object({
     .string()
     .trim()
     .min(1, 'sessionSeriesId must not be empty')
-    .uuid({ message: 'sessionSeriesId must be a valid UUID' })
     .optional(),
   updatedAfter: z
     .string()

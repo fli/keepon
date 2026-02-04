@@ -3,6 +3,7 @@ import Stripe from 'stripe'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { getStripeClient } from '../../_lib/stripeClient'
 
 const requestBodySchema = z.object({
@@ -17,16 +18,6 @@ const trainerStripeAccountSchema = z.object({
 })
 
 const isProductionEnvironment = () => (process.env.ENV ?? '').toLowerCase() === 'production'
-
-const createInvalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'JSON body could not be parsed.',
-      type: '/invalid-json-body',
-    }),
-    { status: 400 }
-  )
 
 const createInvalidBodyResponse = (detail: string | undefined) =>
   NextResponse.json(
@@ -93,20 +84,19 @@ const isGetKeeponHostname = (url: URL) => {
 export async function POST(request: Request) {
   let parsedBody: z.infer<typeof requestBodySchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const validation = requestBodySchema.safeParse(rawBody)
-
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
-      return createInvalidBodyResponse(detail)
-    }
-
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse Stripe account link request body', error)
-    return createInvalidJsonResponse()
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
   }
+
+  const validation = requestBodySchema.safeParse(parsed.data)
+
+  if (!validation.success) {
+    const detail = validation.error.issues.map((issue) => issue.message).join('; ')
+    return createInvalidBodyResponse(detail)
+  }
+
+  parsedBody = validation.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while creating Stripe account link',

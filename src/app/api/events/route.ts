@@ -265,15 +265,14 @@ export async function GET(request: Request) {
       .executeTakeFirst()
 
     if (!provider) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Service provider not found',
-          detail: 'No service provider matches the provided providerUrlSlug value.',
-          type: '/service-provider-not-found',
-        }),
-        { status: 404 }
-      )
+        return NextResponse.json(
+          buildErrorResponse({
+            status: 404,
+            title: 'Service provider not found',
+            type: '/resource-not-found',
+          }),
+          { status: 404 }
+        )
     }
 
     const rows = (await db

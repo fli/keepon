@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { adaptSessionRow, RawSessionRow } from '../shared'
 
 const paramsSchema = z.object({
@@ -155,8 +156,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Appointment not found',
-          detail: 'No appointment exists with the provided identifier.',
-          type: '/not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
@@ -192,6 +192,14 @@ export async function GET(request: NextRequest, context: HandlerContext) {
 }
 
 export async function PUT(request: NextRequest, context: HandlerContext) {
+  const authorization = await authenticateTrainerRequest(request, {
+    extensionFailureLogMessage: 'Failed to extend access token expiry while updating session',
+  })
+
+  if (!authorization.ok) {
+    return authorization.response
+  }
+
   const parsedParams = paramsSchema.safeParse(await context.params)
 
   if (!parsedParams.success) {
@@ -209,54 +217,30 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
   const { sessionId } = parsedParams.data
 
-  let parsedBody: z.infer<typeof requestBodySchema>
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
+  }
 
-  try {
-    const rawText = await request.text()
-    const rawBody: unknown = rawText.trim().length === 0 ? {} : (JSON.parse(rawText) as unknown)
-    const validation = requestBodySchema.safeParse(rawBody)
+  const validation = requestBodySchema.safeParse(parsedJson.data)
 
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse session update request body', {
-      sessionId,
-      error,
-    })
+  if (!validation.success) {
+    const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
 
+  const parsedBody = validation.data
+
   const hasUpdates = Object.values(parsedBody).some((value) => value !== undefined)
-
-  const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage: 'Failed to extend access token expiry while updating session',
-  })
-
-  if (!authorization.ok) {
-    return authorization.response
-  }
 
   try {
     const session = await db.transaction().execute(async (trx) => {
@@ -421,8 +405,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Appointment not found',
-          detail: 'No appointment exists with the provided identifier.',
-          type: '/not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
@@ -557,8 +540,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Appointment not found',
-          detail: 'No appointment exists with the provided identifier.',
-          type: '/not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

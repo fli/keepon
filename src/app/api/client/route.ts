@@ -52,7 +52,7 @@ export async function GET(request: Request) {
         eb.ref('c.email').as('email'),
         eb.ref('c.stripe_customer_id').as('stripeCustomerId'),
         eb.ref('t.stripe_account_id').as('stripeAccountId'),
-        sql<string | null>`stripeAccount.object->>'type'`.as('stripeAccountType'),
+        sql<string | null>`${sql.ref('stripeAccount.object')}->>'type'`.as('stripeAccountType'),
       ])
       .where('c.id', '=', authorization.clientId)
       .where('c.trainer_id', '=', authorization.trainerId)

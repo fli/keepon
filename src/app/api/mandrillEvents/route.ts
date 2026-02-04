@@ -119,11 +119,6 @@ export async function POST(request: Request) {
     return createInvalidBodyResponse('Payload must be form-encoded')
   }
 
-  const signature = request.headers.get('x-mandrill-signature')
-  if (!signature) {
-    return createInvalidSignatureResponse()
-  }
-
   let webhook: MandrillWebhook | undefined
   try {
     const webhooks = await fetchWebhooks(mandrillApiKey)
@@ -136,6 +131,11 @@ export async function POST(request: Request) {
   if (!webhook) {
     console.error('Mandrill webhook not found for URL', { webhookUrl })
     return createInternalErrorResponse()
+  }
+
+  const signature = request.headers.get('x-mandrill-signature')
+  if (!signature) {
+    return createInvalidSignatureResponse()
   }
 
   let computedSignature: string

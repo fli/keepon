@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { buildErrorResponse } from '../../../../_lib/accessToken'
 import { APP_EMAIL, APP_NAME, NO_REPLY_EMAIL } from '../../../../_lib/constants'
 
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
 const paramsSchema = z.object({
   bookingId: z.string().trim().min(1, 'Booking identifier must not be empty'),
 })
@@ -185,12 +187,20 @@ const createInvalidParamsResponse = (detail?: string) =>
     { status: 400 }
   )
 
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
+
 const createBookingNotFoundResponse = () =>
   NextResponse.json(
     buildErrorResponse({
       status: 404,
       title: 'Booking not found',
-      detail: 'No booking matched the provided identifier.',
       type: '/resource-not-found',
     }),
     { status: 404 }
@@ -216,7 +226,19 @@ const createInternalErrorResponse = () =>
     { status: 500 }
   )
 
-export async function POST(_request: NextRequest, context: HandlerContext) {
+export async function POST(request: NextRequest, context: HandlerContext) {
+  const rawBodyText = await request.text()
+  if (rawBodyText.trim().length > 0) {
+    try {
+      const parsedBody = JSON.parse(rawBodyText)
+      if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+        return createLegacyInvalidJsonResponse()
+      }
+    } catch {
+      return createLegacyInvalidJsonResponse()
+    }
+  }
+
   const paramsResult = paramsSchema.safeParse(await context.params)
 
   if (!paramsResult.success) {

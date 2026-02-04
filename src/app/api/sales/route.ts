@@ -1,8 +1,21 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { uuidOrNil } from '@/lib/uuid'
 import { authenticateTrainerOrClientRequest, authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 import { adaptSaleRow, fetchSales, saleListSchema, saleSchema, salesQuerySchema } from './shared'
 import { db } from '@/lib/db'
+
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -52,6 +65,10 @@ export async function GET(request: Request) {
       }
 
       filters.clientId = authorization.clientId
+    }
+
+    if (filters.clientId) {
+      filters.clientId = uuidOrNil(filters.clientId)
     }
 
     const rows = await fetchSales({
@@ -126,25 +143,19 @@ class ClientSessionNotFoundError extends Error {
 }
 
 export async function POST(request: Request) {
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch (error) {
-    console.error('Failed to parse sale create body as JSON', error)
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
-      }),
-      { status: 400 }
-    )
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
+  }
+  const body = parsedJson.data
+
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return createLegacyInvalidJsonResponse()
   }
 
-  const parsed = createSaleSchema.safeParse(body)
-  if (!parsed.success) {
-    const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
+  const parsedBody = createSaleSchema.safeParse(body)
+  if (!parsedBody.success) {
+    const detail = parsedBody.error.issues.map((issue) => issue.message).join('; ')
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
@@ -164,7 +175,7 @@ export async function POST(request: Request) {
     return auth.response
   }
 
-  const { clientId, note, dueAfter, paymentRequestPassOnTransactionFee, clientSessionId } = parsed.data
+  const { clientId, note, dueAfter, paymentRequestPassOnTransactionFee, clientSessionId } = parsedBody.data
 
   try {
     const saleId = await db.transaction().execute(async (trx) => {

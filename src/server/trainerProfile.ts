@@ -258,6 +258,11 @@ const buildBankAccount = (account: Stripe.BankAccount | null): TrainerProfile['b
   }
 }
 
+const resolveStripeBankAccount = (
+  _stripeAccount: Stripe.Account | null,
+  stripeBankAccount: Stripe.BankAccount | null
+): Stripe.BankAccount | null => stripeBankAccount
+
 type GetTrainerProfileOptions = {
   includeSessionSeries?: boolean
 }
@@ -338,6 +343,7 @@ export const getTrainerProfile = async (
   const stripeAccount = (parsedRow.stripeAccount ?? null) as Stripe.Account | null
   const stripeBalance = (parsedRow.stripeBalance ?? null) as Stripe.Balance | null
   const stripeBankAccount = (parsedRow.stripeBankAccount ?? null) as Stripe.BankAccount | null
+  const resolvedBankAccount = resolveStripeBankAccount(stripeAccount, stripeBankAccount)
 
   const pendingVerification = (stripeAccount?.requirements?.pending_verification ?? []).length > 0
   const cardPayments = stripeAccount?.charges_enabled ? 'active' : pendingVerification ? 'pending' : 'inactive'
@@ -375,7 +381,7 @@ export const getTrainerProfile = async (
     termsAccepted: parsedRow.termsAccepted,
     cardPayments,
     transfers,
-    bankAccount: buildBankAccount(stripeBankAccount),
+    bankAccount: buildBankAccount(resolvedBankAccount),
     balance: computeBalance(stripeBalance, parsedRow.defaultCurrency),
     requirements: accountRequirements(stripeAccount),
     industry: parsedRow.industry,

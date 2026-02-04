@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 import { normalizeSessionSeriesRow, type RawSessionSeriesRow } from './shared'
 
 const isoDateTimeSchema = z.string().trim().datetime({ offset: true })
@@ -34,17 +35,37 @@ const clientReminderSchema = z
 
 const geoSchema = z.object({ lat: z.number(), lng: z.number() }).nullable().optional()
 
+const nonNegativeNumberSchema = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return value
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed.length === 0) return Number.NaN
+      return Number(trimmed)
+    }
+    return value
+  },
+  z.number().min(0, { message: 'price must be a non-negative number' })
+)
+
+const nullableNonNegativeNumberSchema = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return value
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed.length === 0) return Number.NaN
+      return Number(trimmed)
+    }
+    return value
+  },
+  z.union([z.number().min(0, { message: 'price must be a non-negative number' }), z.null()])
+)
+
 const appointmentProductSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('creditPack'),
     name: z.string().trim().min(1),
-    price: z.union([z.number(), z.string()]).transform((value) => {
-      const numeric = typeof value === 'number' ? value : Number(value)
-      if (!Number.isFinite(numeric) || numeric < 0) {
-        throw new Error('price must be a non-negative number')
-      }
-      return numeric
-    }),
+    price: nonNegativeNumberSchema,
     currency: z.string().trim().min(1),
     totalCredits: z.number().int().min(0),
     productId: nullableTrimmedString,
@@ -52,13 +73,7 @@ const appointmentProductSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('item'),
     name: z.string().trim().min(1),
-    price: z.union([z.number(), z.string()]).transform((value) => {
-      const numeric = typeof value === 'number' ? value : Number(value)
-      if (!Number.isFinite(numeric) || numeric < 0) {
-        throw new Error('price must be a non-negative number')
-      }
-      return numeric
-    }),
+    price: nonNegativeNumberSchema,
     currency: z.string().trim().min(1),
     productId: nullableTrimmedString,
     quantity: z.number().int().min(1).optional(),
@@ -66,13 +81,7 @@ const appointmentProductSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('service'),
     name: z.string().trim().min(1),
-    price: z.union([z.number(), z.string()]).transform((value) => {
-      const numeric = typeof value === 'number' ? value : Number(value)
-      if (!Number.isFinite(numeric) || numeric < 0) {
-        throw new Error('price must be a non-negative number')
-      }
-      return numeric
-    }),
+    price: nonNegativeNumberSchema,
     currency: z.string().trim().min(1),
     productId: nullableTrimmedString,
     durationMinutes: z.number().int().min(1),
@@ -96,17 +105,7 @@ const commonPartialSchema = {
   googlePlaceId: nullableTrimmedString,
   repeatsEvery: z.number().int().positive().nullable().optional(),
   endDate: isoDateTimeSchema.nullable().optional(),
-  price: z
-    .union([z.number(), z.string(), z.null()])
-    .transform((value) => {
-      if (value === null || value === undefined) return null
-      const numeric = typeof value === 'number' ? value : Number(value)
-      if (!Number.isFinite(numeric) || numeric < 0) {
-        throw new Error('price must be a non-negative number')
-      }
-      return numeric
-    })
-    .optional(),
+  price: nullableNonNegativeNumberSchema.optional(),
   serviceId: nullableTrimmedString,
   sessionColor: nullableTrimmedString,
   avatarName: nullableTrimmedString,
@@ -248,21 +247,19 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch (error) {
-    console.error('Failed to parse session series body as JSON', error)
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
-      }),
-      { status: 400 }
-    )
+  const authorization = await authenticateTrainerRequest(request, {
+    extensionFailureLogMessage: 'Failed to extend access token expiry while creating session series',
+  })
+
+  if (!authorization.ok) {
+    return authorization.response
   }
+
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
+  }
+  const body = parsedJson.data
 
   const parsed = requestBodySchema.safeParse(body)
   if (!parsed.success) {
@@ -316,14 +313,6 @@ export async function POST(request: Request) {
       }),
       { status: 400 }
     )
-  }
-
-  const authorization = await authenticateTrainerRequest(request, {
-    extensionFailureLogMessage: 'Failed to extend access token expiry while creating session series',
-  })
-
-  if (!authorization.ok) {
-    return authorization.response
   }
 
   const appReminderTriggerMinutes =

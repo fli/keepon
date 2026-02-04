@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { buildErrorResponse, extractAccessToken } from '../../../_lib/accessToken'
-
-const paramsSchema = z.object({
-  userId: z.string().trim().min(1, 'User id is required').uuid({ message: 'User id must be a valid UUID' }),
-})
+import { parseStrictJsonBody } from '../../../_lib/strictJson'
 
 const requestSchema = z.object({
   password: z.string().min(1, 'Password is required'),
@@ -34,59 +31,35 @@ const createTemporaryCodeInvalidResponse = () =>
 type HandlerContext = RouteContext<'/api/members/[userId]/password'>
 
 export async function POST(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid user identifier',
-        detail: detail || 'Request parameters did not match the expected user identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
+  void context
 
   let parsedBody: z.infer<typeof requestSchema>
-  try {
-    const rawBody = (await request.json()) as unknown
-    const validation = requestSchema.safeParse(rawBody)
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
+  }
 
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse member password reset request body as JSON', error)
+  const validation = requestSchema.safeParse(parsed.data)
+  if (!validation.success) {
+    const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+  parsedBody = validation.data
 
   const accessToken = await extractAccessToken(request)
   if (!accessToken) {
     return createMissingTokenResponse()
   }
 
-  const { userId } = paramsResult.data
   const { password } = parsedBody
 
   try {
@@ -100,7 +73,6 @@ export async function POST(request: NextRequest, context: HandlerContext) {
              AND access_token.type = 'password_reset'
              AND access_token.expires_at >= NOW()
              AND access_token.id = ${accessToken}
-             AND trainer.user_id = ${userId}
            RETURNING trainer.user_id AS "userId"
         `.execute(trx)
 
@@ -111,7 +83,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
       await sql`
           DELETE FROM access_token
-           WHERE user_id = ${userId}
+           WHERE user_id = ${row.userId}
              AND type IN ('api', 'password_reset')
         `.execute(trx)
 
@@ -124,10 +96,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
     return new Response(null, { status: 204 })
   } catch (error) {
-    console.error('Failed to reset member password', {
-      userId,
-      error,
-    })
+    console.error('Failed to reset member password', { error })
 
     return NextResponse.json(
       buildErrorResponse({

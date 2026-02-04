@@ -39,3 +39,5 @@ yarn-error.log*
 .env.*
 .env
 .tmp
+# AI planning documents (ephemeral)
+history/

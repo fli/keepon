@@ -3,6 +3,8 @@ import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\', "#" is not valid JSON'
+
 const requestSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
   password: z.string().min(5, 'Password must be at least 5 characters long'),
@@ -12,9 +14,7 @@ const invalidJsonResponse = () =>
   NextResponse.json(
     buildErrorResponse({
       status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
+      title: LEGACY_INVALID_JSON_MESSAGE,
     }),
     { status: 400 }
   )
@@ -54,8 +54,12 @@ export async function POST(request: Request) {
   let parsedBody: z.infer<typeof requestSchema>
 
   try {
-    const rawBody = (await request.json()) as unknown
-    const validation = requestSchema.safeParse(rawBody)
+    const rawText = await request.text()
+    const parsed = JSON.parse(rawText) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return invalidJsonResponse()
+    }
+    const validation = requestSchema.safeParse(parsed)
 
     if (!validation.success) {
       const detail = validation.error.issues.map((issue) => issue.message).join('; ')

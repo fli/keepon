@@ -4,14 +4,15 @@ import { z } from 'zod'
 import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../../_lib/constants'
+import { parseStrictJsonBody } from '../../../../_lib/strictJson'
 import { currencyChargeLimits } from '../../../../_lib/transactionFees'
 import { normalizePlanRow, type RawPlanRow } from '../../../../plans/shared'
 
 const MAX_TIME = new Date(8640000000000000)
 
 const paramsSchema = z.object({
-  clientId: z.string().trim().min(1, 'Client id is required').uuid({ message: 'Client id must be a valid UUID.' }),
-  planId: z.string().trim().min(1, 'Plan id is required').uuid({ message: 'Plan id must be a valid UUID.' }),
+  clientId: z.string().trim().min(1, 'Client id is required'),
+  planId: z.string().trim().min(1, 'Plan id is required'),
 })
 
 const requestBodySchema = z.object({
@@ -22,8 +23,7 @@ const requestBodySchema = z.object({
     .datetime({
       message: 'endDate must be an ISO 8601 date-time string',
     })
-    .nullable()
-    .optional(),
+    .nullable(),
 })
 
 const planDetailsSchema = z.object({
@@ -248,37 +248,28 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
 
   let parsedBody: z.infer<typeof requestBodySchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const validation = requestBodySchema.safeParse(rawBody)
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
+  }
 
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
+  const validation = requestBodySchema.safeParse(parsed.data)
 
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
+  if (!validation.success) {
+    const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse subscription update body', error)
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+
+  parsedBody = validation.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating subscription',
@@ -291,6 +282,21 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
   const { clientId, planId } = paramsResult.data
 
   try {
+    const updatedEndDate =
+      parsedBody.endDate === null
+        ? null
+        : (() => {
+            const parsed = new Date(parsedBody.endDate)
+            if (Number.isNaN(parsed.getTime())) {
+              throw new InvalidEndDateError('endDate must be an ISO 8601 date-time string')
+            }
+            return parsed
+          })()
+
+    if (updatedEndDate && updatedEndDate.getTime() < Date.now()) {
+      throw new InvalidEndDateError('Subscription must not end in the past')
+    }
+
     const plan = await db.transaction().execute(async (trx) => {
       const planRow = await trx
         .selectFrom('payment_plan as plan')
@@ -322,7 +328,6 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           eb.ref('currency.alpha_code').as('currency'),
         ])
         .where('plan.id', '=', planId)
-        .where('plan.client_id', '=', clientId)
         .where('plan.trainer_id', '=', authorization.trainerId)
         .executeTakeFirst()
 
@@ -372,21 +377,6 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         )
       }
 
-      const updatedEndDate =
-        parsedBody.endDate === undefined || parsedBody.endDate === null
-          ? null
-          : (() => {
-              const parsed = new Date(parsedBody.endDate)
-              if (Number.isNaN(parsed.getTime())) {
-                throw new InvalidEndDateError('endDate must be an ISO 8601 date-time string')
-              }
-              return parsed
-            })()
-
-      if (updatedEndDate && updatedEndDate.getTime() < Date.now()) {
-        throw new InvalidEndDateError('Subscription must not end in the past')
-      }
-
       const startDate = toDateOrThrow(details.start, 'Subscription start')
 
       if (updatedEndDate && updatedEndDate.getTime() < startDate.getTime()) {
@@ -413,7 +403,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
             JOIN payment ON payment.sale_id = sale.id
             JOIN payment_subscription ON payment_subscription.id = payment.id
            WHERE payment_subscription.subscription_id = ${planId}
-             AND client_session.client_id = ${clientId}
+             AND client_session.client_id = ${details.clientId}
              AND session.start > ${finalPaymentDate.toISOString()}
         `.execute(trx)
 

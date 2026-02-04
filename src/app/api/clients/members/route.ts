@@ -71,8 +71,7 @@ export async function GET(request: Request) {
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail: 'No client exists with the provided email address.',
-          type: '/not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

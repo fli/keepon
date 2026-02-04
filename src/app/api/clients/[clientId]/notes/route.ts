@@ -3,13 +3,16 @@ import { db } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 
-const paramsSchema = z.object({
-  clientId: z
-    .string({ message: 'Client id is required.' })
-    .trim()
-    .min(1, 'Client id must not be empty.')
-    .uuid({ message: 'Client id must be a valid UUID.' }),
-})
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
 
 const classificationSchema = z.enum(['notes', 'goals', 'medication', 'currentInjuries', 'pastInjuries'])
 
@@ -55,59 +58,41 @@ const toNumber = (value: unknown) => {
 }
 
 export async function POST(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
+  const { clientId } = await context.params
 
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid client identifier',
-        detail: detail || 'Request parameters did not match the expected client identifier schema.',
-        type: '/invalid-parameter',
-      }),
-      { status: 400 }
-    )
-  }
-
-  const { clientId } = paramsResult.data
-
-  let parsedBody: z.infer<typeof requestBodySchema>
-
-  try {
-    const rawBody = (await request.json()) as unknown
-    const bodyResult = requestBodySchema.safeParse(rawBody)
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
+  let rawBody: unknown = {}
+  const rawBodyText = await request.text()
+  if (rawBodyText.trim().length > 0) {
+    try {
+      rawBody = JSON.parse(rawBodyText)
+    } catch (error) {
+      console.error('Failed to parse client note update request body', {
+        clientId,
+        error,
+      })
+      return createLegacyInvalidJsonResponse()
     }
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse client note update request body', {
-      clientId,
-      error,
-    })
+
+    if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
+      return createLegacyInvalidJsonResponse()
+    }
+  }
+
+  const bodyResult = requestBodySchema.safeParse(rawBody)
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+  const parsedBody = bodyResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating client notes',

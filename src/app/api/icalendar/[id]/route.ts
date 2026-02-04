@@ -180,9 +180,8 @@ export async function GET(_request: Request, context: HandlerContext) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
-          title: 'iCalendar feed not found',
-          detail: 'No iCalendar feed exists for the provided identifier.',
-          type: '/not-found',
+          title: 'iCalendar feed not found.',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

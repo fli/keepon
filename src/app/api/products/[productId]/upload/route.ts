@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import sharp, { type Sharp } from 'sharp'
-import { z } from 'zod'
 import { db } from '@/lib/db'
 import { getProductById } from '@/server/products'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
@@ -28,71 +27,42 @@ const uploadFields = [
 ] as const satisfies readonly UploadField[]
 type HandlerContext = { params: Promise<{ productId: string }> }
 
-const paramsSchema = z.object({
-  productId: z.string().trim().min(1, 'Product id is required').uuid({ message: 'Product id must be a valid UUID' }),
-})
-
-const createInvalidParamsResponse = (detail?: string) =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid path parameters',
-      detail: detail || 'Product identifier parameter did not match the expected schema.',
-      type: '/invalid-path-parameters',
-    }),
-    { status: 400 }
-  )
-
-const createInvalidBodyResponse = (detail?: string) =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid request body',
-      detail: detail ?? 'Request body must be multipart/form-data with image file fields.',
-      type: '/invalid-body',
-    }),
-    { status: 400 }
-  )
-
-const createInvalidFileTypeResponse = (detail?: string) =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid file type',
-      detail: detail ?? 'Only JPG, PNG, or GIF images are supported.',
-      type: '/invalid-file-type',
-    }),
-    { status: 400 }
-  )
-
-const createMissingBucketResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 500,
-      title: 'Public bucket is not configured',
-      detail: 'Set PUBLIC_BUCKET_NAME in the environment.',
-      type: '/public-bucket-misconfigured',
-    }),
-    { status: 500 }
-  )
-
-const createNotFoundResponse = () =>
+const createResourceNotFoundResponse = (title: string) =>
   NextResponse.json(
     buildErrorResponse({
       status: 404,
-      title: 'Product not found',
-      detail: 'We could not find a product with the specified identifier for the authenticated trainer.',
-      type: '/product-not-found',
+      title,
+      type: '/resource-not-found',
     }),
     { status: 404 }
   )
 
-const createUnexpectedErrorResponse = () =>
+const createErrorProcessingImageResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: 'Your image could not be processed. It may be corrupt or invalid.',
+      type: '/error-processing-image',
+    }),
+    { status: 400 }
+  )
+
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
+
+const createLegacyInternalErrorResponse = () =>
   NextResponse.json(
     buildErrorResponse({
       status: 500,
-      title: 'Unexpected error uploading file',
-      type: '/upload-failed',
+      title: 'Something on our end went wrong.',
     }),
     { status: 500 }
   )
@@ -150,15 +120,7 @@ const fetchServiceProduct = async (trainerId: string, productId: string) =>
     .executeTakeFirst()
 
 export async function POST(request: Request, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return createInvalidParamsResponse(detail || undefined)
-  }
-
-  const { productId } = paramsResult.data
+  const { productId } = await context.params
 
   const auth = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while uploading product images',
@@ -168,17 +130,44 @@ export async function POST(request: Request, context: HandlerContext) {
     return auth.response
   }
 
-  const serviceProduct = await fetchServiceProduct(auth.trainerId, productId)
+  const contentType = request.headers.get('content-type') ?? ''
+  if (contentType.includes('application/json')) {
+    const rawBody = await request.clone().text()
+    if (rawBody.trim().length > 0) {
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(rawBody)
+      } catch {
+        return createLegacyInvalidJsonResponse()
+      }
+
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return createLegacyInvalidJsonResponse()
+      }
+    }
+  }
+
+  let serviceProduct
+  try {
+    serviceProduct = await fetchServiceProduct(auth.trainerId, productId)
+  } catch (error) {
+    console.error('Failed to fetch product for upload', {
+      trainerId: auth.trainerId,
+      productId,
+      error,
+    })
+    return createLegacyInternalErrorResponse()
+  }
 
   if (!serviceProduct) {
-    return createNotFoundResponse()
+    return createResourceNotFoundResponse('Product not found')
   }
 
   let formData: FormData
   try {
     formData = await request.formData()
   } catch {
-    return createInvalidBodyResponse()
+    return createErrorProcessingImageResponse()
   }
 
   const { fileTypeFromBuffer } = await import('file-type')
@@ -188,12 +177,16 @@ export async function POST(request: Request, context: HandlerContext) {
     for (const field of uploadFields) {
       const file = formData.get(field.formKey)
 
-      if (!file || !(file instanceof File) || file.size === 0) {
+      if (!file || !(file instanceof File)) {
         continue
       }
 
       if (file.size > MAX_FILE_BYTES) {
-        return createInvalidBodyResponse('Image file is larger than 5MB.')
+        return createErrorProcessingImageResponse()
+      }
+
+      if (file.size === 0) {
+        return createErrorProcessingImageResponse()
       }
 
       let buffer: Buffer
@@ -201,16 +194,17 @@ export async function POST(request: Request, context: HandlerContext) {
         buffer = Buffer.from(await file.arrayBuffer())
       } catch (error) {
         console.error('Failed to read product upload buffer', auth.trainerId, productId, field.formKey, error)
-        return createInvalidBodyResponse('Unable to read uploaded image.')
+        return createErrorProcessingImageResponse()
       }
 
       const detected = await fileTypeFromBuffer(buffer)
 
       if (!detected || !allowedExtensions.has(detected.ext.toLowerCase())) {
-        return createInvalidFileTypeResponse()
+        return createErrorProcessingImageResponse()
       }
 
-      const format: OutputFormat = detected.ext.toLowerCase() === 'png' ? 'png' : 'jpg'
+      const normalizedExt = detected.ext.toLowerCase()
+      const format: OutputFormat = normalizedExt === 'png' || normalizedExt === 'gif' ? 'png' : 'jpg'
 
       const square = 'square' in field && field.square === true
 
@@ -231,7 +225,7 @@ export async function POST(request: Request, context: HandlerContext) {
     }
   } catch (error: unknown) {
     if (error instanceof PublicBucketNotConfiguredError) {
-      return createMissingBucketResponse()
+      return createLegacyInternalErrorResponse()
     }
 
     console.error('Failed to upload product image', {
@@ -240,7 +234,7 @@ export async function POST(request: Request, context: HandlerContext) {
       error,
     })
 
-    return createUnexpectedErrorResponse()
+    return createLegacyInternalErrorResponse()
   }
 
   if (Object.keys(uploads).length > 0) {
@@ -253,7 +247,7 @@ export async function POST(request: Request, context: HandlerContext) {
       .executeTakeFirst()
 
     if (!updated) {
-      return createNotFoundResponse()
+      return createResourceNotFoundResponse('Product not found (or not service)')
     }
   }
 
@@ -261,29 +255,17 @@ export async function POST(request: Request, context: HandlerContext) {
     const product = await getProductById(auth.trainerId, productId)
 
     if (!product) {
-      return createNotFoundResponse()
+      return createResourceNotFoundResponse('Product not found')
     }
 
     return NextResponse.json(product)
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 500,
-          title: 'Failed to parse product data from database',
-          detail: 'Product data did not match the expected response schema.',
-          type: '/invalid-response',
-        }),
-        { status: 500 }
-      )
-    }
-
     console.error('Failed to fetch product after upload', {
       trainerId: auth.trainerId,
       productId,
       error,
     })
 
-    return createUnexpectedErrorResponse()
+    return createLegacyInternalErrorResponse()
   }
 }

@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
-
-const paramsSchema = z.object({
-  userId: z.string().trim().min(1, 'Member id is required').uuid({ message: 'Member id must be a valid UUID' }),
-})
+import { parseStrictJsonBody } from '../../../_lib/strictJson'
 
 const requestSchema = z.object({
   deviceToken: z.string().trim().min(1, 'Device token is required'),
@@ -19,17 +16,6 @@ const createInvalidParamsResponse = (detail?: string) =>
       title: 'Invalid member identifier',
       detail: detail ?? 'Request parameters did not match the expected member identifier schema.',
       type: '/invalid-parameter',
-    }),
-    { status: 400 }
-  )
-
-const createInvalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
     }),
     { status: 400 }
   )
@@ -58,30 +44,22 @@ const createInternalErrorResponse = () =>
 type HandlerContext = RouteContext<'/api/members/[userId]/devices'>
 
 export async function POST(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-
-    return createInvalidParamsResponse(detail || undefined)
-  }
-
-  const { userId: memberId } = paramsResult.data
+  void context
 
   let parsedBody: z.infer<typeof requestSchema>
-  try {
-    const rawBody = (await request.json()) as unknown
-    const validation = requestSchema.safeParse(rawBody)
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
-
-      return createInvalidBodyResponse(detail || undefined)
-    }
-
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse device registration body as JSON', error)
-    return createInvalidJsonResponse()
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
   }
+
+  const validation = requestSchema.safeParse(parsed.data)
+  if (!validation.success) {
+    const detail = validation.error.issues.map((issue) => issue.message).join('; ')
+
+    return createInvalidBodyResponse(detail || undefined)
+  }
+
+  parsedBody = validation.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while registering device',
@@ -89,13 +67,6 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
   if (!authorization.ok) {
     return authorization.response
-  }
-
-  if (memberId !== authorization.userId) {
-    console.warn('Authenticated user does not match member parameter for device registration', {
-      memberId,
-      authenticatedUserId: authorization.userId,
-    })
   }
 
   try {

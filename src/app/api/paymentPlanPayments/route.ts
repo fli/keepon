@@ -23,11 +23,6 @@ const paymentPlanPaymentSchema = z.object({
 
 const paymentPlanPaymentListSchema = z.array(paymentPlanPaymentSchema)
 
-const querySchema = z.object({
-  status: paymentPlanPaymentStatusSchema.optional(),
-  paymentPlanId: z.string().min(1, 'paymentPlanId cannot be empty').optional(),
-})
-
 type PaymentPlanPaymentRow = {
   createdAt: Date | string | null
   updatedAt: Date | string | null
@@ -158,24 +153,6 @@ export async function GET(request: Request) {
   const normalizedPaymentPlanId =
     rawPaymentPlanId && rawPaymentPlanId.trim().length > 0 ? rawPaymentPlanId.trim() : undefined
 
-  const queryParse = querySchema.safeParse({
-    status: normalizedStatus,
-    paymentPlanId: normalizedPaymentPlanId,
-  })
-
-  if (!queryParse.success) {
-    const detail = queryParse.error.issues.map((issue) => issue.message).join('; ')
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 400,
-        title: 'Invalid query parameters',
-        detail: detail || 'Request query parameters did not match the expected schema.',
-        type: '/invalid-query',
-      }),
-      { status: 400 }
-    )
-  }
-
   const authorization = await authenticateClientRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while fetching payment plan payments',
   })
@@ -207,14 +184,12 @@ export async function GET(request: Request) {
       .where('payment_plan.client_id', '=', authorization.clientId)
       .where('payment_plan.trainer_id', '=', authorization.trainerId)
 
-    const { status, paymentPlanId } = queryParse.data
-
-    if (status) {
-      query = query.where('payment_plan_payment.status', '=', status)
+    if (normalizedStatus) {
+      query = query.where('payment_plan_payment.status', '=', normalizedStatus)
     }
 
-    if (paymentPlanId) {
-      query = query.where('payment_plan_payment.payment_plan_id', '=', paymentPlanId)
+    if (normalizedPaymentPlanId) {
+      query = query.where('payment_plan_payment.payment_plan_id', '=', normalizedPaymentPlanId)
     }
 
     const rows = (await query.orderBy('payment_plan_payment.created_at', 'desc').execute()) as PaymentPlanPaymentRow[]
@@ -239,8 +214,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       buildErrorResponse({
         status: 500,
-        title: 'Failed to fetch payment plan payments',
-        type: '/internal-server-error',
+        title: 'Something on our end went wrong.',
       }),
       { status: 500 }
     )

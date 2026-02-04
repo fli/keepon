@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 
 const isoDateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid ISO date format (expected YYYY-MM-DD)')
 
@@ -142,17 +143,6 @@ const createInvalidBodyResponse = (detail?: string) =>
     { status: 400 }
   )
 
-const createInvalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
-    }),
-    { status: 400 }
-  )
-
 const parseIsoCalendarDate = (value: string, label: string) => {
   const match = isoDatePattern.exec(value.slice(0, 10))
   if (!match) {
@@ -201,10 +191,6 @@ const buildInsertValues = (items: z.infer<typeof requestBodySchema>, trainerId: 
       const startDate = ensureAllDayDate(item.startDate, `${prefix}.startDate`)
       const endDate = ensureAllDayDate(item.endDate, `${prefix}.endDate`)
 
-      if (endDate.getTime() < startDate.getTime()) {
-        throw new InvalidBusyTimeInputError(`${prefix}.endDate must be on or after startDate.`)
-      }
-
       return {
         trainer_id: trainerId,
         start_date: startDate,
@@ -216,10 +202,6 @@ const buildInsertValues = (items: z.infer<typeof requestBodySchema>, trainerId: 
 
     const startTime = ensureDateTimeValue(item.startDate, `${prefix}.startDate`)
     const endTime = ensureDateTimeValue(item.endDate, `${prefix}.endDate`)
-
-    if (endTime.getTime() < startTime.getTime()) {
-      throw new InvalidBusyTimeInputError(`${prefix}.endDate must be on or after startDate.`)
-    }
 
     return {
       trainer_id: trainerId,
@@ -284,20 +266,19 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   let parsedBody: z.infer<typeof requestBodySchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const validation = requestBodySchema.safeParse(rawBody)
-
-    if (!validation.success) {
-      const detail = formatZodIssues(validation.error.issues)
-      return createInvalidBodyResponse(detail)
-    }
-
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse busy time request body', error)
-    return createInvalidJsonResponse()
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
   }
+
+  const validation = requestBodySchema.safeParse(parsed.data)
+
+  if (!validation.success) {
+    const detail = formatZodIssues(validation.error.issues)
+    return createInvalidBodyResponse(detail)
+  }
+
+  parsedBody = validation.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating busy times',

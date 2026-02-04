@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { db, sql } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
 import { APP_NAME, NO_REPLY_EMAIL } from '../../../_lib/constants'
+import { parseStrictJsonBody } from '../../../_lib/strictJson'
 import { currencyChargeLimits } from '../../../_lib/transactionFees'
 import { normalizePlanRow, planFrequencyValues, type RawPlanRow } from '../../../plans/shared'
 
@@ -224,37 +225,28 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
   let parsedBody: z.infer<typeof requestBodySchema>
 
-  try {
-    const rawBody = (await request.json()) as unknown
-    const validation = requestBodySchema.safeParse(rawBody)
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
+  }
 
-    if (!validation.success) {
-      const detail = validation.error.issues.map((issue) => issue.message).join('; ')
+  const validation = requestBodySchema.safeParse(parsed.data)
 
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
+  if (!validation.success) {
+    const detail = validation.error.issues.map((issue) => issue.message).join('; ')
 
-    parsedBody = validation.data
-  } catch (error) {
-    console.error('Failed to parse subscription request body', error)
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+
+  parsedBody = validation.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while creating subscription',
@@ -447,7 +439,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       return normalizePlanRow(rawPlanRow)
     })
 
-    return NextResponse.json(plan, { status: 201 })
+    return NextResponse.json(plan, { status: 200 })
   } catch (error) {
     if (error instanceof ClientNotFoundError) {
       return NextResponse.json(

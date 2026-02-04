@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db, type Json } from '@/lib/db'
 import { authenticateTrainerRequest, buildErrorResponse } from '../_lib/accessToken'
+import { parseStrictJsonBody } from '../_lib/strictJson'
 
 const APP_STORE_PROD_URL = 'https://buy.itunes.apple.com/verifyReceipt'
 const APP_STORE_SANDBOX_URL = 'https://sandbox.itunes.apple.com/verifyReceipt'
@@ -78,17 +79,6 @@ type PgError = { code?: string; constraint?: string }
 
 const isPgError = (error: unknown): error is PgError =>
   typeof error === 'object' && error !== null && 'code' in error && typeof (error as PgError).code === 'string'
-
-const createInvalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
-    }),
-    { status: 400 }
-  )
 
 const createInvalidBodyResponse = (detail?: string) =>
   NextResponse.json(
@@ -352,14 +342,11 @@ const processReceipt = async ({
 }
 
 export async function POST(request: Request) {
-  let body: unknown
-
-  try {
-    body = await request.json()
-  } catch (error) {
-    console.error('Failed to parse App Store receipt body as JSON', error)
-    return createInvalidJsonResponse()
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
   }
+  const body = parsedJson.data
 
   const parsedBody = requestSchema.safeParse(body)
   if (!parsedBody.success) {

@@ -5,17 +5,20 @@ import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/acces
 import { APP_NAME, NO_REPLY_EMAIL } from '../../_lib/constants'
 import { adaptClientSessionRow, nullableNumber, RawClientSessionRow } from '../../_lib/clientSessionsSchema'
 
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
+
 const requestSchema = z.object({
-  clientId: z
-    .string({ message: 'clientId is required' })
-    .trim()
-    .min(1, 'clientId must not be empty')
-    .uuid({ message: 'clientId must be a valid UUID' }),
-  sessionId: z
-    .string({ message: 'sessionId is required' })
-    .trim()
-    .min(1, 'sessionId must not be empty')
-    .uuid({ message: 'sessionId must be a valid UUID' }),
+  clientId: z.string({ message: 'clientId is required' }).trim().min(1, 'clientId must not be empty'),
+  sessionId: z.string({ message: 'sessionId is required' }).trim().min(1, 'sessionId must not be empty'),
 })
 
 const nullableCount = z.union([z.number(), z.string(), z.null()]).transform((value) => {
@@ -197,38 +200,36 @@ const formatEventPrice = (price: number | null, locale: string, currency?: strin
 }
 
 export async function POST(request: NextRequest) {
-  let parsedBody: z.infer<typeof requestSchema>
-
-  try {
-    const rawBody = (await request.json()) as unknown
-    const bodyResult = requestSchema.safeParse(rawBody)
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
+  let rawBody: unknown = {}
+  const rawBodyText = await request.text()
+  if (rawBodyText.trim().length > 0) {
+    try {
+      rawBody = JSON.parse(rawBodyText)
+    } catch (error) {
+      console.error('Failed to parse client session invite request body', error)
+      return createLegacyInvalidJsonResponse()
     }
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse client session invite request body', error)
+
+    if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
+      return createLegacyInvalidJsonResponse()
+    }
+  }
+
+  const bodyResult = requestSchema.safeParse(rawBody)
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+  const parsedBody = bodyResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while inviting client session',
@@ -402,8 +403,7 @@ export async function POST(request: NextRequest) {
         buildErrorResponse({
           status: 404,
           title: 'Client or session not found',
-          detail: 'We could not find the specified client or session for the authenticated trainer.',
-          type: '/client-or-session-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

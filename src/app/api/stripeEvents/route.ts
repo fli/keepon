@@ -111,5 +111,5 @@ export async function POST(request: Request) {
     return createInternalErrorResponse()
   }
 
-  return new Response(null, { status: 200 })
+  return new Response(null, { status: 204 })
 }

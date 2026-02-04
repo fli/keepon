@@ -1,5 +1,5 @@
 import { Kysely, PostgresDialect } from 'kysely'
-import { Pool } from 'pg'
+import { Pool, types as pgTypes } from 'pg'
 import type { PoolConfig } from 'pg'
 import type { DB } from './generated'
 
@@ -16,6 +16,9 @@ export type DbConfig = {
    */
   pool?: PoolConfig
 }
+
+// Match legacy behavior: keep intervals as ISO8601 strings instead of pg-interval objects.
+pgTypes.setTypeParser(1186, (value) => value)
 
 const parseOptionalNumber = (value: string | undefined) => {
   if (!value) return undefined
@@ -39,6 +42,7 @@ const buildPoolConfig = (connectionStringFromConfig?: string, overrides?: PoolCo
     min: overrides?.min ?? parseOptionalNumber(process.env.DB_POOL_MIN),
     idleTimeoutMillis: overrides?.idleTimeoutMillis ?? parseOptionalNumber(process.env.DB_POOL_IDLE_TIMEOUT),
     ssl: overrides?.ssl ?? (process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined),
+    options: overrides?.options ?? process.env.DB_OPTIONS ?? '-c intervalstyle=iso_8601',
   }
 }
 

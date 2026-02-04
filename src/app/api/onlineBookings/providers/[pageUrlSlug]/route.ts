@@ -498,7 +498,6 @@ export async function GET(_request: Request, context: HandlerContext) {
         buildErrorResponse({
           status: 404,
           title: 'Service provider page not found',
-          detail: 'No online bookings page exists for the provided slug.',
           type: '/resource-not-found',
         }),
         { status: 404 }

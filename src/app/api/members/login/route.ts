@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { login, loginRequestSchema } from '@/server/auth'
 
 const responseSchema = z.object({
@@ -8,17 +9,6 @@ const responseSchema = z.object({
   userId: z.string(),
   trainerId: z.string(),
 })
-
-const invalidJsonResponse = () =>
-  NextResponse.json(
-    buildErrorResponse({
-      status: 400,
-      title: 'Invalid JSON payload',
-      detail: 'Request body must be valid JSON.',
-      type: '/invalid-json',
-    }),
-    { status: 400 }
-  )
 
 const invalidBodyResponse = (detail?: string) =>
   NextResponse.json(
@@ -32,32 +22,31 @@ const invalidBodyResponse = (detail?: string) =>
   )
 
 export async function POST(request: Request) {
-  try {
-    const rawBody: unknown = await request.json()
-    const parsed = loginRequestSchema.safeParse(rawBody)
-    if (!parsed.success) {
-      const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
-      return invalidBodyResponse(detail || undefined)
-    }
+  const parsedJson = await parseStrictJsonBody(request)
+  if (!parsedJson.ok) {
+    return parsedJson.response
+  }
 
-    try {
-      const result = await login(parsed.data)
-      const responseBody = responseSchema.parse(result)
-      return NextResponse.json(responseBody)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to sign in'
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Failed to sign in',
-          detail: message,
-          type: '/login-failed',
-        }),
-        { status: 400 }
-      )
-    }
+  const parsed = loginRequestSchema.safeParse(parsedJson.data)
+  if (!parsed.success) {
+    const detail = parsed.error.issues.map((issue) => issue.message).join('; ')
+    return invalidBodyResponse(detail || undefined)
+  }
+
+  try {
+    const result = await login(parsed.data)
+    const responseBody = responseSchema.parse(result)
+    return NextResponse.json(responseBody)
   } catch (error) {
-    console.error('Failed to parse login request body as JSON', error)
-    return invalidJsonResponse()
+    const message = error instanceof Error ? error.message : 'Failed to sign in'
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 400,
+        title: 'Failed to sign in',
+        detail: message,
+        type: '/login-failed',
+      }),
+      { status: 400 }
+    )
   }
 }

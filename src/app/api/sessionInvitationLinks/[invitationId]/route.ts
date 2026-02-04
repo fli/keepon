@@ -3,16 +3,10 @@ import { db, sql } from '@/lib/db'
 import { z } from 'zod'
 import { APP_EMAIL, APP_NAME, NO_REPLY_EMAIL } from '../../_lib/constants'
 import { nullableNumber } from '../../_lib/clientSessionsSchema'
+import { buildErrorResponse } from '../../_lib/accessToken'
 import type { Transaction } from 'kysely'
 import type { Database } from '@/lib/db'
-
-const paramsSchema = z.object({
-  invitationId: z
-    .string()
-    .trim()
-    .min(1, 'Invitation id must not be empty.')
-    .uuid({ message: 'Invitation id must be a valid UUID.' }),
-})
+import { validate as validateUuid } from 'uuid'
 
 const querySchema = z.object({
   action: z.enum(['accept', 'decline'] as const),
@@ -117,62 +111,201 @@ const formatDateRange = (start: Date, end: Date, locale: string, timeZone: strin
   }
 }
 
-const renderPage = (options: {
-  badge: string
-  headline: string
-  message: string
-  details?: InvitationDetails
-  statusColor?: string
-}) => {
-  const { badge, headline, message, details, statusColor = '#2563eb' } = options
-
-  const eventRows = details
-    ? [
-        { label: 'Appointment', value: details.eventName },
-        { label: 'When', value: details.dateRange },
-        details.location ? { label: 'Where', value: details.location } : null,
-        details.priceText ? { label: 'Price', value: details.priceText } : null,
-        { label: 'With', value: details.serviceProviderName },
-      ].filter(Boolean)
-    : []
-
-  const contactLine =
-    details && details.publicEmail
-      ? `<p style="margin:16px 0 0 0;color:#4b5563;font-size:14px;">Need help? <a href="mailto:${details.publicEmail}" style="color:${statusColor};text-decoration:none;">Email ${escapeHtml(details.serviceProviderName)}</a></p>`
-      : ''
-
-  const rowsHtml = eventRows
-    .map(
-      (row) => `
-        <div style="display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;">
-          <span style="font-weight:600;color:#111827;font-size:14px;">${escapeHtml(row!.label)}</span>
-          <span style="color:#111827;font-size:14px;text-align:right;max-width:65%;">${escapeHtml(row!.value ?? '')}</span>
-        </div>`
-    )
-    .join('')
-
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeHtml(headline)}</title>
-  </head>
-  <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
-      <div style="max-width:560px;width:100%;background:#ffffff;border-radius:16px;padding:28px 24px;box-shadow:0 20px 60px rgba(15,23,42,0.12);border:1px solid #e5e7eb;">
-        <div style="display:inline-flex;padding:6px 12px;border-radius:999px;background:${statusColor}1A;color:${statusColor};font-weight:700;font-size:12px;letter-spacing:0.02em;text-transform:uppercase;">${escapeHtml(
-          badge
-        )}</div>
-        <h1 style="margin:16px 0 8px 0;font-size:26px;font-weight:800;color:#0f172a;">${escapeHtml(headline)}</h1>
-        <p style="margin:0 0 18px 0;color:#1f2937;font-size:16px;line-height:1.55;">${escapeHtml(message)}</p>
-        ${rowsHtml ? `<div style="display:flex;flex-direction:column;gap:10px;margin-top:14px;">${rowsHtml}</div>` : ''}
-        ${contactLine}
+const successHtml = ({
+  eventName,
+  price,
+  location,
+  serviceProviderFullName,
+  dateRangeString,
+}: {
+  eventName: string | null
+  dateRangeString: string
+  serviceProviderFullName: string
+  location: string | null
+  price: string | null
+}) => `<link
+    href="https://unpkg.com/tailwindcss@^1.4.6/dist/tailwind.min.css"
+    rel="stylesheet"
+  />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>You're all booked in!</title>
+  <div class="bg-gray-200">
+    <div
+      class="flex justify-center items-center max-w-screen-xl h-screen mx-auto text-center py-12 px-12 lg:py-16"
+    >
+      <div class="bg-white p-12 rounded-lg shadow-2xl">
+        <div class="text-left">
+          <p
+            class="mb-4 text-base leading-6 text-blue-600 font-semibold tracking-wide uppercase"
+          >
+            Success!
+          </p>
+          <h3
+            class=" mb-8 mt-2 text-3xl leading-8 font-heavy tracking-tight text-gray-900 sm:text-4xl sm:leading-10"
+          >
+            You're booked.
+          </h3>
+          <p
+            className="mt-4 max-w-2xl text-xl leading-8 text-gray-600 lg:mx-auto"
+          >
+           ${
+             eventName
+               ? `<span className="text-gray-900 text-2xl font-bold">${eventName}</span>`
+               : ''
+           }
+            <br />
+            ${escapeHtml(dateRangeString)}${price === null ? '' : `, ${escapeHtml(price)}`}<br />
+            ${location ? `at : <span>${escapeHtml(location)}</span> <br />` : ''} With :
+            <span>${escapeHtml(serviceProviderFullName)}</span>
+          </p>
+          <p class="mt-4 max-w-2xl text-xl leading-8 text-gray-600 lg:mx-auto">
+            We're looking forward to seeing you!
+          </p>
+        </div>
       </div>
     </div>
-  </body>
-</html>`
-}
+  </div>`
+
+const declineHtml = `<link
+    href="https://unpkg.com/tailwindcss@^1.4.6/dist/tailwind.min.css"
+    rel="stylesheet"
+  />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>We've marked you as not going</title>
+  <div class="bg-gray-200">
+    <div
+      class="flex justify-center items-center max-w-screen-xl h-screen mx-auto text-center py-12 px-12 lg:py-16"
+    >
+      <div class="bg-white p-12 rounded-lg shadow-2xl">
+        <div class="text-left">
+          <p
+            class="mb-4 text-base leading-6 text-blue-600 font-semibold tracking-wide uppercase"
+          >
+            No worries.
+          </p>
+          <h3
+            class=" mb-8 mt-2 text-3xl leading-8 font-heavy tracking-tight text-gray-900 sm:text-4xl sm:leading-10"
+          >
+            We'll see you at the next one...
+          </h3>
+          <p class="mt-4 max-w-2xl text-xl leading-8 text-gray-600 lg:mx-auto">
+            Don't hesitate to reach out if you change your mind and we’ll
+            hopefully see you at the next one.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>`
+
+const maxReachedHtml = ({
+  maximumAttendance,
+  serviceProviderEmail,
+}: {
+  maximumAttendance: number
+  serviceProviderEmail: string
+}) => `
+  <link
+    href="https://unpkg.com/tailwindcss@^1.4.6/dist/tailwind.min.css"
+    rel="stylesheet"
+  />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>This appointment is full</title>
+  <div class="bg-gray-200">
+    <div
+      class="flex justify-center items-center max-w-screen-xl h-screen mx-auto text-center py-12 px-12 lg:py-16"
+    >
+      <div class="bg-white p-12 rounded-lg shadow-2xl">
+        <div class="text-left">
+          <p
+            class="mb-4 text-base leading-6 text-red-600 font-semibold tracking-wide uppercase"
+          >
+            We couldn't book you in sorry.
+          </p>
+          <h3
+            class=" mb-8 mt-2 text-3xl leading-8 font-heavy tracking-tight text-gray-900 sm:text-4xl sm:leading-10"
+          >
+            We've reached max capacity
+          </h3>
+          <p class="mt-4 max-w-2xl text-xl leading-8 text-gray-600 lg:mx-auto">
+            Unfortunately we couldn’t reserve your spot as the max number of
+            ${maximumAttendance} client${maximumAttendance === 1 ? '' : 's'} has
+            been reached. Please contact us to see if there are any
+            cancellations or if you have any questions.
+            <br />
+          </p>
+          <div class="mt-8 flex justify-left">
+            <div class="inline-flex rounded-md shadow">
+              <a
+                href="mailto:${serviceProviderEmail}"
+                class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-lg leading-6 font-medium rounded-md text-white bg-blue-500 hover:bg-blue-900 focus:outline-none focus:shadow-outline transition duration-150 ease-in-out"
+              >
+                Contact us
+              </a>
+            </div>
+            <div class="ml-3 inline-flex"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+`
+
+const eventNotFoundHtml = `
+<link href="https://unpkg.com/tailwindcss@^1.4.6/dist/tailwind.min.css" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Event not found</title>
+<div class="bg-gray-200">
+  <div class="flex justify-center items-center max-w-screen-xl h-screen mx-auto text-center py-12 px-12 lg:py-16">
+    <div class="bg-white p-12 rounded-lg shadow-2xl">
+      <div class="text-left">
+        <p class="mb-4 text-base leading-6 text-red-600 font-semibold tracking-wide uppercase">
+          Can't find this event.
+        </p>
+        <h3 class=" mb-8 mt-2 text-3xl leading-8 font-heavy tracking-tight text-gray-900 sm:text-4xl sm:leading-10">
+          Looks like this event has been removed.
+        </h3>
+        <p class="mt-4 max-w-2xl text-xl leading-8 text-gray-600 lg:mx-auto">
+          Don't hesitate to reach out if you think this is a mistake.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+`
+
+const invitationExpiredHtml = ({
+  serviceProviderEmail,
+}: {
+  serviceProviderEmail: string
+}) => `
+<link href="https://unpkg.com/tailwindcss@^1.4.6/dist/tailwind.min.css" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>This invitation has expired</title>
+<div class="bg-gray-200">
+  <div class="flex justify-center items-center max-w-screen-xl h-screen mx-auto text-center py-12 px-12 lg:py-16">
+    <div class="bg-white p-12 rounded-lg shadow-2xl">
+      <div class="text-left">
+        <p class="mb-4 text-base leading-6 text-red-600 font-semibold tracking-wide uppercase">
+          This invitation has expired
+        </p>
+        <p class="mt-4 max-w-2xl text-xl leading-8 text-gray-600 lg:mx-auto">
+          Don't hesitate to reach out if you think this is a mistake.
+        </p>
+        <div class="mt-8 flex justify-left">
+          <div class="inline-flex rounded-md shadow">
+          <a href="mailto:${serviceProviderEmail}"
+              class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-lg leading-6 font-medium rounded-md text-white bg-blue-500 hover:bg-blue-900 focus:outline-none focus:shadow-outline transition duration-150 ease-in-out">
+              Contact us
+            </a>
+          </div>
+          <div class="ml-3 inline-flex"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+`
 
 const buildTrainerAcceptEmail = (details: InvitationDetails) => `
 <!doctype html>
@@ -351,22 +484,22 @@ const sendCapacityReachedSideEffects = async (
   `.execute(trx)
 }
 
-const badRequestResponse = (message: string) =>
-  new NextResponse(
-    renderPage({
-      badge: 'Invalid Link',
-      headline: 'We could not process this invitation',
-      message,
-      statusColor: '#dc2626',
-    }),
-    { status: 400, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-  )
+const badRequestResponse = (_message: string) =>
+  new NextResponse(eventNotFoundHtml, {
+    status: 400,
+    headers: { 'Content-Type': 'text/html' },
+  })
 
 export async function GET(request: NextRequest, context: HandlerContext) {
-  const paramsResult = paramsSchema.safeParse(await context.params)
-  if (!paramsResult.success) {
-    const detail = paramsResult.error.issues.map((issue) => issue.message).join('; ')
-    return badRequestResponse(detail || 'Invitation identifier was invalid.')
+  const { invitationId } = await context.params
+  if (!validateUuid(invitationId)) {
+    return NextResponse.json(
+      buildErrorResponse({
+        status: 500,
+        title: 'Something on our end went wrong.',
+      }),
+      { status: 500 }
+    )
   }
 
   const url = new URL(request.url)
@@ -376,7 +509,6 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     return badRequestResponse(detail || 'Action must be either accept or decline.')
   }
 
-  const { invitationId } = paramsResult.data
   const { action } = queryResult.data
 
   try {
@@ -396,11 +528,11 @@ export async function GET(request: NextRequest, context: HandlerContext) {
           trainer.first_name AS "serviceProviderFirstName",
           trainer.last_name AS "serviceProviderLastName",
           COALESCE(trainer.online_bookings_business_name, trainer.business_name, trainer.first_name || COALESCE(' ' || trainer.last_name, '')) AS "serviceProviderName",
-          session_series.name AS "sessionName",
-          COALESCE(session_series.location, session.location) AS "location",
+          COALESCE(session_series.name, 'Group Appointment') AS "sessionName",
+          session_series.location AS "location",
           session.start AS "start",
           session.start + session.duration AS "end",
-          session.timezone AS "timezone",
+          trainer.timezone AS "timezone",
           trainer.locale AS "locale",
           session.maximum_attendance AS "maximumAttendance",
           session_series.price AS price,
@@ -430,7 +562,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
         dateRange: formatDateRange(parsed.start, parsed.end, parsed.locale, parsed.timezone),
         priceText: formatEventPrice(parsed.price, parsed.locale, parsed.currency),
         clientFullName: joinNames(parsed.clientFirstName, parsed.clientLastName) || 'A client',
-        eventName: parsed.sessionName?.trim() || 'an appointment',
+        eventName: parsed.sessionName,
       }
 
       if (parsed.invitationState === 'expired') {
@@ -500,79 +632,53 @@ export async function GET(request: NextRequest, context: HandlerContext) {
     })
 
     if (outcome.type === 'not-found') {
-      return new NextResponse(
-        renderPage({
-          badge: 'Not Found',
-          headline: 'We can’t find this invitation',
-          message: 'The invitation link may be incorrect or has already been handled.',
-          statusColor: '#dc2626',
-        }),
-        { status: 404, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-      )
+      return new NextResponse(eventNotFoundHtml, {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      })
     }
 
     const details = 'details' in outcome ? outcome.details : undefined
 
     if (outcome.type === 'expired') {
-      return new NextResponse(
-        renderPage({
-          badge: 'Expired',
-          headline: 'This invitation has expired',
-          message:
-            'This appointment has already started or finished. Please contact the provider if you think this is a mistake.',
-          details,
-          statusColor: '#dc2626',
-        }),
-        { status: 410, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-      )
+      return new NextResponse(invitationExpiredHtml({ serviceProviderEmail: details!.serviceProviderEmail }), {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      })
     }
 
     if (outcome.type === 'full') {
       return new NextResponse(
-        renderPage({
-          badge: 'Full',
-          headline: 'This appointment is full',
-          message: 'We could not reserve your spot because the maximum number of attendees has been reached.',
-          details,
-          statusColor: '#d97706',
+        maxReachedHtml({
+          maximumAttendance: details!.maximumAttendance ?? 0,
+          serviceProviderEmail: details!.serviceProviderEmail,
         }),
-        { status: 409, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        { status: 200, headers: { 'Content-Type': 'text/html' } }
       )
     }
 
     if (outcome.type === 'declined') {
-      return new NextResponse(
-        renderPage({
-          badge: 'Updated',
-          headline: 'You’re marked as not attending',
-          message: 'We’ve let the provider know you can’t make it.',
-          details,
-          statusColor: '#334155',
-        }),
-        { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-      )
+      return new NextResponse(declineHtml, {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      })
     }
 
     return new NextResponse(
-      renderPage({
-        badge: 'Booked',
-        headline: 'You’re all booked in!',
-        message: 'Thanks for confirming. We’ll see you there.',
-        details,
-        statusColor: '#16a34a',
+      successHtml({
+        eventName: details!.eventName,
+        dateRangeString: details!.dateRange,
+        location: details!.location,
+        price: details!.priceText,
+        serviceProviderFullName: details!.serviceProviderName,
       }),
-      { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+      { status: 200, headers: { 'Content-Type': 'text/html' } }
     )
   } catch (error) {
     console.error('Failed to handle session invitation link', { invitationId, action, error })
-    return new NextResponse(
-      renderPage({
-        badge: 'Error',
-        headline: 'Something went wrong',
-        message: 'We could not process your request right now. Please try again later.',
-        statusColor: '#dc2626',
-      }),
-      { status: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-    )
+    return new NextResponse(eventNotFoundHtml, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html' },
+    })
   }
 }

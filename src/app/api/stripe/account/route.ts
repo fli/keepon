@@ -5,15 +5,14 @@ import { authenticateTrainerOrClientRequest, buildErrorResponse } from '../../_l
 
 const stripeAccountSchema = z
   .object({
-    id: z.string(),
     type: z.enum(['custom', 'standard']),
     charges_enabled: z.boolean(),
     payouts_enabled: z.boolean(),
     requirements: z
       .object({
-        current_deadline: z.number().nullable().optional(),
-        currently_due: z.array(z.string()).nullable().optional(),
-        disabled_reason: z.string().nullable().optional(),
+        current_deadline: z.number().nullable(),
+        currently_due: z.array(z.string()).nullable(),
+        disabled_reason: z.string().nullable(),
         errors: z
           .array(
             z.object({
@@ -22,13 +21,11 @@ const stripeAccountSchema = z
               requirement: z.string(),
             })
           )
-          .nullable()
-          .optional(),
-        eventually_due: z.array(z.string()).nullable().optional(),
-        past_due: z.array(z.string()).nullable().optional(),
-        pending_verification: z.array(z.string()).nullable().optional(),
+          .nullable(),
+        eventually_due: z.array(z.string()).nullable(),
+        past_due: z.array(z.string()).nullable(),
+        pending_verification: z.array(z.string()).nullable(),
       })
-      .partial()
       .optional(),
     settings: z
       .object({
@@ -66,7 +63,6 @@ const stripeAccountSchema = z
       .nullable()
       .optional(),
   })
-  .passthrough()
 
 const trainerStripeAccountRowSchema = z.object({
   account: z.unknown(),
@@ -144,7 +140,10 @@ export async function GET(request: Request) {
       .selectFrom('client')
       .innerJoin('trainer', 'trainer.id', 'client.trainer_id')
       .innerJoin('stripe.account as stripeAccount', 'stripeAccount.id', 'trainer.stripe_account_id')
-      .select(() => [sql<string>`stripeAccount.id`.as('id'), sql<string>`stripeAccount.object ->> 'type'`.as('type')])
+      .select(() => [
+        sql<string>`${sql.ref('stripeAccount.id')}`.as('id'),
+        sql<string>`${sql.ref('stripeAccount.object')} ->> 'type'`.as('type'),
+      ])
       .where('client.id', '=', authorization.clientId)
       .where('trainer.id', '=', authorization.trainerId)
       .executeTakeFirst()

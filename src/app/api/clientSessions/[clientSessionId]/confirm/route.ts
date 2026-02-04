@@ -8,8 +8,7 @@ const paramsSchema = z.object({
   clientSessionId: z
     .string()
     .trim()
-    .min(1, 'Client session id must not be empty.')
-    .uuid({ message: 'Client session id must be a valid UUID.' }),
+    .min(1, 'Client session id must not be empty.'),
 })
 
 type HandlerContext = RouteContext<'/api/clientSessions/[clientSessionId]/confirm'>
@@ -20,6 +19,27 @@ class ClientSessionNotFoundError extends Error {
     this.name = 'ClientSessionNotFoundError'
   }
 }
+
+const createLegacyNotFoundResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 404,
+      title: 'Client session not found',
+      type: '/resource-not-found',
+    }),
+    { status: 404 }
+  )
+
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
 
 const normalizeUpdatedCount = (value: unknown) => {
   if (typeof value === 'number') {
@@ -52,6 +72,21 @@ export async function POST(request: NextRequest, context: HandlerContext) {
   }
 
   const { clientSessionId } = paramsResult.data
+
+  const rawBodyText = await request.text()
+  if (rawBodyText.trim().length > 0) {
+    let jsonBody: unknown
+    try {
+      jsonBody = JSON.parse(rawBodyText)
+    } catch (error) {
+      console.error('Failed to parse client session confirm request JSON', clientSessionId, error)
+      return createLegacyInvalidJsonResponse()
+    }
+
+    if (!jsonBody || typeof jsonBody !== 'object' || Array.isArray(jsonBody)) {
+      return createLegacyInvalidJsonResponse()
+    }
+  }
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while confirming client session',
@@ -117,15 +152,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
     return NextResponse.json(clientSession)
   } catch (error) {
     if (error instanceof ClientSessionNotFoundError) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Client session not found',
-          detail: 'We could not find a client session with the specified identifier for the authenticated trainer.',
-          type: '/client-session-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     if (error instanceof ZodError) {

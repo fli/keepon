@@ -7,13 +7,11 @@ const paramsSchema = z.object({
   sessionId: z
     .string({ message: 'Session id is required.' })
     .trim()
-    .min(1, 'Session id must not be empty.')
-    .uuid({ message: 'Session id must be a valid UUID.' }),
+    .min(1, 'Session id must not be empty.'),
   clientId: z
     .string({ message: 'Client id is required.' })
     .trim()
-    .min(1, 'Client id must not be empty.')
-    .uuid({ message: 'Client id must be a valid UUID.' }),
+    .min(1, 'Client id must not be empty.'),
 })
 
 const querySchema = z.object({
@@ -222,9 +220,8 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
-          title: 'Client appointment not found',
-          detail: 'We could not find a client appointment with the specified identifiers.',
-          type: '/client-session-not-found',
+          title: 'Client session not found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )

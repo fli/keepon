@@ -4,28 +4,43 @@ import type { Database } from '@/lib/db'
 import { z } from 'zod'
 import type { Kysely, Transaction } from 'kysely'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../../_lib/accessToken'
-import { adaptClientSessionRow, clientSessionListSchema, RawClientSessionRow } from '../../../_lib/clientSessionsSchema'
+import { adaptClientSessionRow, RawClientSessionRow } from '../../../_lib/clientSessionsSchema'
 
 const paramsSchema = z.object({
   sessionId: z
     .string({ message: 'Session id is required.' })
     .trim()
-    .min(1, 'Session id must not be empty.')
-    .uuid({ message: 'Session id must be a valid UUID.' }),
+    .min(1, 'Session id must not be empty.'),
 })
 
+const LEGACY_INVALID_JSON_MESSAGE = 'Unexpected token \'"\\", "#" is not valid JSON'
+
+const createLegacyInvalidJsonResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 400,
+      title: LEGACY_INVALID_JSON_MESSAGE,
+    }),
+    { status: 400 }
+  )
+
+const legacyInternalErrorResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 500,
+      title: 'Something on our end went wrong.',
+    }),
+    { status: 500 }
+  )
+
 const priceSchema = z
-  .union([z.number(), z.string(), z.null()])
-  .optional()
+  .union([z.number(), z.string(), z.null(), z.undefined()])
   .transform((value) => {
     if (value === null || value === undefined) {
       return 0
     }
 
     if (typeof value === 'number') {
-      if (!Number.isFinite(value) || value < 0) {
-        throw new Error('Price must be a non-negative number.')
-      }
       return value
     }
 
@@ -34,12 +49,10 @@ const priceSchema = z
       return 0
     }
 
-    const parsed = Number(trimmed)
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      throw new Error('Price must be a non-negative number.')
-    }
-
-    return parsed
+    return Number(trimmed)
+  })
+  .refine((value) => Number.isFinite(value) && value >= 0, {
+    message: 'price should not be provided or  should be greater than or equal to 0',
   })
 
 const noteSchema = z
@@ -57,8 +70,7 @@ const requestBodySchema = z.object({
   clientId: z
     .string({ message: 'clientId is required.' })
     .trim()
-    .min(1, 'clientId must not be empty.')
-    .uuid({ message: 'clientId must be a valid UUID.' }),
+    .min(1, 'clientId must not be empty.'),
   future: z
     .union([z.boolean(), z.literal('true'), z.literal('false')])
     .transform((value) => value === true || value === 'true'),
@@ -72,6 +84,13 @@ class ClientNotFoundError extends Error {
   constructor() {
     super('Client not found')
     this.name = 'ClientNotFoundError'
+  }
+}
+
+class SessionNotFoundError extends Error {
+  constructor() {
+    super('Session not found')
+    this.name = 'SessionNotFoundError'
   }
 }
 
@@ -125,40 +144,36 @@ export async function POST(request: NextRequest, context: HandlerContext) {
 
   const { sessionId } = paramsResult.data
 
-  let parsedBody: z.infer<typeof requestBodySchema>
-
-  try {
-    const rawBody = (await request.json()) as unknown
-    const bodyResult = requestBodySchema.safeParse(rawBody)
-
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
-
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
+  let rawBody: unknown = {}
+  const rawBodyText = await request.text()
+  if (rawBodyText.trim().length > 0) {
+    try {
+      rawBody = JSON.parse(rawBodyText)
+    } catch (error) {
+      console.error('Failed to parse session client request body', sessionId, error)
+      return createLegacyInvalidJsonResponse()
     }
 
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse session client request body', sessionId, error)
+    if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
+      return createLegacyInvalidJsonResponse()
+    }
+  }
+
+  const bodyResult = requestBodySchema.safeParse(rawBody)
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+  const parsedBody = bodyResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while adding client to session',
@@ -218,7 +233,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       const insertedIds = insertResult.rows?.map((row) => row.id).filter((id): id is string => Boolean(id)) ?? []
 
       if (insertedIds.length === 0) {
-        return []
+        throw new SessionNotFoundError()
       }
 
       const rows = (await clientSessionSelect(
@@ -230,20 +245,21 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       return rows.map((row) => adaptClientSessionRow(row))
     })
 
-    const responseBody = clientSessionListSchema.parse(clientSessions)
-
-    return NextResponse.json(responseBody)
+    return NextResponse.json(clientSessions)
   } catch (error) {
     if (error instanceof ClientNotFoundError) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
           title: 'Client not found',
-          detail: 'We could not find a client with the specified identifier for the authenticated trainer.',
-          type: '/client-not-found',
+          type: '/resource-not-found',
         }),
         { status: 404 }
       )
+    }
+
+    if (error instanceof SessionNotFoundError) {
+      return legacyInternalErrorResponse()
     }
 
     if (error instanceof z.ZodError) {
@@ -265,13 +281,6 @@ export async function POST(request: NextRequest, context: HandlerContext) {
       error,
     })
 
-    return NextResponse.json(
-      buildErrorResponse({
-        status: 500,
-        title: 'Failed to add client to session',
-        type: '/internal-server-error',
-      }),
-      { status: 500 }
-    )
+    return legacyInternalErrorResponse()
   }
 }

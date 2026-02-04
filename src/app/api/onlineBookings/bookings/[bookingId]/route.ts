@@ -98,8 +98,7 @@ export async function GET(_request: NextRequest, context: HandlerContext) {
       return NextResponse.json(
         buildErrorResponse({
           status: 404,
-          title: 'Booking not found',
-          detail: 'No booking matched the provided identifier.',
+          title: 'Booking not found.',
           type: '/resource-not-found',
         }),
         { status: 404 }

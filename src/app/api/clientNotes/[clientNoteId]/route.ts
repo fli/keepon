@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
+import { parseStrictJsonBody } from '../../_lib/strictJson'
 import { adaptClientNoteRow, clientNoteSchema, type ClientNoteRow } from '../shared'
 
 const paramsSchema = z.object({
   clientNoteId: z
     .string()
     .trim()
-    .min(1, 'Client note id is required')
-    .uuid({ message: 'Client note id must be a valid UUID' }),
+    .min(1, 'Client note id is required'),
 })
 
 const patchRequestBodySchema = z
@@ -34,6 +34,16 @@ const normalizeDeletedCount = (value: unknown) => {
   }
   return 0
 }
+
+const createLegacyNotFoundResponse = () =>
+  NextResponse.json(
+    buildErrorResponse({
+      status: 404,
+      title: 'Client note not found',
+      type: '/resource-not-found',
+    }),
+    { status: 404 }
+  )
 
 export async function GET(request: NextRequest, context: HandlerContext) {
   const paramsResult = paramsSchema.safeParse(await context.params)
@@ -71,15 +81,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
       .executeTakeFirst()) as ClientNoteRow | undefined
 
     if (!noteRow) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Client note not found',
-          detail: 'We could not find a client note with the specified identifier for the authenticated trainer.',
-          type: '/client-note-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     const responseBody = clientNoteSchema.parse(adaptClientNoteRow(noteRow))
@@ -148,15 +150,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
     const deletedCount = normalizeDeletedCount(deleteResult?.numDeletedRows ?? 0)
 
     if (deletedCount === 0) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Client note not found',
-          detail: 'We could not find a client note with the specified identifier for the authenticated trainer.',
-          type: '/client-note-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     return new NextResponse(null, { status: 204 })
@@ -195,37 +189,28 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
   }
 
   let parsedBody: z.infer<typeof patchRequestBodySchema>
-  try {
-    const rawBody = (await request.json()) as unknown
-    const bodyResult = patchRequestBodySchema.safeParse(rawBody)
+  const parsed = await parseStrictJsonBody(request)
+  if (!parsed.ok) {
+    return parsed.response
+  }
 
-    if (!bodyResult.success) {
-      const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
+  const bodyResult = patchRequestBodySchema.safeParse(parsed.data)
 
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 400,
-          title: 'Invalid request body',
-          detail: detail || 'Request body did not match the expected schema.',
-          type: '/invalid-body',
-        }),
-        { status: 400 }
-      )
-    }
+  if (!bodyResult.success) {
+    const detail = bodyResult.error.issues.map((issue) => issue.message).join('; ')
 
-    parsedBody = bodyResult.data
-  } catch (error) {
-    console.error('Failed to parse client note update request body', error)
     return NextResponse.json(
       buildErrorResponse({
         status: 400,
-        title: 'Invalid JSON payload',
-        detail: 'Request body must be valid JSON.',
-        type: '/invalid-json',
+        title: 'Invalid request body',
+        detail: detail || 'Request body did not match the expected schema.',
+        type: '/invalid-body',
       }),
       { status: 400 }
     )
   }
+
+  parsedBody = bodyResult.data
 
   const authorization = await authenticateTrainerRequest(request, {
     extensionFailureLogMessage: 'Failed to extend access token expiry while updating client note',
@@ -275,15 +260,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
     }
 
     if (!noteRow) {
-      return NextResponse.json(
-        buildErrorResponse({
-          status: 404,
-          title: 'Client note not found',
-          detail: 'We could not find a client note with the specified identifier for the authenticated trainer.',
-          type: '/client-note-not-found',
-        }),
-        { status: 404 }
-      )
+      return createLegacyNotFoundResponse()
     }
 
     const responseBody = clientNoteSchema.parse(adaptClientNoteRow(noteRow))
