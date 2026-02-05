@@ -162,20 +162,20 @@ SELECT
       SELECT
         COALESCE(
           json_object_agg(
-            trainer_online_booking_override.date,
+            availability.date,
             json_build_object(
               'acceptingBookings',
-              trainer_online_booking_override.accepting_bookings,
+              availability.accepting_bookings,
               'availableIntervals',
               CASE
-                WHEN trainer_online_booking_override.available_intervals IS NULL THEN NULL
+                WHEN availability.available_intervals IS NULL THEN NULL
                 ELSE (
                   SELECT
                     COALESCE(
                       json_agg(ARRAY [to_char(lower(intervals), 'HH24:MI'), to_char(upper(intervals), 'HH24:MI')]),
                       '[]'
                     )
-                  FROM (SELECT unnest(trainer_online_booking_override.available_intervals) intervals) i
+                  FROM (SELECT unnest(availability.available_intervals) intervals) i
                   WHERE NOT isempty(intervals)
                 )
               END
@@ -183,8 +183,8 @@ SELECT
           ),
           '{}'::json
         )
-      FROM trainer_online_booking_override
-      WHERE trainer_online_booking_override.trainer_id = trainer.id
+      FROM availability
+      WHERE availability.trainer_id = trainer.id
     )
   ) AS availability,
   (
