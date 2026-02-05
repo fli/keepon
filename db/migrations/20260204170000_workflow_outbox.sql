@@ -1,3 +1,5 @@
+-- migrate:up
+
 CREATE TABLE IF NOT EXISTS public.workflow_outbox (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -67,7 +69,6 @@ BEGIN
   RETURN v_outbox_id;
 END;
 $$;
-
 CREATE OR REPLACE FUNCTION public.process_stripe_event() RETURNS trigger
     LANGUAGE plpgsql
     AS $$ BEGIN
@@ -127,6 +128,7 @@ CREATE OR REPLACE FUNCTION public.send_mail() RETURNS trigger
 END;
 $$;
 
+
 CREATE OR REPLACE FUNCTION public.send_sms() RETURNS trigger
     LANGUAGE plpgsql
     AS $$ BEGIN
@@ -148,3 +150,5 @@ CREATE OR REPLACE FUNCTION public.send_sms() RETURNS trigger
   RETURN NEW;
 END;
 $$;
+
+-- migrate:down

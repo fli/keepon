@@ -1,3 +1,5 @@
+-- migrate:up
+
 CREATE OR REPLACE VIEW public.vw_generate_payment_plan_payments AS
 SELECT *
 FROM public.generate_payment_plan_payments();
@@ -203,3 +205,4 @@ SELECT
 FROM public.vw_session_reminder_details
 WHERE reminder_checked_at IS NULL
   AND NOW() <@ tstzrange(starts_at - reminder_interval, starts_at + '10 minutes'::interval);
+-- migrate:down

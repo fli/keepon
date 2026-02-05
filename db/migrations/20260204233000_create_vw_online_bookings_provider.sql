@@ -1,3 +1,5 @@
+-- migrate:up
+
 CREATE OR REPLACE VIEW vw_online_bookings_provider AS
 SELECT
   CASE
@@ -274,3 +276,4 @@ JOIN currency ON currency.id = supported_country_currency.currency_id
 JOIN vw_legacy_trainer ON trainer.id = vw_legacy_trainer.id
 LEFT JOIN stripe.account ON stripe.account.id = trainer.stripe_account_id
 WHERE trainer.online_bookings_page_url_slug IS NOT NULL;
+-- migrate:down
