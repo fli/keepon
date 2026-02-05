@@ -330,7 +330,9 @@ export const getTrainerProfile = async (
       eb.ref('trainer.business_logo_url').as('businessLogoUrl'),
       eb.ref('trainer.cover_image_url').as('coverImageUrl'),
       eb.ref('trainer.industry').as('industry'),
-      eb.fn('concat', [eb.val(calendarBaseUrl), eb.ref('trainer.icalendar_url_slug')]).as('calendarUrl'),
+      eb
+        .fn('concat', [eb.cast<string>(eb.val(calendarBaseUrl), 'text'), eb.ref('trainer.icalendar_url_slug')])
+        .as('calendarUrl'),
       eb.ref('trainer.default_can_clients_cancel_appointment').as('defaultCanClientsCancelAppointment'),
       eb.ref('trainer.sms_credit_checkout_id').as('smsCreditCheckoutId'),
       eb
