@@ -7,7 +7,7 @@ export {}
 
 declare global {
   interface RouteContext<AppRouteHandlerRoute extends string = string> {
-    params: Promise<Record<string, string | string[] | undefined>>
+    params: Promise<Record<string, string>>
   }
 }
 '
