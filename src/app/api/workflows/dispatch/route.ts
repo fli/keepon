@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { dispatchOutboxOnce } from '@/server/workflow/dispatcher'
 
-export const runtime = 'nodejs'
 export const maxDuration = 30
 
 const parsePositiveInt = (value: string | null, fallback: number) => {
