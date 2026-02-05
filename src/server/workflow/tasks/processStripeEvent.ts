@@ -17,13 +17,18 @@ const getLatestEventCreated = async (resourceType: string) => {
     .selectFrom('stripe.event')
     .select((eb) =>
       eb
-        .fn('max', [eb.cast<number>(eb.fn('json_extract_path_text', [eb.ref('object'), eb.val('created')]), 'bigint')])
+        .fn('max', [
+          eb.cast<number>(
+            eb.fn('jsonb_extract_path_text', [eb.cast<unknown>(eb.ref('object'), 'jsonb'), eb.val('created')]),
+            'bigint'
+          ),
+        ])
         .as('latestCreated')
     )
     .where((eb) =>
       eb(
         eb.fn('regexp_replace', [
-          eb.fn('json_extract_path_text', [eb.ref('object'), eb.val('type')]),
+          eb.fn('jsonb_extract_path_text', [eb.cast<unknown>(eb.ref('object'), 'jsonb'), eb.val('type')]),
           eb.val('\\.[a-z_]+$'),
           eb.val(''),
         ]),

@@ -394,7 +394,14 @@ export async function GET(request: Request) {
         eb.ref('bankAccount.object').as('object'),
       ])
       .where((eb) =>
-        eb(eb.fn('json_extract_path_text', [eb.ref('bankAccount.object'), eb.val('account')]), '=', stripeAccountId)
+        eb(
+          eb.fn('jsonb_extract_path_text', [
+            eb.cast<unknown>(eb.ref('bankAccount.object'), 'jsonb'),
+            eb.val('account'),
+          ]),
+          '=',
+          stripeAccountId
+        )
       )
       .execute()
 

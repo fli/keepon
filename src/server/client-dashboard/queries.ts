@@ -223,9 +223,19 @@ export const getClientProfile = cache(async (): Promise<ClientProfile> => {
   const paymentMethodRow = await db
     .selectFrom('stripe.payment_method')
     .select(['id', 'object'])
-    .where((eb) => eb(eb.fn('json_extract_path_text', [eb.ref('object'), eb.val('customer')]), '=', stripeCustomerId))
+    .where((eb) =>
+      eb(
+        eb.fn('jsonb_extract_path_text', [eb.cast<unknown>(eb.ref('object'), 'jsonb'), eb.val('customer')]),
+        '=',
+        stripeCustomerId
+      )
+    )
     .orderBy(
-      (eb) => eb.cast<number>(eb.fn('json_extract_path_text', [eb.ref('object'), eb.val('created')]), 'bigint'),
+      (eb) =>
+        eb.cast<number>(
+          eb.fn('jsonb_extract_path_text', [eb.cast<unknown>(eb.ref('object'), 'jsonb'), eb.val('created')]),
+          'bigint'
+        ),
       'desc'
     )
     .limit(1)

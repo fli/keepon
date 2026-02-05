@@ -91,10 +91,18 @@ export async function GET(request: Request) {
       .selectFrom('stripe.payment_method')
       .select(['id', 'object'])
       .where((eb) =>
-        eb(eb.fn('json_extract_path_text', [eb.ref('object'), eb.val('customer')]), '=', clientRow.stripeCustomerId)
+        eb(
+          eb.fn('jsonb_extract_path_text', [eb.cast<unknown>(eb.ref('object'), 'jsonb'), eb.val('customer')]),
+          '=',
+          clientRow.stripeCustomerId
+        )
       )
       .orderBy(
-        (eb) => eb.cast<number>(eb.fn('json_extract_path_text', [eb.ref('object'), eb.val('created')]), 'bigint'),
+        (eb) =>
+          eb.cast<number>(
+            eb.fn('jsonb_extract_path_text', [eb.cast<unknown>(eb.ref('object'), 'jsonb'), eb.val('created')]),
+            'bigint'
+          ),
         'desc'
       )
       .limit(1)

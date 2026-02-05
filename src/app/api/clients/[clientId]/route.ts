@@ -356,7 +356,9 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
           eb.ref('client.user_id').as('userId'),
           eb.ref('client.stripe_customer_id').as('stripeCustomerId'),
           eb.ref('trainer.stripe_account_id').as('stripeAccountId'),
-          eb.fn('json_extract_path_text', [eb.ref('stripeAccount.object'), eb.val('type')]).as('stripeAccountType'),
+          eb
+            .fn('jsonb_extract_path_text', [eb.cast<unknown>(eb.ref('stripeAccount.object'), 'jsonb'), eb.val('type')])
+            .as('stripeAccountType'),
         ])
         .where('client.id', '=', clientId)
         .where('client.trainer_id', '=', authorization.trainerId)

@@ -343,12 +343,18 @@ export const getTrainerProfile = async (
         .where((sub) =>
           sub.and([
             sub(
-              sub.fn('json_extract_path_text', [sub.ref('bankAccount.object'), sub.val('account')]),
+              sub.fn('jsonb_extract_path_text', [
+                sub.cast<unknown>(sub.ref('bankAccount.object'), 'jsonb'),
+                sub.val('account'),
+              ]),
               '=',
               sub.ref('trainer.stripe_account_id')
             ),
             sub(
-              sub.fn('json_extract_path_text', [sub.ref('bankAccount.object'), sub.val('default_for_currency')]),
+              sub.fn('jsonb_extract_path_text', [
+                sub.cast<unknown>(sub.ref('bankAccount.object'), 'jsonb'),
+                sub.val('default_for_currency'),
+              ]),
               '=',
               sub.val('true')
             ),

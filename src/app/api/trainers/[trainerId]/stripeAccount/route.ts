@@ -187,9 +187,19 @@ export async function GET(request: NextRequest, context: HandlerContext) {
           await db
             .selectFrom('stripe.account')
             .select('object')
-            .where((eb) => eb(eb.fn('json_extract_path_text', [eb.ref('object'), eb.val('object')]), '=', 'person'))
             .where((eb) =>
-              eb(eb.fn('json_extract_path_text', [eb.ref('object'), eb.val('account')]), '=', stripeAccountId)
+              eb(
+                eb.fn('jsonb_extract_path_text', [eb.cast<unknown>(eb.ref('object'), 'jsonb'), eb.val('object')]),
+                '=',
+                'person'
+              )
+            )
+            .where((eb) =>
+              eb(
+                eb.fn('jsonb_extract_path_text', [eb.cast<unknown>(eb.ref('object'), 'jsonb'), eb.val('account')]),
+                '=',
+                stripeAccountId
+              )
             )
             .execute()
         ).map((personRow) => personRow.object)

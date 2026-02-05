@@ -216,7 +216,11 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       if (missionRow) {
         const trainerStatusRow = await trx
           .selectFrom('vw_legacy_trainer')
-          .select((eb) => eb.fn('json_extract_path_text', [eb.ref('subscription'), eb.val('status')]).as('status'))
+          .select((eb) =>
+            eb
+              .fn('jsonb_extract_path_text', [eb.cast<unknown>(eb.ref('subscription'), 'jsonb'), eb.val('status')])
+              .as('status')
+          )
           .where('id', '=', details.trainerId)
           .executeTakeFirst()
 

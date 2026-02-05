@@ -247,13 +247,19 @@ export async function GET(request: Request) {
         eb.ref('payment_manual.transaction_time'),
         eb.fn('to_timestamp', [
           eb.cast<number>(
-            eb.fn('json_extract_path_text', [eb.ref('stripe_charge.object'), eb.val('created')]),
+            eb.fn('jsonb_extract_path_text', [
+              eb.cast<unknown>(eb.ref('stripe_charge.object'), 'jsonb'),
+              eb.val('created'),
+            ]),
             'bigint'
           ),
         ]),
         eb.fn('to_timestamp', [
           eb.cast<number>(
-            eb.fn('json_extract_path_text', [eb.ref('stripe_payment_intent.object'), eb.val('created')]),
+            eb.fn('jsonb_extract_path_text', [
+              eb.cast<unknown>(eb.ref('stripe_payment_intent.object'), 'jsonb'),
+              eb.val('created'),
+            ]),
             'bigint'
           ),
         ]),
