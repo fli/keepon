@@ -1,6 +1,6 @@
 import { FatalError, getStepMetadata } from 'workflow'
 import { db } from '@/lib/db'
-import { normalizeErrorMessage, OUTBOX_STATUS } from '@/server/workflow/outbox'
+import { normalizeErrorMessage, OUTBOX_STATUS } from '@/server/workflow/outbox-shared'
 import { handleChargeOutstandingTask } from '@/server/workflow/tasks/chargeOutstanding'
 import { handleChargePaymentPlansTask } from '@/server/workflow/tasks/chargePaymentPlans'
 import { handleCreateStripeAccountTask } from '@/server/workflow/tasks/createStripeAccount'

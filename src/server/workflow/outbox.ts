@@ -1,19 +1,9 @@
 import type { Kysely, Transaction } from 'kysely'
+import { after } from 'next/server'
 import type { Database } from '@/lib/db'
 import type { WorkflowTaskPayloadMap, WorkflowTaskType } from './types'
-
-export const OUTBOX_STATUS = {
-  Pending: 'pending',
-  Dispatching: 'dispatching',
-  Dispatched: 'dispatched',
-  Running: 'running',
-  Completed: 'completed',
-  Failed: 'failed',
-} as const
-
-export type OutboxStatus = (typeof OUTBOX_STATUS)[keyof typeof OUTBOX_STATUS]
-
-export const DEFAULT_OUTBOX_MAX_ATTEMPTS = 25
+import { dispatchOutboxOnce } from './dispatcher'
+import { DEFAULT_OUTBOX_MAX_ATTEMPTS } from './outbox-shared'
 
 type DbExecutor = Kysely<Database> | Transaction<Database>
 
@@ -30,6 +20,26 @@ export type WorkflowOutboxRecord = {
   dedupeKey: string | null
   attempts: number
   maxAttempts: number
+}
+
+const shouldScheduleAfterDispatch = () => {
+  if (process.env.WORKFLOW_OUTBOX_AFTER_ENABLED === 'false') {
+    return false
+  }
+
+  const requestContext = globalThis[Symbol.for('@next/request-context')] as
+    | { get?: () => { waitUntil?: (promise: Promise<unknown>) => void } | undefined }
+    | undefined
+
+  return Boolean(requestContext?.get?.()?.waitUntil)
+}
+
+const parsePositiveInt = (value: string | undefined, fallback: number) => {
+  if (!value) {
+    return fallback
+  }
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
 export const enqueueWorkflowTask = async <TTaskType extends WorkflowTaskType>(
@@ -65,17 +75,16 @@ export const enqueueWorkflowTask = async <TTaskType extends WorkflowTaskType>(
     throw new Error(`Failed to enqueue workflow outbox task: ${taskType}`)
   }
 
+  if (shouldScheduleAfterDispatch()) {
+    try {
+      const limit = parsePositiveInt(process.env.WORKFLOW_OUTBOX_AFTER_LIMIT, 5)
+      after(() => {
+        void dispatchOutboxOnce({ reason: 'after', limit })
+      })
+    } catch (error) {
+      console.warn('Failed to schedule workflow outbox dispatch after response', error)
+    }
+  }
+
   return row.id
-}
-
-export const normalizeErrorMessage = (error: unknown) => {
-  if (error instanceof Error) {
-    return error.message
-  }
-
-  if (typeof error === 'string') {
-    return error
-  }
-
-  return 'Unknown error'
 }

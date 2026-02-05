@@ -1,13 +1,31 @@
 import { start } from 'workflow/api'
 import { db } from '@/lib/db'
 import { processOutboxTaskWorkflow } from '@/workflows/outbox/process-task'
-import { DEFAULT_OUTBOX_MAX_ATTEMPTS, normalizeErrorMessage, OUTBOX_STATUS, type WorkflowOutboxRecord } from './outbox'
+import { DEFAULT_OUTBOX_MAX_ATTEMPTS, normalizeErrorMessage, OUTBOX_STATUS } from './outbox-shared'
 import { parseWorkflowTaskPayload, workflowTaskTypeSchema } from './types'
 
-const DISPATCH_INTERVAL_MS = 1_500
-const CLAIM_BATCH_SIZE = 20
+const parseOptionalNumber = (value: string | undefined, fallback: number) => {
+  if (!value) {
+    return fallback
+  }
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const DISPATCH_INTERVAL_MS = parseOptionalNumber(process.env.WORKFLOW_OUTBOX_POLL_INTERVAL_MS, 1_500)
+const CLAIM_BATCH_SIZE = parseOptionalNumber(process.env.WORKFLOW_OUTBOX_CLAIM_BATCH_SIZE, 20)
+const DISPATCH_CONCURRENCY = parseOptionalNumber(process.env.WORKFLOW_OUTBOX_DISPATCH_CONCURRENCY, 4)
 const LOCK_TIMEOUT_SECONDS = 120
 const MISSING_RELATION_CODE = '42P01'
+
+type WorkflowOutboxRecord = {
+  id: string
+  taskType: string
+  payload: unknown
+  dedupeKey: string | null
+  attempts: number
+  maxAttempts: number
+}
 
 const isMissingOutboxTableError = (error: unknown) => {
   if (!(error instanceof Error)) {
@@ -39,7 +57,10 @@ const ensureStaleDispatchesAreReleased = async () => {
     .execute()
 }
 
-const claimPendingOutboxRows = async (workerId: string): Promise<WorkflowOutboxRecord[]> => {
+const claimPendingOutboxRows = async (
+  workerId: string,
+  limit: number = CLAIM_BATCH_SIZE
+): Promise<WorkflowOutboxRecord[]> => {
   return db.transaction().execute(async (trx) => {
     const now = new Date()
     const rows = await trx
@@ -57,7 +78,7 @@ const claimPendingOutboxRows = async (workerId: string): Promise<WorkflowOutboxR
       .whereRef('workflow_outbox.attempts', '<', 'workflow_outbox.max_attempts')
       .orderBy('workflow_outbox.available_at', 'asc')
       .orderBy('workflow_outbox.created_at', 'asc')
-      .limit(CLAIM_BATCH_SIZE)
+      .limit(limit)
       .forUpdate()
       .skipLocked()
       .execute()
@@ -107,7 +128,9 @@ const markOutboxRowAsDispatched = async (outboxId: string, runId: string) => {
 const markOutboxRowAsFailedToDispatch = async (record: WorkflowOutboxRecord, error: unknown) => {
   const message = normalizeErrorMessage(error)
   const hasAttemptsRemaining = record.attempts < (record.maxAttempts || DEFAULT_OUTBOX_MAX_ATTEMPTS)
-  const retryDelaySeconds = Math.min(3_600, Math.max(5, 2 ** Math.max(0, record.attempts - 1)))
+  const baseDelaySeconds = Math.min(3_600, Math.max(5, 2 ** Math.max(0, record.attempts - 1)))
+  const jitter = 0.8 + Math.random() * 0.4
+  const retryDelaySeconds = Math.min(3_600, Math.max(5, Math.round(baseDelaySeconds * jitter)))
 
   if (!hasAttemptsRemaining) {
     const now = new Date()
@@ -163,44 +186,73 @@ const dispatchOutboxRecord = async (record: WorkflowOutboxRecord) => {
   }
 }
 
-const runDispatchCycle = async (workerId: string) => {
-  await ensureStaleDispatchesAreReleased()
-
-  const records = await claimPendingOutboxRows(workerId)
+const dispatchOutboxRecords = async (records: WorkflowOutboxRecord[], concurrency: number) => {
   if (records.length === 0) {
     return
   }
 
-  for (const record of records) {
-    await dispatchOutboxRecord(record)
-  }
+  const queue = [...records]
+  const workerCount = Math.max(1, Math.min(concurrency, queue.length))
+
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (queue.length > 0) {
+      const record = queue.shift()
+      if (!record) {
+        return
+      }
+      await dispatchOutboxRecord(record)
+    }
+  })
+
+  await Promise.allSettled(workers)
+}
+
+const runDispatchCycle = async (workerId: string, limit = CLAIM_BATCH_SIZE, concurrency = DISPATCH_CONCURRENCY) => {
+  await ensureStaleDispatchesAreReleased()
+
+  const records = await claimPendingOutboxRows(workerId, limit)
+  await dispatchOutboxRecords(records, concurrency)
+
+  return records.length
 }
 
 let isDispatchCycleRunning = false
 let isDispatcherDisabled = false
 
-const runDispatchCycleSafely = async (workerId: string) => {
+export const dispatchOutboxOnce = async (
+  options: {
+    workerId?: string
+    limit?: number
+    concurrency?: number
+    reason?: string
+  } = {}
+) => {
   if (isDispatcherDisabled) {
-    return
+    return { claimed: 0, skipped: true, reason: 'disabled' as const }
   }
 
   if (isDispatchCycleRunning) {
-    return
+    return { claimed: 0, skipped: true, reason: 'busy' as const }
   }
 
   isDispatchCycleRunning = true
   try {
-    await runDispatchCycle(workerId)
+    const workerId = options.workerId ?? `pid:${process.pid}`
+    const limit = options.limit ?? CLAIM_BATCH_SIZE
+    const concurrency = options.concurrency ?? DISPATCH_CONCURRENCY
+    const claimed = await runDispatchCycle(workerId, limit, concurrency)
+    return { claimed, skipped: false as const, reason: options.reason ?? 'manual' }
   } catch (error) {
     if (isMissingOutboxTableError(error)) {
       isDispatcherDisabled = true
       console.warn(
         'Workflow outbox dispatcher is disabled because workflow_outbox table does not exist yet. Apply migrations to enable it.'
       )
-      return
+      return { claimed: 0, skipped: true, reason: 'missing_table' as const }
     }
 
     console.error('Workflow outbox dispatch cycle failed', error)
+    return { claimed: 0, skipped: true, reason: 'error' as const }
   } finally {
     isDispatchCycleRunning = false
   }
@@ -213,12 +265,12 @@ export const startWorkflowOutboxDispatcher = () => {
 
   const workerId = `pid:${process.pid}`
   const timer = setInterval(() => {
-    void runDispatchCycleSafely(workerId)
+    void dispatchOutboxOnce({ workerId, reason: 'poller' })
   }, DISPATCH_INTERVAL_MS)
 
   timer.unref?.()
 
-  void runDispatchCycleSafely(workerId)
+  void dispatchOutboxOnce({ workerId, reason: 'poller' })
 
   return () => {
     clearInterval(timer)

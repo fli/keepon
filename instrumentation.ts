@@ -7,10 +7,12 @@ export async function register() {
     return
   }
 
+  const isVercel = process.env.VERCEL === '1'
+
   const { getWorld } = await import('workflow/runtime')
   await getWorld().start?.()
 
-  if (globalForWorkflowDispatcher.__keeponWorkflowDispatcherStop) {
+  if (globalForWorkflowDispatcher.__keeponWorkflowDispatcherStop || isVercel) {
     return
   }
 
