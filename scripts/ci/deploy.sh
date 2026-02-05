@@ -63,6 +63,8 @@ fi
 
 if [[ "${SKIP_MIGRATE:-}" != "1" ]]; then
   require_env DATABASE_URL_PROD
+  log "Ensuring dbmate baseline on existing databases."
+  node scripts/ci/ensure-dbmate-baseline.js
   log "Applying database migrations."
   pnpm db:migrate:prod
 else
