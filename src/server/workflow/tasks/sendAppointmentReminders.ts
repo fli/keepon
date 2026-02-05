@@ -6,7 +6,7 @@ import { APP_EMAIL, APP_NAME, NO_REPLY_EMAIL, KEEPON_LOGO_COLOR_URL } from '@/ap
 import { db } from '@/lib/db'
 import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 import { parseScheduledAt, scheduleNextRecurringTaskSafe } from '@/server/workflow/schedules'
-import ctaEmail from '@/server/workflow/templates/ctaEmail'
+import { ctaEmail } from '@/server/workflow/templates/ctaEmail'
 import { joinIgnoreEmpty } from '@/server/workflow/utils'
 
 const reminderTypeValues = [

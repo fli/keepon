@@ -28,7 +28,7 @@ const buildTargetHref = (notification: Notification): Route | null => {
   return null
 }
 
-export default function NotificationsClient({ initialNotifications, initialError = null }: NotificationsClientProps) {
+export function NotificationsClient({ initialNotifications, initialError = null }: NotificationsClientProps) {
   const router = useRouter()
   const [notifications, setNotifications] = useState<NotificationList>(initialNotifications)
   const [error, setError] = useState<string | null>(initialError)

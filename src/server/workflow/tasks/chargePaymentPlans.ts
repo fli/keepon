@@ -9,7 +9,7 @@ import {
   NoPaymentMethodOnFile,
   StripeCardError,
 } from '@/server/workflow/tasks/chargeOutstanding'
-import ctaEmail from '@/server/workflow/templates/ctaEmail'
+import { ctaEmail } from '@/server/workflow/templates/ctaEmail'
 import { joinIgnoreEmpty } from '@/server/workflow/utils'
 
 type PaymentPlanDetailRow = {

@@ -44,7 +44,7 @@ const escapeHtml = (value: string) =>
 
 const resolveBrandColor = (value?: string) => (value && tailwind600[value]) ?? tailwind600.blue
 
-const ctaEmail = ({ bodyHeading, bodyHtml, button, logo, brandColor, receivingReason }: ClientEmailProps) => {
+export function ctaEmail({ bodyHeading, bodyHtml, button, logo, brandColor, receivingReason }: ClientEmailProps) {
   const buttonColor = resolveBrandColor(brandColor)
   const logoMarkup = logo?.url
     ? `<img src="${logo.url}" alt="${escapeHtml(logo.alt ?? '')}" style="max-width:160px;height:auto;border-radius:12px;" />`
@@ -88,5 +88,3 @@ const ctaEmail = ({ bodyHeading, bodyHtml, button, logo, brandColor, receivingRe
   </body>
 </html>`
 }
-
-export default ctaEmail

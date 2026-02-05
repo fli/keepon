@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { createClientDashboardLink } from '@/server/workflow/links'
 import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 import { parseScheduledAt, scheduleNextRecurringTaskSafe } from '@/server/workflow/schedules'
-import ctaEmail from '@/server/workflow/templates/ctaEmail'
+import { ctaEmail } from '@/server/workflow/templates/ctaEmail'
 import { joinIgnoreEmpty } from '@/server/workflow/utils'
 
 export const handleSendPaymentRemindersTask = async ({

@@ -1,10 +1,16 @@
 const fs = require('fs')
 const path = require('path')
 
-const ROOT = path.join(__dirname, '..', 'src', 'app', 'api')
+const NEW_API_ROOT = path.join(__dirname, '..', 'src', 'app', 'api')
 const OUTPUT = path.join(__dirname, '..', 'docs', 'openapi.json')
 
-const EXCLUDED_TOP_DIRS = new Set(['orpc'])
+const LEGACY_ROOT_DEFAULT = '/Users/francis/repos/keepon-full/api-server'
+const LEGACY_ROUTES_DEFAULT = path.join(LEGACY_ROOT_DEFAULT, 'src', 'routes')
+
+const EXCLUDED_PATHS = new Set(['/api/accessToken', '/api/workflows/dispatch'])
+
+const EXCLUDED_PATH_PREFIXES = ['/api/orpc']
+
 const EXCLUDED_WEBHOOK_PATHS = new Set([
   '/api/stripeEvents',
   '/api/mandrillEvents',
@@ -12,15 +18,11 @@ const EXCLUDED_WEBHOOK_PATHS = new Set([
   '/api/twilioStatusMessage',
 ])
 
-const REQUEST_BODY_SCHEMA_NAMES = ['requestBodySchema', 'requestSchema', 'bodySchema', 'payloadSchema', 'inputSchema']
-
-const METHOD_NAMES = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']
-
 const RESPONSE_OVERRIDES = new Map([
-  ['/api/icalendar/{id}', { contentType: 'text/calendar', schema: { type: 'string' } }],
-  ['/api/ics', { contentType: 'text/calendar', schema: { type: 'string' } }],
-  ['/api/sessionInvitationLinks/{invitationId}', { contentType: 'text/html', schema: { type: 'string' } }],
-  ['/api/buckets/ptbizapp-images/download/{imageUrl}', { contentType: 'text/plain', schema: { type: 'string' } }],
+  ['/api/icalendar/{id}', { status: 200, contentType: 'text/calendar', schema: { type: 'string' } }],
+  ['/api/ics', { status: 200, contentType: 'text/calendar', schema: { type: 'string' } }],
+  ['/api/sessionInvitationLinks/{invitationId}', { status: 200, contentType: 'text/html', schema: { type: 'string' } }],
+  ['/api/buckets/ptbizapp-images/download/{imageUrl}', { status: 302 }],
 ])
 
 const REQUEST_CONTENT_TYPE_OVERRIDES = new Map([
@@ -28,6 +30,74 @@ const REQUEST_CONTENT_TYPE_OVERRIDES = new Map([
   ['/api/financeItems/{financeItemId}/upload', 'multipart/form-data'],
   ['/api/products/{productId}/upload', 'multipart/form-data'],
   ['/api/buckets/ptbizapp-images/upload', 'multipart/form-data'],
+])
+
+const MULTIPART_BODY_OVERRIDES = new Map([
+  [
+    '/api/trainer/upload',
+    {
+      type: 'object',
+      properties: {
+        businessLogo: { type: 'string', format: 'binary' },
+        businessIcon: { type: 'string', format: 'binary' },
+        coverImage: { type: 'string', format: 'binary' },
+        id: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
+  ],
+  [
+    '/api/financeItems/{financeItemId}/upload',
+    { type: 'object', properties: { file: { type: 'string', format: 'binary' } }, additionalProperties: false },
+  ],
+  [
+    '/api/products/{productId}/upload',
+    { type: 'object', properties: { file: { type: 'string', format: 'binary' } }, additionalProperties: false },
+  ],
+  [
+    '/api/buckets/ptbizapp-images/upload',
+    { type: 'object', properties: { file: { type: 'string', format: 'binary' } }, additionalProperties: false },
+  ],
+])
+
+const METHOD_NAMES = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'])
+
+const readArg = (name) => {
+  const index = process.argv.indexOf(name)
+  return index !== -1 ? process.argv[index + 1] : undefined
+}
+
+const legacyRootArg = readArg('--legacy-root')
+const LEGACY_ROOT = legacyRootArg
+  ? legacyRootArg.endsWith(path.join('src', 'routes'))
+    ? path.resolve(legacyRootArg, '..', '..')
+    : legacyRootArg
+  : LEGACY_ROOT_DEFAULT
+const LEGACY_ROUTES_DIR = legacyRootArg
+  ? legacyRootArg.endsWith(path.join('src', 'routes'))
+    ? legacyRootArg
+    : path.join(legacyRootArg, 'src', 'routes')
+  : LEGACY_ROUTES_DEFAULT
+
+let ts
+try {
+  ts = require('typescript')
+} catch (error) {
+  const fallback = path.join(LEGACY_ROOT, 'node_modules', 'typescript')
+  try {
+    ts = require(fallback)
+  } catch (fallbackError) {
+    throw new Error(
+      `Unable to load typescript. Install it locally or ensure it exists at ${fallback}. Original error: ${error?.message}`
+    )
+  }
+}
+
+const RESPONSE_SCHEMA_OVERRIDES = new Map([
+  [
+    '/api/appStoreReceipts',
+    { filePath: path.join(LEGACY_ROOT, 'src', 'logic', 'process-apple-receipt.ts'), name: 'AppStoreReceipt' },
+  ],
 ])
 
 const walk = (dir, out = []) => {
@@ -45,7 +115,7 @@ const walk = (dir, out = []) => {
 }
 
 const toRoutePath = (filePath) => {
-  const rel = path.relative(ROOT, filePath)
+  const rel = path.relative(NEW_API_ROOT, filePath)
   const parts = rel.split(path.sep)
   parts.pop()
 
@@ -73,7 +143,6 @@ const parseMethods = (text) => {
   const methods = new Set()
   const fnRe = /export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s*\(/g
   const constRe = /export\s+const\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s*=/g
-  const reexportRe = /export\s*\{[^}]*\bas\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b[^}]*\}/g
 
   let match
   while ((match = fnRe.exec(text))) {
@@ -82,210 +151,804 @@ const parseMethods = (text) => {
   while ((match = constRe.exec(text))) {
     methods.add(match[1])
   }
-  while ((match = reexportRe.exec(text))) {
-    methods.add(match[1])
+
+  for (const exportMatch of text.matchAll(/export\s*\{\s*([^}]+)\s*\}/g)) {
+    const items = exportMatch[1].split(',')
+    for (const raw of items) {
+      const item = raw.trim()
+      if (!item) continue
+      const parts = item.split(/\s+as\s+/i).map((value) => value.trim())
+      const alias = parts.length > 1 ? parts[1] : parts[0]
+      if (METHOD_NAMES.has(alias)) {
+        methods.add(alias)
+      }
+    }
   }
 
   return Array.from(methods)
 }
 
-const includesAuth = (text) =>
-  text.includes('authenticateTrainerRequest') || text.includes('authenticateTrainerOrClientRequest')
+const normalizePath = (value) => value.replaceAll(/\{[^}]+\}/g, ':param').replaceAll(/:([A-Za-z0-9_]+)\*?/g, ':param')
 
-const isClientOnly = (text) => {
-  const hasClient = text.includes('authenticateClientRequest')
-  const hasTrainer = text.includes('authenticateTrainerRequest')
-  const hasEither = text.includes('authenticateTrainerOrClientRequest')
-  return hasClient && !hasTrainer && !hasEither
+const toLegacyLookupKey = (method, pathValue) => `${method} ${normalizePath(pathValue)}`
+
+const fileCache = new Map()
+const schemaCache = new Map()
+const resolvingSchemas = new Set()
+
+const SHARED_OVERRIDES = {
+  email: { type: 'string', format: 'email' },
+  dateOrIsoDateString: { type: 'string', format: 'date' },
+  dateOrIsoDateTimeString: { type: 'string', format: 'date-time' },
+  dateTimeString: { type: 'string', format: 'date-time' },
+  duration: { type: 'string' },
+  timezone: { type: 'string' },
+  trimmed: { type: 'string' },
+  emptyIsNull: { type: ['string', 'null'] },
+  stringTrimmedToNull: { type: ['string', 'null'] },
+  money: { type: 'number' },
 }
 
-const findObjectLiteral = (text, startIndex) => {
-  const braceStart = text.indexOf('{', startIndex)
-  if (braceStart === -1) return null
+const DECODER_OVERRIDES = {
+  int: { type: 'integer' },
+  date: { type: 'string', format: 'date-time' },
+  bigNumber: { type: 'number' },
+}
 
-  let depth = 0
-  let inString = false
-  let stringChar = ''
-  let inLineComment = false
-  let inBlockComment = false
-
-  for (let i = braceStart; i < text.length; i += 1) {
-    const char = text[i]
-    const next = text[i + 1]
-
-    if (inLineComment) {
-      if (char === '\n') inLineComment = false
-      continue
-    }
-
-    if (inBlockComment) {
-      if (char === '*' && next === '/') {
-        inBlockComment = false
-        i += 1
-      }
-      continue
-    }
-
-    if (!inString) {
-      if (char === '/' && next === '/') {
-        inLineComment = true
-        i += 1
-        continue
-      }
-      if (char === '/' && next === '*') {
-        inBlockComment = true
-        i += 1
-        continue
-      }
-    }
-
-    if (inString) {
-      if (char === '\\') {
-        i += 1
-        continue
-      }
-      if (char === stringChar) {
-        inString = false
-        stringChar = ''
-      }
-      continue
-    }
-
-    if (char === '"' || char === "'" || char === '`') {
-      inString = true
-      stringChar = char
-      continue
-    }
-
-    if (char === '{') {
-      depth += 1
-      continue
-    }
-
-    if (char === '}') {
-      depth -= 1
-      if (depth === 0) {
-        return text.slice(braceStart + 1, i)
-      }
+const resolveImportPath = (specifier, fromFile) => {
+  if (!specifier.startsWith('.') && !specifier.startsWith('/')) {
+    return null
+  }
+  const base = path.resolve(path.dirname(fromFile), specifier)
+  const candidates = [
+    base,
+    `${base}.ts`,
+    `${base}.tsx`,
+    `${base}.js`,
+    `${base}.mjs`,
+    `${base}.cjs`,
+    path.join(base, 'index.ts'),
+    path.join(base, 'index.tsx'),
+    path.join(base, 'index.js'),
+    path.join(base, 'index.mjs'),
+    path.join(base, 'index.cjs'),
+  ]
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      return candidate
     }
   }
-
   return null
 }
 
-const extractObjectKeys = (text, varName) => {
-  const varRe = new RegExp(`\\b${varName}\\b\\s*=\\s*z\\.object\\s*\\(`)
-  const match = varRe.exec(text)
-  if (!match) return null
+const getFileInfo = (filePath) => {
+  if (fileCache.has(filePath)) {
+    return fileCache.get(filePath)
+  }
+  const content = fs.readFileSync(filePath, 'utf8')
+  const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true)
+  const locals = new Map()
+  const exports = new Map()
+  const imports = new Map()
+  const namespaceImports = new Map()
+  const decoderNamespaces = new Set()
 
-  const objectLiteral = findObjectLiteral(text, match.index + match[0].length)
-  if (!objectLiteral) return null
-
-  const keys = []
-  let depth = 0
-  let inString = false
-  let stringChar = ''
-  let inLineComment = false
-  let inBlockComment = false
-
-  const isIdentifierStart = (char) => /[A-Za-z_$]/.test(char)
-  const isIdentifierPart = (char) => /[A-Za-z0-9_$]/.test(char)
-
-  for (let i = 0; i < objectLiteral.length; i += 1) {
-    const char = objectLiteral[i]
-    const next = objectLiteral[i + 1]
-
-    if (inLineComment) {
-      if (char === '\n') inLineComment = false
-      continue
-    }
-    if (inBlockComment) {
-      if (char === '*' && next === '/') {
-        inBlockComment = false
-        i += 1
+  for (const statement of sourceFile.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      const moduleSpecifier = statement.moduleSpecifier.text
+      const resolved = resolveImportPath(moduleSpecifier, filePath)
+      const importClause = statement.importClause
+      if (!importClause) continue
+      if (importClause.name) {
+        if (resolved) {
+          imports.set(importClause.name.text, { source: resolved, name: 'default', kind: 'default' })
+        }
       }
-      continue
-    }
-
-    if (!inString) {
-      if (char === '/' && next === '/') {
-        inLineComment = true
-        i += 1
-        continue
-      }
-      if (char === '/' && next === '*') {
-        inBlockComment = true
-        i += 1
-        continue
+      if (importClause.namedBindings) {
+        if (ts.isNamespaceImport(importClause.namedBindings)) {
+          const localName = importClause.namedBindings.name.text
+          if (resolved) {
+            namespaceImports.set(localName, { source: resolved })
+          }
+          if (moduleSpecifier === 'io-ts/Decoder') {
+            decoderNamespaces.add(localName)
+          }
+        }
+        if (ts.isNamedImports(importClause.namedBindings)) {
+          for (const element of importClause.namedBindings.elements) {
+            const localName = element.name.text
+            const importName = element.propertyName ? element.propertyName.text : element.name.text
+            if (resolved) {
+              imports.set(localName, { source: resolved, name: importName, kind: 'named' })
+            }
+          }
+        }
       }
     }
 
-    if (inString) {
-      if (char === '\\') {
-        i += 1
-        continue
+    if (ts.isVariableStatement(statement)) {
+      const isExported = statement.modifiers?.some((mod) => mod.kind === ts.SyntaxKind.ExportKeyword)
+      for (const declaration of statement.declarationList.declarations) {
+        if (!ts.isIdentifier(declaration.name) || !declaration.initializer) continue
+        locals.set(declaration.name.text, declaration.initializer)
+        if (isExported) {
+          exports.set(declaration.name.text, declaration.initializer)
+        }
       }
-      if (char === stringChar) {
-        inString = false
-        stringChar = ''
+    }
+
+    if (ts.isExportAssignment(statement)) {
+      exports.set('default', statement.expression)
+    }
+
+    if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+      for (const element of statement.exportClause.elements) {
+        const exportedName = element.name.text
+        const localName = element.propertyName ? element.propertyName.text : element.name.text
+        exports.set(exportedName, ts.factory.createIdentifier(localName))
       }
-      continue
-    }
-
-    if (char === '"' || char === "'" || char === '`') {
-      inString = true
-      stringChar = char
-      continue
-    }
-
-    if (char === '{') {
-      depth += 1
-      continue
-    }
-
-    if (char === '}') {
-      depth -= 1
-      continue
-    }
-
-    if (depth !== 0) {
-      continue
-    }
-
-    if (char === '.' && objectLiteral.slice(i, i + 3) === '...') {
-      continue
-    }
-
-    if (isIdentifierStart(char)) {
-      let j = i + 1
-      while (j < objectLiteral.length && isIdentifierPart(objectLiteral[j])) j += 1
-      const key = objectLiteral.slice(i, j)
-      let k = j
-      while (k < objectLiteral.length && /\s/.test(objectLiteral[k])) k += 1
-      if (objectLiteral[k] === ':') {
-        keys.push(key)
-      }
-      i = j - 1
-      continue
-    }
-
-    if (char === '"' || char === "'") {
-      let j = i + 1
-      while (j < objectLiteral.length && objectLiteral[j] !== char) {
-        if (objectLiteral[j] === '\\') j += 1
-        j += 1
-      }
-      const key = objectLiteral.slice(i + 1, j)
-      let k = j + 1
-      while (k < objectLiteral.length && /\s/.test(objectLiteral[k])) k += 1
-      if (objectLiteral[k] === ':') {
-        keys.push(key)
-      }
-      i = j
     }
   }
 
-  return keys.length > 0 ? Array.from(new Set(keys)) : null
+  const info = { sourceFile, locals, exports, imports, namespaceImports, decoderNamespaces }
+  fileCache.set(filePath, info)
+  return info
+}
+
+const isDecoderNamespace = (identifier, fileInfo) => fileInfo.decoderNamespaces.has(identifier)
+
+const getOverrideSchema = (filePath, exportName) => {
+  if (filePath.endsWith(path.join('types', 'api', '_shared.ts')) && SHARED_OVERRIDES[exportName]) {
+    return SHARED_OVERRIDES[exportName]
+  }
+  if (filePath.endsWith(path.join('types', 'decoders.ts')) && DECODER_OVERRIDES[exportName]) {
+    return DECODER_OVERRIDES[exportName]
+  }
+  return null
+}
+
+const schemaFromExpr = (expr, filePath) => {
+  if (!expr) return {}
+  const fileInfo = getFileInfo(filePath)
+
+  if (ts.isIdentifier(expr)) {
+    return schemaFromIdentifier(expr.text, filePath)
+  }
+
+  if (ts.isPropertyAccessExpression(expr)) {
+    if (ts.isIdentifier(expr.expression)) {
+      const base = expr.expression.text
+      if (isDecoderNamespace(base, fileInfo)) {
+        return schemaFromDecoderToken(expr.name.text)
+      }
+      if (fileInfo.namespaceImports.has(base)) {
+        const module = fileInfo.namespaceImports.get(base)
+        if (module?.source) {
+          const override = getOverrideSchema(module.source, expr.name.text)
+          if (override) return override
+          return schemaFromExport(module.source, expr.name.text)
+        }
+      }
+    }
+    return {}
+  }
+
+  if (ts.isCallExpression(expr)) {
+    return schemaFromCallExpression(expr, filePath)
+  }
+
+  if (ts.isObjectLiteralExpression(expr)) {
+    const objectSchema = schemaFromObjectLiteral(expr, filePath, true)
+    return objectSchema
+  }
+
+  if (ts.isArrayLiteralExpression(expr)) {
+    const items = expr.elements.map((element) => schemaFromExpr(element, filePath))
+    return { type: 'array', items: { oneOf: items } }
+  }
+
+  if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr)) {
+    return { type: 'string' }
+  }
+
+  if (ts.isNumericLiteral(expr)) {
+    return { type: 'number' }
+  }
+
+  if (expr.kind === ts.SyntaxKind.NullKeyword) {
+    return { type: ['null'] }
+  }
+
+  if (ts.isPrefixUnaryExpression(expr) && ts.isNumericLiteral(expr.operand)) {
+    return { type: 'number' }
+  }
+
+  return {}
+}
+
+const schemaFromIdentifier = (name, filePath) => {
+  const key = `${filePath}::${name}`
+  if (schemaCache.has(key)) {
+    return schemaCache.get(key)
+  }
+
+  const override = getOverrideSchema(filePath, name)
+  if (override) {
+    schemaCache.set(key, override)
+    return override
+  }
+
+  if (resolvingSchemas.has(key)) {
+    return {}
+  }
+
+  resolvingSchemas.add(key)
+  const fileInfo = getFileInfo(filePath)
+  let schema = {}
+
+  if (fileInfo.locals.has(name)) {
+    schema = schemaFromExpr(fileInfo.locals.get(name), filePath)
+  } else if (fileInfo.imports.has(name)) {
+    const info = fileInfo.imports.get(name)
+    if (info?.source) {
+      const overrideImport = getOverrideSchema(info.source, info.name)
+      if (overrideImport) {
+        schema = overrideImport
+      } else {
+        schema = schemaFromExport(info.source, info.name)
+      }
+    }
+  } else if (fileInfo.exports.has(name)) {
+    schema = schemaFromExport(filePath, name)
+  }
+
+  schemaCache.set(key, schema)
+  resolvingSchemas.delete(key)
+  return schema
+}
+
+const schemaFromExport = (filePath, exportName) => {
+  const override = getOverrideSchema(filePath, exportName)
+  if (override) return override
+
+  const fileInfo = getFileInfo(filePath)
+  if (!fileInfo.exports.has(exportName)) {
+    return schemaFromIdentifier(exportName, filePath)
+  }
+  const expr = fileInfo.exports.get(exportName)
+  return schemaFromExpr(expr, filePath)
+}
+
+const schemaFromDecoderToken = (name) => {
+  switch (name) {
+    case 'string':
+      return { type: 'string' }
+    case 'number':
+      return { type: 'number' }
+    case 'boolean':
+      return { type: 'boolean' }
+    case 'unknown':
+      return {}
+    case 'null':
+      return { type: ['null'] }
+    case 'UnknownArray':
+      return { type: 'array', items: {} }
+    case 'UnknownRecord':
+      return { type: 'object', additionalProperties: true }
+    default:
+      return {}
+  }
+}
+
+const schemaFromCallExpression = (expr, filePath) => {
+  const fileInfo = getFileInfo(filePath)
+  const callee = expr.expression
+
+  if (ts.isIdentifier(callee) && callee.text === 'pipe') {
+    return schemaFromPipe(expr.arguments, filePath)
+  }
+
+  if (ts.isCallExpression(callee) && ts.isPropertyAccessExpression(callee.expression)) {
+    if (
+      ts.isIdentifier(callee.expression.expression) &&
+      isDecoderNamespace(callee.expression.expression.text, fileInfo) &&
+      callee.expression.name.text === 'sum'
+    ) {
+      const tagArg = callee.arguments[0]
+      const mappingArg = expr.arguments[0]
+      if (!tagArg || !mappingArg || !ts.isStringLiteral(tagArg) || !ts.isObjectLiteralExpression(mappingArg)) {
+        return {}
+      }
+      return schemaFromSum(tagArg.text, mappingArg, filePath)
+    }
+  }
+
+  if (ts.isPropertyAccessExpression(callee)) {
+    if (ts.isIdentifier(callee.expression) && isDecoderNamespace(callee.expression.text, fileInfo)) {
+      const name = callee.name.text
+      switch (name) {
+        case 'struct':
+          return schemaFromObjectArgument(expr.arguments[0], filePath, true)
+        case 'partial':
+          return schemaFromObjectArgument(expr.arguments[0], filePath, false)
+        case 'array':
+          return { type: 'array', items: schemaFromExpr(expr.arguments[0], filePath) }
+        case 'union':
+          return schemaFromUnion(expr.arguments, filePath)
+        case 'intersect':
+          return schemaFromIntersect(expr.arguments, filePath)
+        case 'literal':
+          return schemaFromLiteral(expr.arguments)
+        case 'nullable':
+          return schemaFromNullable(expr.arguments[0], filePath)
+        case 'record':
+          return schemaFromRecord(expr.arguments, filePath)
+        case 'tuple':
+          return schemaFromTuple(expr.arguments, filePath)
+        case 'id':
+          return { description: 'Any JSON value' }
+        case 'compose':
+        case 'parse':
+        case 'refine':
+        case 'fromRefinement':
+        case 'mapLeftWithInput':
+          return schemaFromExpr(expr.arguments[0], filePath)
+        default:
+          return {}
+      }
+    }
+  }
+
+  return {}
+}
+
+const schemaFromPipe = (args, filePath) => {
+  if (!args.length) return {}
+  let schema = schemaFromExpr(args[0], filePath)
+  for (let i = 1; i < args.length; i += 1) {
+    const arg = args[i]
+    if (ts.isCallExpression(arg) && ts.isPropertyAccessExpression(arg.expression)) {
+      const callee = arg.expression
+      const fileInfo = getFileInfo(filePath)
+      if (ts.isIdentifier(callee.expression) && isDecoderNamespace(callee.expression.text, fileInfo)) {
+        if (callee.name.text === 'intersect' && arg.arguments.length === 1) {
+          const other = schemaFromExpr(arg.arguments[0], filePath)
+          schema = mergeObjectSchemas(schema, other)
+          continue
+        }
+        if (['compose', 'parse', 'refine', 'fromRefinement', 'mapLeftWithInput'].includes(callee.name.text)) {
+          continue
+        }
+      }
+    }
+  }
+  return schema
+}
+
+const schemaFromObjectArgument = (expr, filePath, required) => {
+  if (!expr) return { type: 'object', properties: {}, additionalProperties: false }
+  if (ts.isIdentifier(expr)) {
+    const resolved = resolveIdentifierExpression(expr.text, filePath)
+    if (resolved?.expr) {
+      return schemaFromObjectArgument(resolved.expr, resolved.filePath, required)
+    }
+  }
+  if (ts.isObjectLiteralExpression(expr)) {
+    return schemaFromObjectLiteral(expr, filePath, required)
+  }
+  return schemaFromExpr(expr, filePath)
+}
+
+const schemaFromObjectLiteral = (expr, filePath, required) => {
+  const properties = {}
+  const requiredKeys = []
+
+  for (const prop of expr.properties) {
+    if (ts.isPropertyAssignment(prop)) {
+      const key = getPropertyKey(prop.name)
+      if (!key) continue
+      properties[key] = schemaFromExpr(prop.initializer, filePath)
+      if (required) {
+        requiredKeys.push(key)
+      }
+    } else if (ts.isShorthandPropertyAssignment(prop)) {
+      const key = prop.name.text
+      properties[key] = schemaFromIdentifier(key, filePath)
+      if (required) {
+        requiredKeys.push(key)
+      }
+    } else if (ts.isSpreadAssignment(prop)) {
+      const spreadProps = resolveSpreadProperties(prop.expression, filePath)
+      for (const [key, valueExpr] of Object.entries(spreadProps)) {
+        properties[key] = schemaFromExpr(valueExpr, filePath)
+        if (required) {
+          requiredKeys.push(key)
+        }
+      }
+    }
+  }
+
+  const schema = { type: 'object', properties, additionalProperties: false }
+  if (required && requiredKeys.length) {
+    schema.required = Array.from(new Set(requiredKeys))
+  }
+  return schema
+}
+
+const resolveSpreadProperties = (expr, filePath) => {
+  if (ts.isIdentifier(expr)) {
+    const resolved = resolveIdentifierExpression(expr.text, filePath)
+    if (resolved?.expr) {
+      return resolveSpreadProperties(resolved.expr, resolved.filePath)
+    }
+    return {}
+  }
+  if (ts.isObjectLiteralExpression(expr)) {
+    const out = {}
+    for (const prop of expr.properties) {
+      if (ts.isPropertyAssignment(prop)) {
+        const key = getPropertyKey(prop.name)
+        if (!key) continue
+        out[key] = prop.initializer
+      } else if (ts.isShorthandPropertyAssignment(prop)) {
+        out[prop.name.text] = ts.factory.createIdentifier(prop.name.text)
+      } else if (ts.isSpreadAssignment(prop)) {
+        Object.assign(out, resolveSpreadProperties(prop.expression, filePath))
+      }
+    }
+    return out
+  }
+  return {}
+}
+
+const resolveIdentifierExpression = (name, filePath) => {
+  const fileInfo = getFileInfo(filePath)
+  if (fileInfo.locals.has(name)) {
+    return { expr: fileInfo.locals.get(name), filePath }
+  }
+  if (fileInfo.imports.has(name)) {
+    const info = fileInfo.imports.get(name)
+    if (info?.source) {
+      return { expr: ts.factory.createIdentifier(info.name), filePath: info.source }
+    }
+  }
+  if (fileInfo.exports.has(name)) {
+    return { expr: fileInfo.exports.get(name), filePath }
+  }
+  return null
+}
+
+const getPropertyKey = (nameNode) => {
+  if (ts.isIdentifier(nameNode)) return nameNode.text
+  if (ts.isStringLiteral(nameNode) || ts.isNoSubstitutionTemplateLiteral(nameNode)) return nameNode.text
+  return null
+}
+
+const schemaFromUnion = (args, filePath) => {
+  let members = args
+  if (args.length === 1 && ts.isArrayLiteralExpression(args[0])) {
+    members = args[0].elements
+  }
+  const schemas = members.map((member) => schemaFromExpr(member, filePath))
+  const nullSchemas = schemas.filter((schema) => isOnlyNullSchema(schema))
+  const nonNullSchemas = schemas.filter((schema) => !isOnlyNullSchema(schema))
+  if (nullSchemas.length) {
+    if (nonNullSchemas.length === 1) {
+      return addNullToSchema(nonNullSchemas[0])
+    }
+    if (nonNullSchemas.length > 1) {
+      const [primary, ...rest] = nonNullSchemas
+      return { oneOf: [addNullToSchema(primary), ...rest] }
+    }
+  }
+  return { oneOf: schemas }
+}
+
+const schemaFromIntersect = (args, filePath) => {
+  let members = args
+  if (args.length === 1 && ts.isArrayLiteralExpression(args[0])) {
+    members = args[0].elements
+  }
+  const schemas = members.map((member) => schemaFromExpr(member, filePath))
+  return schemas.reduce((acc, schema) => mergeObjectSchemas(acc, schema))
+}
+
+const mergeObjectSchemas = (a, b) => {
+  if (!a || !b) return a || b || {}
+  const combineAllOf = (left, right) => {
+    const allOf = []
+    const pushSchema = (schema) => {
+      if (!schema || Object.keys(schema).length === 0) return
+      if (schema.allOf && Array.isArray(schema.allOf)) {
+        allOf.push(...schema.allOf)
+      } else {
+        allOf.push(schema)
+      }
+    }
+    pushSchema(left)
+    pushSchema(right)
+    if (allOf.length === 1) return allOf[0]
+    return { allOf }
+  }
+  if (a.oneOf || a.anyOf || a.allOf || b.oneOf || b.anyOf || b.allOf) {
+    return combineAllOf(a, b)
+  }
+  const aProps = a.properties
+  const bProps = b.properties
+  if (aProps || bProps) {
+    const properties = { ...(aProps || {}), ...(bProps || {}) }
+    const required = Array.from(new Set([...(a.required || []), ...(b.required || [])]))
+    const merged = { type: 'object', properties, additionalProperties: false }
+    if (required.length) {
+      merged.required = required
+    }
+    return merged
+  }
+  return { allOf: [a, b] }
+}
+
+const schemaFromLiteral = (args) => {
+  const values = args.map((arg) => {
+    if (ts.isStringLiteral(arg) || ts.isNoSubstitutionTemplateLiteral(arg)) return arg.text
+    if (ts.isNumericLiteral(arg)) return Number(arg.text)
+    if (arg.kind === ts.SyntaxKind.TrueKeyword) return true
+    if (arg.kind === ts.SyntaxKind.FalseKeyword) return false
+    if (arg.kind === ts.SyntaxKind.NullKeyword) return null
+    return undefined
+  })
+  const filtered = values.filter((value) => value !== undefined)
+  if (!filtered.length) return {}
+  if (filtered.includes(null)) {
+    return { enum: Array.from(new Set(filtered)) }
+  }
+  return { enum: Array.from(new Set(filtered)) }
+}
+
+const schemaAllowsNull = (schema) => {
+  if (!schema) return false
+  if (schema.type === 'null') return true
+  if (Array.isArray(schema.type) && schema.type.includes('null')) return true
+  if (Array.isArray(schema.enum) && schema.enum.includes(null)) return true
+  return false
+}
+
+const isOnlyNullSchema = (schema) => {
+  if (!schema) return false
+  if (schema.type === 'null') return true
+  if (Array.isArray(schema.type) && schema.type.length === 1 && schema.type[0] === 'null') return true
+  if (Array.isArray(schema.enum) && schema.enum.length === 1 && schema.enum[0] === null) return true
+  return false
+}
+
+const addNullToSchema = (schema) => {
+  if (!schema || Object.keys(schema).length === 0) {
+    return {}
+  }
+
+  if (schema.enum) {
+    if (schema.enum.includes(null)) return schema
+    return { ...schema, enum: [...schema.enum, null] }
+  }
+
+  if (schema.type) {
+    if (Array.isArray(schema.type)) {
+      if (schema.type.includes('null')) return schema
+      return { ...schema, type: [...schema.type, 'null'] }
+    }
+    if (schema.type === 'null') return schema
+    return { ...schema, type: [schema.type, 'null'] }
+  }
+
+  if (schema.anyOf) {
+    if (schema.anyOf.some((entry) => schemaAllowsNull(entry))) return schema
+    return { ...schema, anyOf: [...schema.anyOf, { type: ['null'] }] }
+  }
+
+  if (schema.oneOf) {
+    if (schema.oneOf.some((entry) => schemaAllowsNull(entry))) return schema
+    return { ...schema, oneOf: [...schema.oneOf, { type: ['null'] }] }
+  }
+
+  if (schema.allOf) {
+    return { anyOf: [schema, { type: ['null'] }] }
+  }
+
+  return { anyOf: [schema, { type: ['null'] }] }
+}
+
+const schemaFromNullable = (arg, filePath) => addNullToSchema(schemaFromExpr(arg, filePath))
+
+const schemaFromRecord = (args, filePath) => {
+  const valueSchema = args.length > 1 ? schemaFromExpr(args[1], filePath) : schemaFromExpr(args[0], filePath)
+  return { type: 'object', additionalProperties: valueSchema }
+}
+
+const schemaFromTuple = (args, filePath) => {
+  let members = args
+  if (args.length === 1 && ts.isArrayLiteralExpression(args[0])) {
+    members = args[0].elements
+  }
+  const schemas = members.map((member) => schemaFromExpr(member, filePath))
+  const itemSchema = schemas.length === 1 ? schemas[0] : { oneOf: schemas }
+  return { type: 'array', items: itemSchema, minItems: schemas.length, maxItems: schemas.length }
+}
+
+const schemaFromSum = (tagName, mappingArg, filePath) => {
+  const variants = []
+  for (const prop of mappingArg.properties) {
+    if (!ts.isPropertyAssignment(prop)) continue
+    const tagValue = getPropertyKey(prop.name)
+    if (!tagValue) continue
+    const variantSchema = schemaFromExpr(prop.initializer, filePath)
+    const tagSchema = {
+      type: 'object',
+      properties: { [tagName]: { const: tagValue } },
+      required: [tagName],
+      additionalProperties: true,
+    }
+    variants.push({ allOf: [variantSchema, tagSchema] })
+  }
+  return { oneOf: variants }
+}
+
+const SCHEMA_META_KEYS = new Set([
+  'title',
+  'description',
+  'deprecated',
+  'readOnly',
+  'writeOnly',
+  'default',
+  'example',
+  'examples',
+])
+
+const mergeSchemaMeta = (schema, source) => {
+  for (const key of SCHEMA_META_KEYS) {
+    if (source[key] !== undefined && schema[key] === undefined) {
+      schema[key] = source[key]
+    }
+  }
+  return schema
+}
+
+const replaceSchema = (target, next) => {
+  for (const key of Object.keys(target)) {
+    delete target[key]
+  }
+  Object.assign(target, next)
+}
+
+const normalizeUnionSchema = (schema, key) => {
+  const union = schema[key]
+  if (!Array.isArray(union)) return false
+
+  const nullSchemas = union.filter((entry) => isOnlyNullSchema(entry))
+  if (!nullSchemas.length) return false
+
+  const nonNullSchemas = union.filter((entry) => !isOnlyNullSchema(entry))
+  if (!nonNullSchemas.length) return false
+
+  if (nonNullSchemas.length === 1) {
+    const merged = mergeSchemaMeta(addNullToSchema(nonNullSchemas[0]), schema)
+    replaceSchema(schema, merged)
+    return true
+  }
+
+  const [primary, ...rest] = nonNullSchemas
+  schema[key] = [addNullToSchema(primary), ...rest]
+  return true
+}
+
+const normalizeSchema = (schema) => {
+  if (!schema || typeof schema !== 'object') return
+  if (Array.isArray(schema)) {
+    schema.forEach((entry) => normalizeSchema(entry))
+    return
+  }
+
+  for (const value of Object.values(schema)) {
+    if (value && typeof value === 'object') {
+      normalizeSchema(value)
+    }
+  }
+
+  const changed = normalizeUnionSchema(schema, 'oneOf') || normalizeUnionSchema(schema, 'anyOf')
+
+  if (changed) {
+    normalizeSchema(schema)
+  }
+}
+
+const parseLegacyRoutes = () => {
+  if (!fs.existsSync(LEGACY_ROUTES_DIR)) {
+    throw new Error(`Legacy routes directory not found: ${LEGACY_ROUTES_DIR}`)
+  }
+  const files = fs.readdirSync(LEGACY_ROUTES_DIR).filter((file) => file.endsWith('.ts'))
+  const routes = []
+
+  for (const fileName of files) {
+    const filePath = path.join(LEGACY_ROUTES_DIR, fileName)
+    const content = fs.readFileSync(filePath, 'utf8')
+    const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true)
+
+    const visit = (node) => {
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+        const { expression } = node
+        if (ts.isIdentifier(expression.expression) && expression.expression.text === 'router') {
+          const method = expression.name.text.toUpperCase()
+          if (!METHOD_NAMES.has(method)) {
+            return
+          }
+          const [pathArg, optionsArg] = node.arguments
+          if (!pathArg || !optionsArg) {
+            return
+          }
+          if (!ts.isStringLiteral(pathArg) && !ts.isNoSubstitutionTemplateLiteral(pathArg)) {
+            return
+          }
+          const routePath = pathArg.text
+          const options = parseLegacyOptions(optionsArg, filePath)
+          routes.push({ method, path: routePath, filePath, options })
+        }
+      }
+      ts.forEachChild(node, visit)
+    }
+
+    visit(sourceFile)
+  }
+
+  return routes
+}
+
+const parseLegacyOptions = (optionsArg, filePath) => {
+  if (!ts.isObjectLiteralExpression(optionsArg)) {
+    return { security: null, response: null, request: null, query: null, path: null, filePath }
+  }
+  const options = { security: null, response: null, request: null, query: null, path: null, filePath }
+
+  for (const prop of optionsArg.properties) {
+    if (!ts.isPropertyAssignment(prop)) continue
+    const key = getPropertyKey(prop.name)
+    if (!key) continue
+    if (key === 'security') {
+      if (prop.initializer.kind === ts.SyntaxKind.NullKeyword) {
+        options.security = null
+      } else if (ts.isStringLiteral(prop.initializer) || ts.isNoSubstitutionTemplateLiteral(prop.initializer)) {
+        options.security = prop.initializer.text
+      }
+    }
+    if (key === 'responseBody') {
+      options.response = prop.initializer
+    }
+    if (key === 'requestBody') {
+      options.request = prop.initializer
+    }
+    if (key === 'queryParameters') {
+      options.query = prop.initializer
+    }
+    if (key === 'pathParameters') {
+      options.path = prop.initializer
+    }
+  }
+
+  return options
+}
+
+const parseNewRoutes = () => {
+  const files = walk(NEW_API_ROOT)
+  const routes = []
+
+  for (const filePath of files) {
+    const text = fs.readFileSync(filePath, 'utf8')
+    const methods = parseMethods(text)
+    if (!methods.length) continue
+    const routeInfo = toRoutePath(filePath)
+    for (const method of methods) {
+      routes.push({ method, path: routeInfo.path, segments: routeInfo.segments, filePath })
+    }
+  }
+
+  return routes
 }
 
 const buildOperationId = (method, segments) => {
@@ -306,127 +969,179 @@ const buildOperationId = (method, segments) => {
   return method.toLowerCase() + parts.join('')
 }
 
-const guessQueryParams = (text) => extractObjectKeys(text, 'querySchema') || []
-
-const guessRequestBodyKeys = (text) => {
-  for (const name of REQUEST_BODY_SCHEMA_NAMES) {
-    const keys = extractObjectKeys(text, name)
-    if (keys && keys.length > 0) return keys
+const schemaToQueryParameters = (schema) => {
+  if (!schema || schema.type !== 'object' || !schema.properties) {
+    return []
   }
-  return null
+  const required = new Set(schema.required || [])
+  return Object.entries(schema.properties).map(([name, propSchema]) => ({
+    name,
+    in: 'query',
+    required: required.has(name),
+    schema: propSchema,
+  }))
 }
 
-const buildRequestBodySchema = (keys) => {
-  if (!keys || keys.length === 0) {
-    return { type: 'object', additionalProperties: true }
-  }
-
-  const properties = {}
-  for (const key of keys) {
-    properties[key] = {}
-  }
-
-  return {
-    type: 'object',
-    properties,
-    additionalProperties: true,
-  }
-}
-
-const buildSpec = (routes) => {
+const buildSpec = (routes, legacyMap) => {
   const paths = {}
   const usedOperationIds = new Set()
+  const unresolved = []
 
   for (const route of routes) {
-    const { path: routePath, segments, methods, requiresAuth, queryParams, requestBodyKeys } = route
-    if (!paths[routePath]) paths[routePath] = {}
+    if (EXCLUDED_PATHS.has(route.path)) {
+      continue
+    }
+    if (EXCLUDED_PATH_PREFIXES.some((prefix) => route.path.startsWith(prefix))) {
+      continue
+    }
+    if (EXCLUDED_WEBHOOK_PATHS.has(route.path)) {
+      continue
+    }
+    const legacyKey = toLegacyLookupKey(route.method, route.path)
+    const legacy = legacyMap.get(legacyKey)
+    if (!legacy) {
+      unresolved.push(`${route.method} ${route.path} (missing legacy match)`)
+      continue
+    }
 
-    for (const method of methods) {
-      const lower = method.toLowerCase()
-      let operationId = buildOperationId(method, segments)
-      if (usedOperationIds.has(operationId)) {
-        let idx = 2
-        while (usedOperationIds.has(`${operationId}${idx}`)) idx += 1
-        operationId = `${operationId}${idx}`
+    if (legacy.options.security === 'client') {
+      continue
+    }
+
+    if (!paths[route.path]) paths[route.path] = {}
+
+    let operationId = buildOperationId(route.method, route.segments)
+    if (usedOperationIds.has(operationId)) {
+      let idx = 2
+      while (usedOperationIds.has(`${operationId}${idx}`)) idx += 1
+      operationId = `${operationId}${idx}`
+    }
+    usedOperationIds.add(operationId)
+
+    const parameters = []
+
+    for (const segment of route.segments) {
+      if (segment.startsWith('{') && segment.endsWith('}')) {
+        const name = segment.slice(1, -1)
+        parameters.push({ name, in: 'path', required: true, schema: { type: 'string' } })
       }
-      usedOperationIds.add(operationId)
+    }
 
-      const parameters = []
+    let querySchema
+    if (legacy.options.query) {
+      querySchema = schemaFromExpr(legacy.options.query, legacy.filePath)
+      parameters.push(...schemaToQueryParameters(querySchema))
+    }
 
-      for (const segment of segments) {
-        if (segment.startsWith('{') && segment.endsWith('}')) {
-          const name = segment.slice(1, -1)
-          parameters.push({
-            name,
-            in: 'path',
-            required: true,
-            schema: { type: 'string' },
-          })
-        }
-      }
+    const requestContentType = REQUEST_CONTENT_TYPE_OVERRIDES.get(route.path) || 'application/json'
+    const responseOverride = RESPONSE_OVERRIDES.get(route.path)
+    const responseSchemaOverride = RESPONSE_SCHEMA_OVERRIDES.get(route.path)
 
-      for (const name of queryParams) {
-        parameters.push({
-          name,
-          in: 'query',
-          required: false,
-          schema: { type: 'string' },
-        })
-      }
+    const responses = {}
 
-      const requestContentType = REQUEST_CONTENT_TYPE_OVERRIDES.get(routePath) || 'application/json'
-      const responseOverride = RESPONSE_OVERRIDES.get(routePath)
-
-      const responses = {
-        200: {
+    if (responseOverride) {
+      if (responseOverride.schema) {
+        responses[responseOverride.status || 200] = {
           description: 'Success',
           content: {
-            [responseOverride?.contentType || 'application/json']: {
-              schema: responseOverride?.schema || { type: 'object', additionalProperties: true },
+            [responseOverride.contentType || 'application/json']: {
+              schema: responseOverride.schema,
             },
           },
-        },
-        default: {
-          description: 'Error',
-          content: {
-            'application/json': {
-              schema: { $ref: '#/components/schemas/ErrorResponse' },
-            },
+        }
+      } else {
+        responses[responseOverride.status || 204] = { description: 'Success' }
+      }
+    } else if (legacy.options.response || responseSchemaOverride) {
+      const responseSchema = responseSchemaOverride
+        ? schemaFromIdentifier(responseSchemaOverride.name, responseSchemaOverride.filePath)
+        : schemaFromExpr(legacy.options.response, legacy.filePath)
+      if (Object.keys(responseSchema).length === 0) {
+        unresolved.push(`${route.method} ${route.path} (unresolved response schema)`)
+      }
+      responses[200] = {
+        description: 'Success',
+        content: {
+          'application/json': {
+            schema: responseSchema,
           },
         },
       }
+    } else {
+      responses[204] = { description: 'No content' }
+    }
 
-      const operation = {
-        operationId,
-        tags: [route.tag],
-        responses,
+    responses.default = {
+      description: 'Error',
+      content: {
+        'application/json': {
+          schema: { $ref: '#/components/schemas/ErrorResponse' },
+        },
+      },
+    }
+
+    const operation = {
+      operationId,
+      tags: [route.segments[0] || 'api'],
+      responses,
+    }
+
+    if (parameters.length) {
+      operation.parameters = parameters
+    }
+
+    if (legacy.options.security === 'serviceProvider' || legacy.options.security === 'serviceProviderOrClient') {
+      operation.security = [{ BearerAuth: [] }]
+    }
+
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(route.method)) {
+      let requestSchema = null
+      if (legacy.options.request) {
+        requestSchema = schemaFromExpr(legacy.options.request, legacy.filePath)
+      }
+      if (requestContentType === 'multipart/form-data') {
+        requestSchema = MULTIPART_BODY_OVERRIDES.get(route.path) || requestSchema || { type: 'object' }
       }
 
-      if (parameters.length > 0) {
-        operation.parameters = parameters
-      }
-
-      if (requiresAuth) {
-        operation.security = [{ BearerAuth: [] }]
-      }
-
-      if (['post', 'put', 'patch', 'delete'].includes(lower)) {
-        const isMultipart = requestContentType === 'multipart/form-data'
+      if (requestSchema) {
         operation.requestBody = {
-          required: isMultipart,
+          required: true,
           content: {
             [requestContentType]: {
-              schema: buildRequestBodySchema(requestBodyKeys),
+              schema: requestSchema,
             },
           },
         }
       }
-
-      paths[routePath][lower] = operation
     }
+
+    paths[route.path][route.method.toLowerCase()] = operation
   }
 
-  return {
+  return { paths, unresolved }
+}
+
+const main = () => {
+  const legacyRoutes = parseLegacyRoutes()
+  const legacyMap = new Map()
+  for (const route of legacyRoutes) {
+    const key = toLegacyLookupKey(route.method, `/api${route.path}`)
+    legacyMap.set(key, route)
+  }
+
+  const newRoutes = parseNewRoutes()
+  const { paths, unresolved } = buildSpec(newRoutes, legacyMap)
+
+  if (unresolved.length) {
+    console.error('Unresolved schemas or legacy matches:')
+    unresolved.slice(0, 50).forEach((entry) => console.error(`- ${entry}`))
+    if (unresolved.length > 50) {
+      console.error(`...and ${unresolved.length - 50} more`)
+    }
+    process.exit(1)
+  }
+
+  const spec = {
     openapi: '3.1.0',
     info: {
       title: 'KeepOn Legacy API',
@@ -466,45 +1181,9 @@ const buildSpec = (routes) => {
       },
     },
   }
-}
 
-const main = () => {
-  const files = walk(ROOT)
-  const routes = []
+  normalizeSchema(spec)
 
-  for (const filePath of files) {
-    const { path: routePath, segments } = toRoutePath(filePath)
-    if (!routePath.startsWith('/api/')) continue
-
-    const topDir = segments[0]
-    if (EXCLUDED_TOP_DIRS.has(topDir)) continue
-    if (EXCLUDED_WEBHOOK_PATHS.has(routePath)) continue
-
-    const text = fs.readFileSync(filePath, 'utf8')
-    if (isClientOnly(text)) continue
-
-    const methods = parseMethods(text)
-    if (methods.length === 0) continue
-
-    const requiresAuth = includesAuth(text)
-    const queryParams = guessQueryParams(text)
-    const requestBodyKeys = guessRequestBodyKeys(text)
-
-    routes.push({
-      filePath,
-      path: routePath,
-      segments,
-      methods,
-      requiresAuth,
-      queryParams,
-      requestBodyKeys,
-      tag: segments[0] || 'api',
-    })
-  }
-
-  routes.sort((a, b) => a.path.localeCompare(b.path))
-
-  const spec = buildSpec(routes)
   const json = JSON.stringify(spec, null, 2)
 
   if (process.argv.includes('--check')) {

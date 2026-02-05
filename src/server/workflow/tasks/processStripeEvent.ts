@@ -5,7 +5,7 @@ import { APP_EMAIL, APP_NAME, KEEPON_LOGO_COLOR_URL } from '@/app/api/_lib/const
 import { getStripeClient, STRIPE_API_VERSION } from '@/app/api/_lib/stripeClient'
 import { db } from '@/lib/db'
 import { enqueueWorkflowTask } from '@/server/workflow/outbox'
-import ctaEmail from '@/server/workflow/templates/ctaEmail'
+import { ctaEmail } from '@/server/workflow/templates/ctaEmail'
 import { currencyFormat, joinIgnoreEmpty } from '@/server/workflow/utils'
 
 const stripeApiVersionDate = STRIPE_API_VERSION.split('.')[0]

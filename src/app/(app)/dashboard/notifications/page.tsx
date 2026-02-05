@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { PageContainer } from '@/components/page-container'
 import { listTrainerNotifications, type NotificationList } from '@/server/notifications'
 import { readSessionFromCookies } from '../../../session.server'
-import NotificationsClient from './notifications-client'
+import { NotificationsClient } from './notifications-client'
 
 async function loadNotifications(session: { token: string; trainerId: string; userId: string }) {
   return listTrainerNotifications(session.trainerId, session.userId)

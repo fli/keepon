@@ -36,6 +36,7 @@ export const createClientDashboardLink = async (
   }
 
   const link = new URL(baseUrl)
+  link.pathname = '/client-dashboard/link'
   link.hash = `/client/${clientId}/${tokenRow.id}?email=${encodeURIComponent(clientEmail)}`
 
   return link

@@ -208,6 +208,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       }
 
       const link = new URL(baseUrl)
+      link.pathname = '/client-dashboard/link'
       link.hash = `/client/${details.clientId}/${tokenRow.id}?email=${encodeURIComponent(details.email)}`
 
       const html = buildDashboardLinkEmail({

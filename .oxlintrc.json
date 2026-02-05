@@ -244,13 +244,19 @@
         "null": "ignore"
       }
     ],
-    "func-style": "off",
+    "func-style": [
+      "error",
+      "declaration",
+      {
+        "allowArrowFunctions": true
+      }
+    ],
     "id-length": "off",
     "import/consistent-type-specifier-style": "off",
     "import/exports-last": "off",
     "import/group-exports": "off",
     "import/max-dependencies": "off",
-    "import/no-default-export": "off",
+    "import/no-default-export": "error",
     "import/no-duplicates": "off",
     "import/no-nodejs-modules": "off",
     "import/no-named-as-default": "off",
