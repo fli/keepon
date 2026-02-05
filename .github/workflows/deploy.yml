@@ -16,16 +16,15 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CI: true
-      DATABASE_URL_PROD: ${{ secrets.DATABASE_URL_PROD }}
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.28.2
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: node scripts/ci/ensure-dbmate-baseline.js
-      - run: pnpm db:migrate:prod
+      - name: Run dbmate migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+        run: |
+          docker run --rm \
+            -e DATABASE_URL \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            amacneil/dbmate:latest \
+            --no-dump-schema --migrations-dir db/migrations up
