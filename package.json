@@ -15,6 +15,7 @@
     "lint": "oxlint --type-aware --type-check .",
     "openapi:check": "node scripts/generate-openapi.js --check",
     "openapi:generate": "node scripts/generate-openapi.js",
+    "prepare": "lefthook install",
     "start": "next start -p 3001",
     "sync:reference-data": "tsx scripts/sync-reference-data.ts"
   },
@@ -61,6 +62,7 @@
     "dbmate": "^2.29.5",
     "eslint-plugin-react-hooks": "experimental",
     "kysely-codegen": "^0.19.0",
+    "lefthook": "^2.1.0",
     "oxfmt": "^0.28.0",
     "oxlint": "^1.43.0",
     "oxlint-tsgolint": "0.11.4",
@@ -72,6 +74,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "lefthook",
       "esbuild",
       "sharp",
       "unrs-resolver"

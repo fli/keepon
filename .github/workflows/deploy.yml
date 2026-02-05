@@ -1,21 +1,22 @@
-name: deploy
+name: Migrate
 on:
   push:
     branches:
       - main
 
 concurrency:
-  group: deploy-main
+  group: migrate-main
   cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  deploy:
+  migrate:
     runs-on: ubuntu-latest
     env:
       CI: true
+      DATABASE_URL_PROD: ${{ secrets.DATABASE_URL_PROD }}
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
@@ -26,9 +27,5 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm ci:deploy
-        env:
-          DATABASE_URL_PROD: ${{ secrets.DATABASE_URL_PROD }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - run: node scripts/ci/ensure-dbmate-baseline.js
+      - run: pnpm db:migrate:prod
