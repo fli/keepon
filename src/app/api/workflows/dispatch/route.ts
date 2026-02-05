@@ -12,15 +12,20 @@ const parsePositiveInt = (value: string | null, fallback: number) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
+const getDispatchTokens = () =>
+  [process.env.WORKFLOW_OUTBOX_DISPATCH_SECRET, process.env.CRON_SECRET].filter((value): value is string =>
+    Boolean(value && value.trim())
+  )
+
 const isAuthorized = (request: Request) => {
-  const requiredToken = process.env.WORKFLOW_OUTBOX_DISPATCH_SECRET
-  if (!requiredToken) {
+  const tokens = getDispatchTokens()
+  if (tokens.length === 0) {
     return true
   }
 
   const url = new URL(request.url)
   const queryToken = url.searchParams.get('token')
-  if (queryToken && queryToken === requiredToken) {
+  if (queryToken && tokens.includes(queryToken)) {
     return true
   }
 
@@ -28,13 +33,13 @@ const isAuthorized = (request: Request) => {
   const bearerPrefix = 'Bearer '
   if (authorization.startsWith(bearerPrefix)) {
     const token = authorization.slice(bearerPrefix.length).trim()
-    return token === requiredToken
+    return tokens.includes(token)
   }
 
   return false
 }
 
-export async function POST(request: Request) {
+const handleDispatchRequest = async (request: Request) => {
   if (!isAuthorized(request)) {
     return NextResponse.json(
       {
@@ -57,4 +62,12 @@ export async function POST(request: Request) {
     status: 'ok',
     ...result,
   })
+}
+
+export async function GET(request: Request) {
+  return handleDispatchRequest(request)
+}
+
+export async function POST(request: Request) {
+  return handleDispatchRequest(request)
 }
