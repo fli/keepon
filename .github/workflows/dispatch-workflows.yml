@@ -1,0 +1,25 @@
+name: Dispatch Workflow Outbox
+
+on:
+  schedule:
+    - cron: "* * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: workflow-outbox-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Dispatch workflow outbox
+        env:
+          WORKFLOW_DISPATCH_URL: ${{ secrets.WORKFLOW_DISPATCH_URL }}
+          WORKFLOW_OUTBOX_DISPATCH_SECRET: ${{ secrets.WORKFLOW_OUTBOX_DISPATCH_SECRET }}
+          WORKFLOW_DISPATCH_LIMIT: "50"
+        run: bash scripts/ci/dispatch-workflows.sh
