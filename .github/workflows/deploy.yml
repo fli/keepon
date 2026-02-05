@@ -26,6 +26,6 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - run: node scripts/ci/ensure-dbmate-baseline.js
       - run: pnpm db:migrate:prod
