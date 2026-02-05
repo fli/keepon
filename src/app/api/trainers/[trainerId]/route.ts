@@ -531,11 +531,12 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
     return mustUploadImageResponse()
   }
 
-  if (body.email !== undefined) {
+  if (typeof body.email === 'string') {
+    const normalizedEmail = body.email.trim().toLowerCase()
     const duplicate = await db
       .selectFrom('trainer')
       .select('id')
-      .where((eb) => eb(eb.fn('lower', [eb.ref('email')]), '=', body.email.trim().toLowerCase()))
+      .where((eb) => eb(eb.fn('lower', [eb.ref('email')]), '=', normalizedEmail))
       .where('id', '!=', auth.trainerId)
       .executeTakeFirst()
 

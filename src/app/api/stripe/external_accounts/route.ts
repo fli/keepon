@@ -394,17 +394,15 @@ export async function GET(request: Request) {
         eb.ref('bankAccount.object').as('object'),
       ])
       .where((eb) =>
-        eb(eb.fn('json_extract_path_text', [eb.ref('bankAccount.object'), 'account']), '=', stripeAccountId)
+        eb(eb.fn('json_extract_path_text', [eb.ref('bankAccount.object'), eb.val('account')]), '=', stripeAccountId)
       )
       .execute()
 
-    const storedBankAccountsParsed = storedBankAccounts
-      .filter((row): row is { id: string; apiVersion: string | null; object: unknown } => row.id !== null)
-      .map((row) => ({
-        id: row.id,
-        apiVersion: row.apiVersion ?? '',
-        object: row.object,
-      }))
+    const storedBankAccountsParsed = storedBankAccounts.map((row) => ({
+      id: row.id,
+      apiVersion: row.apiVersion,
+      object: row.object,
+    }))
 
     const parsedStoredAccounts: {
       apiVersion: string

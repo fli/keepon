@@ -205,6 +205,10 @@ const buildSessionStarts = (options: {
     return [isoLocalDateTimeToUtc(options.startDate, options.timeZone)]
   }
 
+  if (!endParts) {
+    return []
+  }
+
   const starts: Date[] = []
   let current = startParts
 

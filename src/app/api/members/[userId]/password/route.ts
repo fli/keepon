@@ -74,7 +74,7 @@ export async function POST(request: NextRequest, context: HandlerContext) {
         )
         .select((eb) => eb.ref('trainer.user_id').as('userId'))
         .where('access_token.type', '=', 'password_reset')
-        .where((eb) => eb('access_token.expires_at', '>=', eb.fn('now')))
+        .where((eb) => eb('access_token.expires_at', '>=', eb.fn<Date>('now')))
         .where('access_token.id', '=', accessToken)
         .executeTakeFirst()
 

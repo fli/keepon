@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
+import { sql } from 'kysely'
 import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 import { buildErrorResponse } from '../../../../_lib/accessToken'
 import { APP_EMAIL, APP_NAME, NO_REPLY_EMAIL } from '../../../../_lib/constants'
@@ -284,7 +285,11 @@ export async function POST(request: NextRequest, context: HandlerContext) {
           eb
             .and([
               eb('session.can_clients_cancel', '=', true),
-              eb(eb('session.start', '-', eb.ref('session.cancellation_advance_notice_duration')), '>', eb.fn('now')),
+              eb(
+                sql<Date>`session.start - ${sql.ref('session.cancellation_advance_notice_duration')}`,
+                '>',
+                sql<Date>`now()`
+              ),
               eb('client_session.state', 'in', ['accepted', 'confirmed', 'maybe']),
             ])
             .as('canCancel'),

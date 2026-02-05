@@ -47,7 +47,7 @@ type ReminderDetailRow = {
   smsCreditCheckoutId: string
   userId: string
   country: string
-  smsCreditBalance: string | number | bigint | null
+  smsCreditBalance: string | null
   clientRemindersEnabled: boolean
   sessionId: string
   startsAt: Date
@@ -363,7 +363,7 @@ export const handleSendAppointmentRemindersTask = async ({
       .where('session_id', 'in', sessionIds)
       .execute()
 
-    const data: ReminderDetailRow[] = detailRows
+    const data = detailRows
       .map((row) => {
         const reminderType = row.reminderType as ReminderType
         if (!reminderTypeValues.includes(reminderType)) {
@@ -399,7 +399,7 @@ export const handleSendAppointmentRemindersTask = async ({
           clients,
         }
       })
-      .filter((row): row is ReminderDetailRow => !!row && reminderKeys.has(`${row.sessionId}|${row.reminderType}`))
+      .filter((row): row is ReminderDetailRow => row !== null && reminderKeys.has(`${row.sessionId}|${row.reminderType}`))
 
     const userNotifyTasks: WorkflowTaskPayloadMap['user.notify'][] = []
     const mail: Array<{

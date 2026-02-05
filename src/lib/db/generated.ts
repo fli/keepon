@@ -1013,6 +1013,7 @@ export interface SessionSeries {
   color: string | null;
   created_at: Generated<Timestamp>;
   daily_recurrence_interval: Interval | null;
+  description: string | null;
   duration: Interval;
   end_: Timestamp | null;
   event_type: string;
@@ -1174,6 +1175,53 @@ export interface StripeSubscription {
   id: string;
   object: Json;
   updated_at: Generated<Timestamp | null>;
+}
+
+export interface Tax {
+  enabled: boolean;
+  id: string;
+  label: string | null;
+  percent: Numeric | null;
+  trainer_id: string;
+}
+
+export interface TwilioMessage {
+  created_at: Generated<Timestamp>;
+  object: Json;
+  sid: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface WorkflowOutbox {
+  attempts: number;
+  available_at: Generated<Timestamp>;
+  completed_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  dedupe_key: string | null;
+  dispatched_at: Timestamp | null;
+  failed_at: Timestamp | null;
+  id: Generated<string>;
+  last_error: string | null;
+  locked_at: Timestamp | null;
+  locked_by: string | null;
+  max_attempts: number;
+  payload: Json;
+  status: string;
+  task_type: string;
+  updated_at: Generated<Timestamp>;
+  workflow_run_id: string | null;
+}
+
+export interface WorkflowTaskExecution {
+  attempts: number;
+  completed_at: Timestamp | null;
+  last_error: string | null;
+  outbox_id: string;
+  owner_step_id: string;
+  started_at: Generated<Timestamp>;
+  status: string;
+  task_type: string;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface Subscription {
@@ -1868,8 +1916,10 @@ export interface DB {
   survey: Survey;
   tableslist: Tableslist;
   task_queue: TaskQueue;
+  tax: Tax;
   trainer: Trainer;
   trial: Trial;
+  "twilio.message": TwilioMessage;
   user_: User;
   user_type: UserType;
   vw_app_store_latest_receipts: VwAppStoreLatestReceipts;
@@ -1894,4 +1944,6 @@ export interface DB {
   vw_session_reminder_details: VwSessionReminderDetails;
   vw_trialled_didnt_sub_trainers: VwTrialledDidntSubTrainers;
   vw_valid_access_token: VwValidAccessToken;
+  workflow_outbox: WorkflowOutbox;
+  workflow_task_execution: WorkflowTaskExecution;
 }

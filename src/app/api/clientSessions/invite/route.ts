@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z, ZodError } from 'zod'
 import { db } from '@/lib/db'
+import { sql } from 'kysely'
 import type { RawClientSessionRow } from '../../_lib/clientSessionsSchema'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { adaptClientSessionRow, nullableNumber } from '../../_lib/clientSessionsSchema'
@@ -264,8 +265,8 @@ export async function POST(request: NextRequest) {
         .select((eb) => [
           eb.ref('ss.name').as('sessionName'),
           eb.ref('s.start').as('start'),
-          eb(eb.ref('s.start'), '+', eb.ref('s.duration')).as('end'),
-          eb(eb.ref('s.start'), '<=', eb.fn('now')).as('isPastAppointment'),
+          sql<Date>`(${sql.ref('s.start')} + ${sql.ref('s.duration')})`.as('end'),
+          eb(eb.ref('s.start'), '<=', eb.fn<Date>('now')).as('isPastAppointment'),
           eb.ref('ss.location').as('location'),
           eb.ref('ss.price').as('price'),
           eb.ref('s.maximum_attendance').as('maximumAttendance'),

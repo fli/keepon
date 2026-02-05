@@ -1,12 +1,34 @@
-import type { WorkflowTaskPayloadMap } from '@/server/workflow/types'
+import type { Json } from '@/lib/db/generated'
 import { db } from '@/lib/db'
+import type { WorkflowTaskPayloadMap } from '@/server/workflow/types'
 
 export const handleProcessMandrillEventTask = async ({
   ts,
   _id,
   event,
 }: WorkflowTaskPayloadMap['processMandrillEvent']) => {
-  const eventTime = new Date(ts * 1000)
+  const timestamp = Number.parseInt(ts, 10)
+  if (!Number.isFinite(timestamp)) {
+    throw new TypeError(`Invalid Mandrill event timestamp: ${ts}`)
+  }
+  const eventTime = new Date(timestamp * 1000)
+
+  const toRecord = (value: unknown): Record<string, unknown> | null => {
+    if (!value) {
+      return null
+    }
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value)
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : null
+      } catch {
+        return null
+      }
+    }
+    return typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null
+  }
 
   await db
     .updateTable('mandrill.event')
@@ -32,11 +54,10 @@ export const handleProcessMandrillEventTask = async ({
         .executeTakeFirst()
 
       if (row) {
-        const payload =
-          typeof row.object === 'string' ? (JSON.parse(row.object) as Record<string, unknown>) : row.object
-        const ip = typeof payload?.ip === 'string' ? payload.ip : null
-        const userAgent = typeof payload?.user_agent === 'string' ? payload.user_agent : null
-        const location = payload?.location ?? null
+        const payload = toRecord(row.object)
+        const ip = typeof payload?.ip === 'string' ? payload.ip : ''
+        const userAgent = typeof payload?.user_agent === 'string' ? payload.user_agent : ''
+        const location = (payload?.location ?? null) as Json | null
 
         await db
           .insertInto('mail_open')
@@ -62,12 +83,11 @@ export const handleProcessMandrillEventTask = async ({
         .executeTakeFirst()
 
       if (row) {
-        const payload =
-          typeof row.object === 'string' ? (JSON.parse(row.object) as Record<string, unknown>) : row.object
-        const ip = typeof payload?.ip === 'string' ? payload.ip : null
-        const userAgent = typeof payload?.user_agent === 'string' ? payload.user_agent : null
-        const url = typeof payload?.url === 'string' ? payload.url : null
-        const location = payload?.location ?? null
+        const payload = toRecord(row.object)
+        const ip = typeof payload?.ip === 'string' ? payload.ip : ''
+        const userAgent = typeof payload?.user_agent === 'string' ? payload.user_agent : ''
+        const url = typeof payload?.url === 'string' ? payload.url : ''
+        const location = (payload?.location ?? null) as Json | null
 
         await db
           .insertInto('mail_click')
@@ -99,9 +119,11 @@ export const handleProcessMandrillEventTask = async ({
           .executeTakeFirst()
 
         if (row) {
-          const payload =
-            typeof row.object === 'string' ? (JSON.parse(row.object) as Record<string, unknown>) : row.object
-          const msg = typeof payload?.msg === 'object' && payload.msg ? (payload.msg as Record<string, unknown>) : null
+          const payload = toRecord(row.object)
+          const msg =
+            payload && typeof payload.msg === 'object' && payload.msg && !Array.isArray(payload.msg)
+              ? (payload.msg as Record<string, unknown>)
+              : null
           const diagnosis = typeof msg?.diag === 'string' ? msg.diag : null
           const description = typeof msg?.bounce_description === 'string' ? msg.bounce_description : null
 

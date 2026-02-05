@@ -206,7 +206,9 @@ export const fetchSaleProducts = async (
     .selectFrom('payment_credit_pack as paymentCreditPack')
     .select((eb) => [
       eb.ref('paymentCreditPack.sale_credit_pack_id').as('saleCreditPackId'),
-      eb.cast<number>(eb.fn.coalesce(eb.fn.sum('paymentCreditPack.credits_used'), 0), 'int4').as('creditsUsed'),
+      eb
+        .fn<number>('coalesce', [eb.fn<number>('sum', [eb.ref('paymentCreditPack.credits_used')]), eb.val(0)])
+        .as('creditsUsed'),
     ])
     .groupBy('paymentCreditPack.sale_credit_pack_id')
     .as('creditUsage')

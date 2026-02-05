@@ -108,7 +108,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         .selectFrom('payment_plan as plan')
         .select((eb) => [
           eb.ref('plan.status').as('status'),
-          eb(eb.ref('plan.end_'), '<', eb.fn('now')).as('isPastEnd'),
+          eb(eb.ref('plan.end_'), '<', eb.fn<Date>('now')).as('isPastEnd'),
         ])
         .where('plan.id', '=', planId)
         .where('plan.client_id', '=', clientId)

@@ -220,7 +220,7 @@ export async function POST(request: Request) {
           'bookingPaymentType  should be "hidePrice" or  should be "noPrepayment" or  should be "fullPrepayment" or  should be null'
         )
       }
-      bookingPaymentType = value
+      bookingPaymentType = value as 'hidePrice' | 'noPrepayment' | 'fullPrepayment'
     } else {
       return invalidParametersResponse('bookingPaymentType  should be string or  should be null')
     }

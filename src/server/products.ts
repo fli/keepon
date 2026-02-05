@@ -69,11 +69,11 @@ export const productListSchema = z.array(productSchema)
 export type ProductList = z.infer<typeof productListSchema>
 export type Product = z.infer<typeof productSchema>
 
-const combinedUpdatedAt = (eb: ExpressionBuilder<Database, 'product' | 'credit_pack' | 'service'>) =>
+const combinedUpdatedAt = (eb: ExpressionBuilder<Database, any>) =>
   eb.fn('greatest', [
     eb.ref('product.updated_at'),
     eb.fn('coalesce', [eb.ref('service.updated_at'), eb.ref('product.updated_at')]),
-    eb.fn('coalesce', [eb.ref('creditPack.updated_at'), eb.ref('product.updated_at')]),
+    eb.fn('coalesce', [eb.ref('creditPack.updated_at' as any), eb.ref('product.updated_at')]),
   ])
 
 const productTypeSchema = z.enum(['creditPack', 'service', 'item'])

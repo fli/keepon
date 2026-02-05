@@ -116,10 +116,12 @@ export async function changeTrainerPassword(trainerId: string, payload: ChangePa
   const updated = await db
     .updateTable('trainer')
     .set((eb) => ({
-      password_hash: eb.fn('crypt', [eb.val(newPassword), eb.fn('gen_salt', [eb.val('bf'), eb.val(10)])]),
+      password_hash: eb.fn<string>('crypt', [eb.val(newPassword), eb.fn('gen_salt', [eb.val('bf'), eb.val(10)])]),
     }))
     .where('id', '=', trainerId)
-    .where((eb) => eb(eb.ref('password_hash'), '=', eb.fn('crypt', [eb.val(currentPassword), eb.ref('password_hash')])))
+    .where((eb) =>
+      eb(eb.ref('password_hash'), '=', eb.fn<string>('crypt', [eb.val(currentPassword), eb.ref('password_hash')]))
+    )
     .returning('id')
     .executeTakeFirst()
 

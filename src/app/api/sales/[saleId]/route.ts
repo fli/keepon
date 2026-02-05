@@ -142,8 +142,8 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         .leftJoin('payment as payment', 'payment.sale_id', 'sale.id')
         .select((eb) => [
           eb.ref('sale.id').as('id'),
-          eb.fn.coalesce(eb('salePaymentStatus.payment_status', '=', 'paid'), false).as('paidFor'),
-          eb.fn.coalesce(eb.fn.agg('bool_or', [eb.ref('payment.is_stripe')]), false).as('paidByStripe'),
+          eb.fn('coalesce', [eb('salePaymentStatus.payment_status', '=', 'paid'), eb.val(false)]).as('paidFor'),
+          eb.fn('coalesce', [eb.fn.agg('bool_or', [eb.ref('payment.is_stripe')]), eb.val(false)]).as('paidByStripe'),
         ])
         .where('sale.id', '=', saleId)
         .where('sale.trainer_id', '=', auth.trainerId)

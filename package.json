@@ -4,12 +4,15 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "ci:deploy": "bash scripts/ci/deploy.sh",
     "check:workflow-parity": "tsx scripts/check-workflow-parity.ts",
     "codegen": "kysely-codegen",
+    "db:migrate": "dbmate --migrations-dir db/migrations up",
+    "db:migrate:prod": "dbmate --no-dump-schema --migrations-dir db/migrations -e DATABASE_URL_PROD up",
     "dev": "next dev --turbo -p 3001",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
-    "lint": "oxlint --type-aware .",
+    "lint": "oxlint --type-aware --type-check .",
     "start": "next start -p 3001",
     "sync:reference-data": "tsx scripts/sync-reference-data.ts"
   },
@@ -20,7 +23,7 @@
     "@orpc/client": "1.13.4",
     "@orpc/server": "1.13.4",
     "@orpc/tanstack-query": "1.13.4",
-    "@parse/node-apn": "^6.0.0",
+    "@parse/node-apn": "^7.1.0",
     "@stripe/react-stripe-js": "^5.6.0",
     "@stripe/stripe-js": "^8.7.0",
     "@workflow/world-postgres": "4.1.0-beta.30",
@@ -49,11 +52,12 @@
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "25.2.0",
     "@types/pg": "^8.16.0",
-    "@types/react": "^19.2.10",
-    "@typescript/native-preview": "^7.0.0-dev.20260203.1",
+    "@types/react": "^19.2.11",
+    "@typescript/native-preview": "7.0.0-dev.20260204.1",
     "babel-loader": "^10.0.0",
-    "babel-plugin-react-compiler": "0.0.0-experimental-1d44f36-20260128",
-    "eslint-plugin-react-hooks": "0.0.0-experimental-87ae75b3-20260128",
+    "babel-plugin-react-compiler": "experimental",
+    "dbmate": "^2.29.5",
+    "eslint-plugin-react-hooks": "experimental",
     "kysely-codegen": "^0.19.0",
     "oxfmt": "^0.28.0",
     "oxlint": "^1.43.0",
@@ -61,7 +65,8 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.21.0",
-    "tw-animate-css": "^1.4.0"
+    "tw-animate-css": "^1.4.0",
+    "vercel": "^50.11.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

@@ -5,6 +5,7 @@ import { validate as validateUuid } from 'uuid'
 import { z } from 'zod'
 import type { Database } from '@/lib/db'
 import { db } from '@/lib/db'
+import { sql } from 'kysely'
 import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 import { buildErrorResponse } from '../../_lib/accessToken'
 import { nullableNumber } from '../../_lib/clientSessionsSchema'
@@ -554,7 +555,7 @@ export async function GET(request: NextRequest, context: HandlerContext) {
           eb.ref('session_series.name').as('sessionSeriesName'),
           eb.ref('session_series.location').as('location'),
           eb.ref('session.start').as('start'),
-          eb(eb.ref('session.start'), '+', eb.ref('session.duration')).as('end'),
+          sql<Date>`(${sql.ref('session.start')} + ${sql.ref('session.duration')})`.as('end'),
           eb.ref('trainer.timezone').as('timezone'),
           eb.ref('trainer.locale').as('locale'),
           eb.ref('session.maximum_attendance').as('maximumAttendance'),

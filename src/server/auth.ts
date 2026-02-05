@@ -30,7 +30,7 @@ async function loginWithPassword(body: z.infer<typeof passwordLoginSchema>): Pro
         eb(
           eb.ref('trainer.password_hash'),
           '=',
-          eb.fn('crypt', [eb.val(body.password), eb.ref('trainer.password_hash')])
+          eb.fn<string>('crypt', [eb.val(body.password), eb.ref('trainer.password_hash')])
         ).as('passwordMatch'),
       ])
       .where('trainer.email', '=', body.email)

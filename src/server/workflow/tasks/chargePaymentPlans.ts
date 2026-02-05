@@ -51,7 +51,7 @@ export const handleChargePaymentPlansTask = async ({ scheduledAt }: WorkflowTask
       .innerJoin('payment_plan', 'payment_plan_payment.payment_plan_id', 'payment_plan.id')
       .select('payment_plan_payment.payment_plan_id as paymentPlanId')
       .where('payment_plan_payment.date', '<=', now)
-      .where('payment_plan_payment.amount_outstanding', '>', 0)
+      .where('payment_plan_payment.amount_outstanding', '>', '0')
       .where((eb) =>
         eb.or([
           eb.and([
@@ -102,7 +102,7 @@ export const handleChargePaymentPlansTask = async ({ scheduledAt }: WorkflowTask
             ])
             .where('payment_plan.id', '=', paymentPlanId)
             .where('payment_plan_payment.date', '<=', now)
-            .where('payment_plan_payment.amount_outstanding', '>', 0)
+            .where('payment_plan_payment.amount_outstanding', '>', '0')
             .where((eb) =>
               eb.or([
                 eb.and([

@@ -440,7 +440,7 @@ export async function DELETE(request: NextRequest, context: HandlerContext) {
         .leftJoin('sale_payment_status as salePaymentStatus', 'salePaymentStatus.sale_id', 'sale.id')
         .select((eb) => [
           eb.ref('sale.id').as('saleId'),
-          eb.fn.coalesce(eb('salePaymentStatus.payment_status', '=', 'paid'), false).as('paid'),
+          eb.fn('coalesce', [eb('salePaymentStatus.payment_status', '=', 'paid'), eb.val(false)]).as('paid'),
         ])
         .where('saleProduct.id', '=', saleProductId)
         .where('saleProduct.trainer_id', '=', authorization.trainerId)

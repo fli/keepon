@@ -1,4 +1,5 @@
 import type { Kysely, Transaction, Insertable } from 'kysely'
+import { sql } from 'kysely'
 import type { IPostgresInterval } from 'postgres-interval'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -385,12 +386,12 @@ const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) 
           eb(
             eb.val(bookingTime),
             '>=',
-            eb(eb.fn('now'), '+', eb.ref('trainer.online_bookings_duration_until_booking_window_opens'))
+            sql<Date>`now() + ${sql.ref('trainer.online_bookings_duration_until_booking_window_opens')}`
           ).as('afterWindowOpens'),
           eb(
             eb.val(bookingTime),
             '<',
-            eb(eb.fn('now'), '+', eb.ref('trainer.online_bookings_duration_until_booking_window_closes'))
+            sql<Date>`now() + ${sql.ref('trainer.online_bookings_duration_until_booking_window_closes')}`
           ).as('beforeWindowCloses'),
           eb.ref('service.bookable_online').as('bookableOnline'),
           eb.ref('trainer.online_bookings_enabled').as('onlineBookingsEnabled'),
@@ -411,7 +412,7 @@ const handleServiceBooking = async (data: z.infer<typeof serviceBookingSchema>) 
           eb.ref('product.price').as('bookingPrice'),
           eb.ref('service.duration').as('serviceDuration'),
           eb.val(bookingTime).as('bookingStartsAt'),
-          eb(eb.val(bookingTime), '+', eb.ref('service.duration')).as('bookingEndsAt'),
+          sql<Date>`${bookingTime} + ${sql.ref('service.duration')}`.as('bookingEndsAt'),
           eb.ref('service.location').as('bookingLocation'),
           eb.ref('service.address').as('bookingAddress'),
           eb.ref('service.google_place_id').as('bookingGooglePlaceId'),
@@ -686,7 +687,7 @@ const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) 
           eb.ref('trainer.user_id').as('userId'),
           eb.ref('trainer.locale').as('locale'),
           eb.ref('session.start').as('bookingStartsAt'),
-          eb(eb.ref('session.start'), '+', eb.ref('session.duration')).as('bookingEndsAt'),
+          sql<Date>`(${sql.ref('session.start')} + ${sql.ref('session.duration')})`.as('bookingEndsAt'),
           eb.ref('session.duration').as('serviceDuration'),
           eb.ref('session.booking_payment_type').as('bookingPaymentType'),
           eb.ref('session.request_client_address_online').as('bookingRequestClientAddressOnline'),
@@ -702,8 +703,8 @@ const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) 
           eb.ref('session_series.description').as('serviceDescription'),
           eb.ref('session_series.timezone').as('timezone'),
           eb.ref('session.maximum_attendance').as('maximumAttendance'),
-          eb.fn
-            .coalesce(
+          eb
+            .fn('coalesce', [
               eb(
                 eb.ref('session.maximum_attendance'),
                 '-',
@@ -713,18 +714,18 @@ const handleSessionBooking = async (data: z.infer<typeof sessionBookingSchema>) 
                   .whereRef('client_session.session_id', '=', 'session.id')
                   .where('client_session.state', 'in', ['accepted', 'confirmed'])
               ),
-              1
-            )
+              eb.val(1),
+            ])
             .as('availableSpots'),
           eb(
             eb.ref('session.start'),
             '>=',
-            eb(eb.fn('now'), '+', eb.ref('trainer.online_bookings_duration_until_booking_window_opens'))
+            sql<Date>`now() + ${sql.ref('trainer.online_bookings_duration_until_booking_window_opens')}`
           ).as('afterWindowOpens'),
           eb(
             eb.ref('session.start'),
             '<',
-            eb(eb.fn('now'), '+', eb.ref('trainer.online_bookings_duration_until_booking_window_closes'))
+            sql<Date>`now() + ${sql.ref('trainer.online_bookings_duration_until_booking_window_closes')}`
           ).as('beforeWindowCloses'),
           eb.ref('session_series.price').as('bookingPrice'),
           eb.ref('currency.alpha_code').as('currency'),

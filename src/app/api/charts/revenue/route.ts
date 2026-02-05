@@ -288,7 +288,7 @@ export async function GET(request: Request) {
       .selectFrom('finance_item')
       .select((eb) => [eb.ref('start_date').as('date'), eb.ref('amount').as('amount')])
       .where('trainer_id', '=', authorization.trainerId)
-      .where('amount', '>', 0)
+      .where('amount', '>', '0')
       .where('start_date', '>=', startDate)
       .where('start_date', '<', endDate)
       .execute()

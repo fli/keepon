@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer'
-import type { WorkflowTaskPayloadMap } from '@/server/workflow/types'
+import type { Json } from '@/lib/db'
 import { db } from '@/lib/db'
+import type { WorkflowTaskPayloadMap } from '@/server/workflow/types'
 import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 
 const buildStatusCallbackUrl = () => {
@@ -114,7 +115,7 @@ export const handleSendSmsTask = async ({ id }: WorkflowTaskPayloadMap['sendSms'
   }
 
   const message = (await response.json()) as { sid?: string }
-  const sanitizedMessage = JSON.parse(JSON.stringify(message)) as unknown
+  const sanitizedMessage = JSON.parse(JSON.stringify(message)) as Json
 
   if (message.sid) {
     await db

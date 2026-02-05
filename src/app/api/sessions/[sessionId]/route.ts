@@ -297,7 +297,11 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         }
 
         if (parsedBody.geo !== undefined) {
-          updateData.geo = parsedBody.geo === null ? null : toPoint(parsedBody.geo.lat, parsedBody.geo.lng)
+          if (parsedBody.geo === null || parsedBody.geo.lat === null || parsedBody.geo.lng === null) {
+            updateData.geo = null
+          } else {
+            updateData.geo = toPoint(parsedBody.geo.lat, parsedBody.geo.lng)
+          }
         }
 
         if (parsedBody.googlePlaceId !== undefined) {

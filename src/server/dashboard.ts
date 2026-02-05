@@ -211,10 +211,8 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
   const creditUsageCte = db
     .selectFrom('payment_credit_pack as pcp')
     .select((eb) => [
-      eb.ref('pcp.sale_credit_pack_id'),
-      eb
-        .cast<number>(eb.fn('coalesce', [eb.fn('sum', [eb.ref('pcp.credits_used')]), eb.val(0)]), 'int4')
-        .as('credits_used'),
+      eb.ref('pcp.sale_credit_pack_id').as('sale_credit_pack_id'),
+      eb.fn<number>('coalesce', [eb.fn<number>('sum', [eb.ref('pcp.credits_used')]), eb.val(0)]).as('credits_used'),
     ])
     .groupBy('pcp.sale_credit_pack_id')
 
@@ -318,7 +316,11 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
         .where('sp.trainer_id', '=', trainerId)
         .where('sp.is_credit_pack', '=', true)
         .where((sub) =>
-          sub(sub.ref('scp.total_credits'), '>', sub.fn('coalesce', [sub.ref('cu.credits_used'), sub.val(0)]))
+          sub(
+            sub.ref('scp.total_credits'),
+            '>',
+            sub.fn<number>('coalesce', [sub.ref('cu.credits_used'), sub.val(0)])
+          )
         )
         .select(() => eb.fn.countAll().as('count'))
         .as('activePacks'),

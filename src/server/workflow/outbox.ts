@@ -1,9 +1,10 @@
 import type { Kysely, Transaction } from 'kysely'
 import { after } from 'next/server'
 import type { Database } from '@/lib/db'
-import type { WorkflowTaskPayloadMap, WorkflowTaskType } from './types'
+import type { Json } from '@/lib/db/generated'
 import { dispatchOutboxOnce } from './dispatcher'
-import { DEFAULT_OUTBOX_MAX_ATTEMPTS } from './outbox-shared'
+import { DEFAULT_OUTBOX_MAX_ATTEMPTS, OUTBOX_STATUS } from './outbox-shared'
+import type { WorkflowTaskPayloadMap, WorkflowTaskType } from './types'
 
 type DbExecutor = Kysely<Database> | Transaction<Database>
 
@@ -27,7 +28,7 @@ const shouldScheduleAfterDispatch = () => {
     return false
   }
 
-  const requestContext = globalThis[Symbol.for('@next/request-context')] as
+  const requestContext = (globalThis as Record<symbol, unknown>)[Symbol.for('@next/request-context')] as
     | { get?: () => { waitUntil?: (promise: Promise<unknown>) => void } | undefined }
     | undefined
 
@@ -56,8 +57,10 @@ export const enqueueWorkflowTask = async <TTaskType extends WorkflowTaskType>(
     .insertInto('workflow_outbox')
     .values({
       task_type: taskType,
-      payload,
+      payload: payload as Json,
       dedupe_key: dedupeKey,
+      status: OUTBOX_STATUS.Pending,
+      attempts: 0,
       max_attempts: maxAttempts,
       available_at: availableAt,
     })

@@ -129,7 +129,7 @@ export const handleChargeOutstandingTask = async (
       ])
       .where('paymentPlanPayment.payment_plan_id', '=', payload.paymentPlanId)
       .where('paymentPlanPayment.date', '<=', now)
-      .where('paymentPlanPayment.amount_outstanding', '>', 0)
+      .where('paymentPlanPayment.amount_outstanding', '>', '0')
       .where((eb) =>
         eb.or([
           eb.and([

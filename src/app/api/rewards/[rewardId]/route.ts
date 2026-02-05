@@ -3,6 +3,7 @@ import { addDays } from 'date-fns'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
+import { sql } from 'kysely'
 import { intervalFromDays } from '@/lib/db/values'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
@@ -96,12 +97,12 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
       }
 
       const subscriptionValue = statusRow.subscription
-      const subscriptionStatusValue =
-        subscriptionValue && typeof subscriptionValue === 'object' && 'status' in subscriptionValue
-          ? typeof (subscriptionValue as { status?: unknown }).status === 'string'
-            ? (subscriptionValue as { status?: unknown }).status
-            : null
+      const subscriptionRecord =
+        subscriptionValue && typeof subscriptionValue === 'object' && !Array.isArray(subscriptionValue)
+          ? (subscriptionValue as Record<string, unknown>)
           : null
+      const subscriptionStatusValue =
+        typeof subscriptionRecord?.status === 'string' ? subscriptionRecord.status : null
 
       const parsedStatus = rewardStatusSchema.safeParse({
         type: statusRow.type,
@@ -155,9 +156,9 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
           if (trialRow) {
             await trx
               .updateTable('trial')
-              .set((eb) => ({
-                end_time: eb('end_time', '+', intervalFromDays(effectiveType === '1DayTrial' ? 1 : 2)),
-              }))
+              .set({
+                end_time: sql<Date>`end_time + ${intervalFromDays(effectiveType === '1DayTrial' ? 1 : 2)}`,
+              })
               .where('trial.id', '=', trialRow.id)
               .execute()
           } else {

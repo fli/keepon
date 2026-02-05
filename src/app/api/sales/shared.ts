@@ -149,7 +149,10 @@ const buildSaleProductSummary = () =>
     .select((eb) => [
       eb.ref('saleProduct.sale_id').as('saleId'),
       eb
-        .fn('to_char', [eb.fn.coalesce(eb.fn.sum('saleProduct.price'), 0), eb.val('FM999999999990.00')])
+        .fn('to_char', [
+          eb.fn('coalesce', [eb.fn('sum', [eb.ref('saleProduct.price')]), eb.val(0)]),
+          eb.val('FM999999999990.00'),
+        ])
         .as('totalAmount'),
       eb.fn.max('saleProduct.updated_at').as('latestUpdatedAt'),
     ])
@@ -161,15 +164,25 @@ const buildPaymentSummary = () =>
     .selectFrom('payment as payment')
     .select((eb) => [
       eb.ref('payment.sale_id').as('saleId'),
-      eb.fn('to_char', [eb.fn.coalesce(eb.fn.sum('payment.amount'), 0), eb.val('FM999999999990.00')]).as('totalPaid'),
       eb
         .fn('to_char', [
-          eb.fn.coalesce(
-            eb.fn.sum(
-              eb.case().when('payment.refunded_time', 'is not', null).then(eb.ref('payment.amount')).else(0).end()
-            ),
-            0
-          ),
+          eb.fn('coalesce', [eb.fn('sum', [eb.ref('payment.amount')]), eb.val(0)]),
+          eb.val('FM999999999990.00'),
+        ])
+        .as('totalPaid'),
+      eb
+        .fn('to_char', [
+          eb.fn('coalesce', [
+            eb.fn('sum', [
+              eb
+                .case()
+                .when('payment.refunded_time', 'is not', null)
+                .then(eb.ref('payment.amount'))
+                .else(eb.val(0))
+                .end(),
+            ]),
+            eb.val(0),
+          ]),
           eb.val('FM999999999990.00'),
         ])
         .as('totalRefunded'),

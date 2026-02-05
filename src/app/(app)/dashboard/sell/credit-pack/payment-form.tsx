@@ -128,6 +128,8 @@ export function PaymentForm({ client, pack }: Props) {
       packName,
       packPrice,
       creditsValue,
+      setError,
+      setResult,
       startTransition,
     ]
   )

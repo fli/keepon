@@ -162,7 +162,7 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
       const updatePlanPromise = trx
         .updateTable('payment_plan')
         .set((eb) => ({
-          status: details.status === 'pending' ? 'active' : details.status,
+          status: details.status === 'pending' || !details.status ? 'active' : details.status,
           accepted_amount: eb.ref('amount'),
           accepted_end: eb.ref('end_'),
         }))
@@ -195,24 +195,28 @@ export async function PUT(request: NextRequest, context: HandlerContext) {
         throw new SubscriptionNotFoundError()
       }
 
+      if (planRowSnapshot.amount === null || planRowSnapshot.end_ === null) {
+        throw new Error('Plan snapshot missing amount or end date')
+      }
+
       await trx
         .insertInto('payment_plan_acceptance')
         .values({
           trainer_id: planRowSnapshot.trainer_id,
           payment_plan_id: planRowSnapshot.id,
           date: now,
-          ip_address: ipAddress ?? null,
+          ip_address: ipAddress ?? '',
           amount: planRowSnapshot.amount,
           end_: planRowSnapshot.end_,
         })
         .execute()
 
-      const missionRow = missionResult.rows[0] ?? null
+      const missionRow = missionResult[0] ?? null
 
       if (missionRow) {
         const trainerStatusRow = await trx
           .selectFrom('vw_legacy_trainer')
-          .select((eb) => eb.fn('json_extract_path_text', [eb.ref('subscription'), 'status']).as('status'))
+          .select((eb) => eb.fn('json_extract_path_text', [eb.ref('subscription'), eb.val('status')]).as('status'))
           .where('id', '=', details.trainerId)
           .executeTakeFirst()
 

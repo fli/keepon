@@ -107,8 +107,7 @@ export async function POST(request: Request) {
         days: interval.days,
         hours: interval.hours,
         minutes: interval.minutes,
-        seconds: interval.seconds,
-        milliseconds: interval.milliseconds,
+        seconds: interval.seconds + Math.floor(interval.milliseconds / 1000),
       })
 
       const insertedTrial = await trx

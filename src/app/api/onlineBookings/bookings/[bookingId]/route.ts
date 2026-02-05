@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
+import { sql } from 'kysely'
 import { buildErrorResponse } from '../../../_lib/accessToken'
 
 const paramsSchema = z.object({
@@ -73,7 +74,7 @@ export async function GET(_request: NextRequest, context: HandlerContext) {
         eb.ref('session.geo').as('geo'),
         eb.ref('session.google_place_id').as('googlePlaceId'),
         eb.ref('session.start').as('startTime'),
-        eb(eb.ref('session.start'), '+', eb.ref('session.duration')).as('endTime'),
+        sql<Date>`(${sql.ref('session.start')} + ${sql.ref('session.duration')})`.as('endTime'),
         eb.ref('client_session.price').as('price'),
         eb.ref('session.booking_payment_type').as('bookingPaymentType'),
         eb.ref('currency.alpha_code').as('currency'),

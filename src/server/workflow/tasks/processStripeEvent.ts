@@ -84,10 +84,23 @@ export const handleProcessStripeEventTask = async ({ id }: WorkflowTaskPayloadMa
     return
   }
 
-  const event = row.object as Stripe.Event
+  const event = row.object as unknown as Stripe.Event
   const stripeClient = getStripeClient()
 
-  const saveEventToTable = async (tableName: string) => {
+  type StripeEventIdTableName =
+    | 'stripe_payment_intent'
+    | 'stripe_charge'
+    | 'stripe.customer'
+    | 'stripe.subscription'
+    | 'stripe.payment_method'
+    | 'stripe.payout'
+    | 'stripe.checkout_session'
+    | 'stripe.account'
+    | 'stripe.bank_account'
+    | 'stripe.invoice'
+    | 'stripe_resource'
+
+  const saveEventToTable = async (tableName: StripeEventIdTableName) => {
     const resourceType = baseEventType(event.type)
     const latestCreated = await getLatestEventCreated(resourceType)
     if (latestCreated !== null && event.created < latestCreated) {
@@ -115,7 +128,7 @@ export const handleProcessStripeEventTask = async ({ id }: WorkflowTaskPayloadMa
       .execute()
   }
 
-  const saveConnectedEventToTable = async (tableName: string) => {
+  const saveConnectedEventToTable = async (tableName: 'stripe.payout') => {
     const resourceType = baseEventType(event.type)
     const latestCreated = await getLatestEventCreated(resourceType)
     if (latestCreated !== null && event.created < latestCreated) {

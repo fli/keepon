@@ -196,6 +196,10 @@ export async function GET(_request: Request, context: HandlerContext) {
           .filter(Boolean)
       : []
 
+    if (!row.pageUrlSlug) {
+      throw new Error('Provider is missing page URL slug')
+    }
+
     const response: Provider = providerSchema.parse({
       ...row,
       pageUrl: buildBookingsPageUrl(row.pageUrlSlug),

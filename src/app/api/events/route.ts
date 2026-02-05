@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
+import { sql } from 'kysely'
 import { buildErrorResponse } from '../_lib/accessToken'
 import { parseAmount } from '../paymentPlans/shared'
 
@@ -314,14 +315,14 @@ export async function GET(request: Request) {
         eb(
           's.start',
           '<',
-          eb(eb.fn('now'), '+', eb.ref('trainer.online_bookings_duration_until_booking_window_closes'))
+          sql<Date>`now() + ${sql.ref('trainer.online_bookings_duration_until_booking_window_closes')}`
         )
       )
       .where(({ eb }) =>
         eb(
           's.start',
           '>=',
-          eb(eb.fn('now'), '+', eb.ref('trainer.online_bookings_duration_until_booking_window_opens'))
+          sql<Date>`now() + ${sql.ref('trainer.online_bookings_duration_until_booking_window_opens')}`
         )
       )
       .orderBy('s.start', 'asc')
