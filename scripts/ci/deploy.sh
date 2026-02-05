@@ -78,7 +78,7 @@ if [[ "${SKIP_DEPLOY:-}" != "1" ]]; then
   fi
   require_env VERCEL_TOKEN VERCEL_PROJECT_ID VERCEL_ORG_ID
   log "Deploying to production with prebuilt output."
-  pnpm vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN" --yes
+  pnpm vercel deploy --prebuilt --prod --archive=tgz --token "$VERCEL_TOKEN" --yes
 else
   log "SKIP_DEPLOY=1 set. Skipping deployment."
 fi
