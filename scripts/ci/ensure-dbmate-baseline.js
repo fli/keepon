@@ -27,9 +27,9 @@ const run = async () => {
     await client.query(
       `
       INSERT INTO public.schema_migrations (version)
-      SELECT $1
+      SELECT $1::varchar
       WHERE NOT EXISTS (
-        SELECT 1 FROM public.schema_migrations WHERE version = $1
+        SELECT 1 FROM public.schema_migrations WHERE version = $1::varchar
       );
       `,
       ['20251022061248']
