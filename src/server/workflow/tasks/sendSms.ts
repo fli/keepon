@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer'
 import type { Json } from '@/lib/db'
-import { db } from '@/lib/db'
 import type { WorkflowTaskPayloadMap } from '@/server/workflow/types'
+import { db } from '@/lib/db'
 import { enqueueWorkflowTask } from '@/server/workflow/outbox'
 
 const buildStatusCallbackUrl = () => {

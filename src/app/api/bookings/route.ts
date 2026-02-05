@@ -1,6 +1,6 @@
 import type { Kysely, Transaction, Insertable } from 'kysely'
-import { sql } from 'kysely'
 import type { IPostgresInterval } from 'postgres-interval'
+import { sql } from 'kysely'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import type { Database, Interval } from '@/lib/db'

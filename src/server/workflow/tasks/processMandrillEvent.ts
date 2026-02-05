@@ -1,6 +1,6 @@
 import type { Json } from '@/lib/db/generated'
-import { db } from '@/lib/db'
 import type { WorkflowTaskPayloadMap } from '@/server/workflow/types'
+import { db } from '@/lib/db'
 
 export const handleProcessMandrillEventTask = async ({
   ts,

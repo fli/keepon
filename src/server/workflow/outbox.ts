@@ -2,9 +2,9 @@ import type { Kysely, Transaction } from 'kysely'
 import { after } from 'next/server'
 import type { Database } from '@/lib/db'
 import type { Json } from '@/lib/db/generated'
+import type { WorkflowTaskPayloadMap, WorkflowTaskType } from './types'
 import { dispatchOutboxOnce } from './dispatcher'
 import { DEFAULT_OUTBOX_MAX_ATTEMPTS, OUTBOX_STATUS } from './outbox-shared'
-import type { WorkflowTaskPayloadMap, WorkflowTaskType } from './types'
 
 type DbExecutor = Kysely<Database> | Transaction<Database>
 

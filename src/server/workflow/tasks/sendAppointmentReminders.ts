@@ -399,7 +399,9 @@ export const handleSendAppointmentRemindersTask = async ({
           clients,
         }
       })
-      .filter((row): row is ReminderDetailRow => row !== null && reminderKeys.has(`${row.sessionId}|${row.reminderType}`))
+      .filter(
+        (row): row is ReminderDetailRow => row !== null && reminderKeys.has(`${row.sessionId}|${row.reminderType}`)
+      )
 
     const userNotifyTasks: WorkflowTaskPayloadMap['user.notify'][] = []
     const mail: Array<{

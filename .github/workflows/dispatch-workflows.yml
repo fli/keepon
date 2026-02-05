@@ -2,7 +2,7 @@ name: Dispatch Workflow Outbox
 
 on:
   schedule:
-    - cron: "* * * * *"
+    - cron: '* * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -21,5 +21,5 @@ jobs:
         env:
           WORKFLOW_DISPATCH_URL: ${{ secrets.WORKFLOW_DISPATCH_URL }}
           WORKFLOW_OUTBOX_DISPATCH_SECRET: ${{ secrets.WORKFLOW_OUTBOX_DISPATCH_SECRET }}
-          WORKFLOW_DISPATCH_LIMIT: "50"
+          WORKFLOW_DISPATCH_LIMIT: '50'
         run: bash scripts/ci/dispatch-workflows.sh

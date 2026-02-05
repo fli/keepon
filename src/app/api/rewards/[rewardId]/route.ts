@@ -1,9 +1,9 @@
 import type { NextRequest } from 'next/server'
 import { addDays } from 'date-fns'
+import { sql } from 'kysely'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { sql } from 'kysely'
 import { intervalFromDays } from '@/lib/db/values'
 import { authenticateTrainerRequest, buildErrorResponse } from '../../_lib/accessToken'
 import { parseStrictJsonBody } from '../../_lib/strictJson'
@@ -101,8 +101,7 @@ export async function PATCH(request: NextRequest, context: HandlerContext) {
         subscriptionValue && typeof subscriptionValue === 'object' && !Array.isArray(subscriptionValue)
           ? (subscriptionValue as Record<string, unknown>)
           : null
-      const subscriptionStatusValue =
-        typeof subscriptionRecord?.status === 'string' ? subscriptionRecord.status : null
+      const subscriptionStatusValue = typeof subscriptionRecord?.status === 'string' ? subscriptionRecord.status : null
 
       const parsedStatus = rewardStatusSchema.safeParse({
         type: statusRow.type,

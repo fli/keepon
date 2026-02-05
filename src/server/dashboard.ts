@@ -316,11 +316,7 @@ export async function getDashboardSummary(trainerId: string, userId: string): Pr
         .where('sp.trainer_id', '=', trainerId)
         .where('sp.is_credit_pack', '=', true)
         .where((sub) =>
-          sub(
-            sub.ref('scp.total_credits'),
-            '>',
-            sub.fn<number>('coalesce', [sub.ref('cu.credits_used'), sub.val(0)])
-          )
+          sub(sub.ref('scp.total_credits'), '>', sub.fn<number>('coalesce', [sub.ref('cu.credits_used'), sub.val(0)]))
         )
         .select(() => eb.fn.countAll().as('count'))
         .as('activePacks'),

@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server'
+import { sql } from 'kysely'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { sql } from 'kysely'
 import { buildErrorResponse } from '../../../_lib/accessToken'
 
 const paramsSchema = z.object({

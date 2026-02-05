@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "ci:deploy": "bash scripts/ci/deploy.sh",
     "check:workflow-parity": "tsx scripts/check-workflow-parity.ts",
+    "ci:deploy": "bash scripts/ci/deploy.sh",
     "codegen": "kysely-codegen",
     "db:migrate": "dbmate --migrations-dir db/migrations up",
     "db:migrate:prod": "dbmate --no-dump-schema --migrations-dir db/migrations -e DATABASE_URL_PROD up",
@@ -13,6 +13,8 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint --type-aware --type-check .",
+    "openapi:check": "node scripts/generate-openapi.js --check",
+    "openapi:generate": "node scripts/generate-openapi.js",
     "start": "next start -p 3001",
     "sync:reference-data": "tsx scripts/sync-reference-data.ts"
   },

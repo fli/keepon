@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 type PageContainerProps = HTMLAttributes<HTMLDivElement>
 
 /**
- * Shared wrapper to keep nav and pages aligned.
+ * Shared wrapper to keep content aligned.
  * Full-width with consistent horizontal padding.
  */
 export function PageContainer({ className, ...props }: PageContainerProps) {

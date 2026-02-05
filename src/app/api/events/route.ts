@@ -1,7 +1,7 @@
+import { sql } from 'kysely'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { sql } from 'kysely'
 import { buildErrorResponse } from '../_lib/accessToken'
 import { parseAmount } from '../paymentPlans/shared'
 
