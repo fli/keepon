@@ -1,5 +1,12 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": false
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/workflows/dispatch?limit=50",
+      "schedule": "0 0 * * *"
+    }
+  ]
 }
